@@ -76,9 +76,11 @@ func rolesFor(e *validator.ValidationError, x index) map[string]string {
 		}
 	}
 
-	// "{person}'s {event} date reads …" on a family event (MARR, DIV, …):
-	// the couple is the person, so the page fills in the family's name.
-	if code == "EVENT_DATE_UNPARSEABLE" && roles["person"] == "" && x.isFamily(e.Xref) {
+	// A finding on a family record with no individual for {person} (a
+	// marriage date, a broken NOTE on a FAM, …): the couple is the person,
+	// so the page fills in the family's name. Parent/child findings name
+	// child, father and mother instead.
+	if !isParentChild && roles["person"] == "" && x.isFamily(e.Xref) {
 		roles["person"] = e.Xref
 	}
 

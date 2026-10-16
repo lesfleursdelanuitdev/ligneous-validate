@@ -32,12 +32,16 @@ func TestRoles(t *testing.T) {
 			map[string]string{"person": "@I1@", "target": "@F9@"}},
 		{"orphaned husb", "ORPHANED_HUSB",
 			"0 @F1@ FAM\n1 HUSB @I9@\n",
-			map[string]string{"family": "@F1@", "target": "@I9@"}},
+			map[string]string{"family": "@F1@", "person": "@F1@", "target": "@I9@"}},
 		{"unparseable marriage date", "EVENT_DATE_UNPARSEABLE",
 			"0 @I1@ INDI\n1 NAME A /B/\n1 FAMS @F1@\n" +
 				"0 @I2@ INDI\n1 NAME C /D/\n1 FAMS @F1@\n" +
 				"0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n1 MARR\n2 DATE 20 JUL\n",
 			map[string]string{"family": "@F1@", "person": "@F1@"}},
+		{"orphaned note on a family", "ORPHANED_NOTE",
+			"0 @I1@ INDI\n1 NAME A /B/\n1 FAMS @F1@\n" +
+				"0 @F1@ FAM\n1 HUSB @I1@\n1 NOTE @N9@\n",
+			map[string]string{"family": "@F1@", "person": "@F1@", "target": "@N9@"}},
 		{"death before birth", "DEATH_BEFORE_BIRTH",
 			"0 @I1@ INDI\n1 NAME A /B/\n1 BIRT\n2 DATE 1900\n1 DEAT\n2 DATE 1800\n",
 			map[string]string{"person": "@I1@"}},
