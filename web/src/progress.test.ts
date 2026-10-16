@@ -26,6 +26,11 @@ describe('stage percentages', () => {
     expect(REPAIR_STAGES.map(([s]) => s)).toEqual(['repair', 'parse', 'validate', 'finish']);
   });
 
+  it('each stage starts where the measured (v0.2.1, big-file) weights put it', () => {
+    expect(CHECK_STAGES.map(([s]) => stagePercent(CHECK_STAGES, s))).toEqual([0, 1, 18, 52, 85]);
+    expect(REPAIR_STAGES.map(([s]) => stagePercent(REPAIR_STAGES, s))).toEqual([0, 53, 67, 97]);
+  });
+
   it('an unknown stage never moves the bar', () => {
     expect(stagePercent(CHECK_STAGES, 'nonsense')).toBe(-1);
   });

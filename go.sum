@@ -1,6 +1,6 @@
 github.com/google/uuid v1.6.0 h1:NIvaJDMOsjHA8n1jAhLSgzrAzy1Hgr+hNrb57e+94F0=
 github.com/google/uuid v1.6.0/go.mod h1:TIyPZe4MgqvfeYDBFedMoGGpEw/LqOeaOT+nhxU+yHo=
-github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.2.0 h1:FynjabRMWWo8O5NTaie81X9kRyqnB191844U12AaVNo=
-github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.2.0/go.mod h1:6p1bCGGlJFbZsPyBZG+WHex9xe+a5LH9NBxVRo+Lq68=
+github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.2.1 h1:XBXK2S07uK85XbE+QP7dGYlPYHdXez144VjdQ7H712k=
+github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.2.1/go.mod h1:6p1bCGGlJFbZsPyBZG+WHex9xe+a5LH9NBxVRo+Lq68=
 golang.org/x/text v0.28.0 h1:rhazDwis8INMIwQ4tpjLDzUhx6RlXqZNPEM0huQojng=
 golang.org/x/text v0.28.0/go.mod h1:U8nCwOR8jO/marOQ0QbDiOngZVEBB7MAiitBuMjXiNU=

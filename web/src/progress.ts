@@ -4,25 +4,28 @@
 /** [stage, weight]: the share of the whole job each stage takes, summing to 100. */
 export type StageTable = readonly (readonly [string, number])[];
 
-// Weights from timing each stage of the wasm build in Node
-// (`node scripts/stage-times.mjs check/testdata/royal92.ged`, 0.5 MB, 2026-10-16):
-// decode 3.5%, parse 15.5%, validate 22.6%, summary 51.2%, finish 6.6%.
-// Bigger files spend even more in summary (2.3 MB: 79%, 5.5 MB: 92%), which
-// the library speed-up should bring back down; these round royal92's figures.
+// Weights from timing each stage of the wasm build in Node with library
+// v0.2.1 (`node scripts/stage-times.mjs <file>`, 2026-10-16), as shares of
+// the whole call. Set from the big files, where the bar matters:
+//   indented2.ged  5.5 MB, 7.0 s: decode 0.0, parse 20.1, validate 28.8, summary 26.8, finish 24.3
+//   big.ged       21.0 MB, 8.2 s: decode 0.1, parse 13.5, validate 39.6, summary 41.2, finish 5.5
+// (their mean, with decode kept at 1 so every stage moves the bar). Small
+// files differ a little: royal92 (0.5 MB) 4 / 23 / 37 / 28 / 8.
 export const CHECK_STAGES: StageTable = [
-  ['decode', 2],
-  ['parse', 18],
-  ['validate', 25],
-  ['summary', 50],
-  ['finish', 5],
+  ['decode', 1],
+  ['parse', 17],
+  ['validate', 34],
+  ['summary', 33],
+  ['finish', 15],
 ];
 
-// Repair timed the same way: royal92 repair 57%, parse 16%, validate 26%,
-// finish 1%; 2.3 MB 48/11/38/3; 5.5 MB 50/12/34/3.
+// Repair, timed the same way; every size agrees:
+//   indented2.ged: repair 51.5, parse 12.0, validate 33.6, finish 2.9
+//   big.ged:       repair 55.2, parse 16.7, validate 27.5, finish 0.5
 export const REPAIR_STAGES: StageTable = [
-  ['repair', 50],
+  ['repair', 53],
   ['parse', 14],
-  ['validate', 33],
+  ['validate', 30],
   ['finish', 3],
 ];
 

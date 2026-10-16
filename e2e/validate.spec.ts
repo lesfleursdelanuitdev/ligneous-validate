@@ -499,8 +499,9 @@ test('e2e: 5000 findings', async ({ page }, info) => {
 });
 
 test('e2e: 20 MB file', async ({ page }, info) => {
-  // The check itself takes about two minutes on this shared server.
-  test.setTimeout(300_000);
+  // With library v0.2.1 the check takes about 9.4 s here (it was about 100 s
+  // on v0.2.0): twice that plus a margin for a busy shared server.
+  test.setTimeout(60_000);
   const path = scratch('big.ged');
   const rec = (i: number) =>
     `0 @I${i}@ INDI\n${i % 1000 === 0 ? '' : `1 NAME Person${i} /Family${i % 500}/\n`}1 SEX ${i % 2 ? 'M' : 'F'}\n1 BIRT\n2 DATE ${1 + (i % 28)} MAR ${1700 + (i % 300)}\n2 PLAC Somewhere in the world, Region ${i % 50}\n1 NOTE A note about this person to give the file some weight, number ${i}.\n`;
@@ -524,7 +525,7 @@ test('e2e: 20 MB file', async ({ page }, info) => {
   await expect(page.locator('#status')).toHaveText(/^(Reading your file…|Getting the checker ready…|Checking…)$/);
   let sawChecking = false;
   let focusOk = 0;
-  const deadline = Date.now() + 280_000;
+  const deadline = Date.now() + 40_000;
   while (Date.now() < deadline) {
     const state = await page.evaluate(() => {
       const b = document.getElementById('choose') as HTMLButtonElement;
