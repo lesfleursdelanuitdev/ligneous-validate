@@ -1,0 +1,6 @@
+node_modules/
+web/dist/
+web/src/wasm/ligneous.wasm
+web/public/wasm_exec.js
+test-results/
+playwright-report/
