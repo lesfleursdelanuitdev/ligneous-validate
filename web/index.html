@@ -11,6 +11,7 @@
 <meta name="theme-color" content="#141815" media="(prefers-color-scheme: dark)">
 <link rel="stylesheet" href="/src/styles.css">
 <script type="module" src="/src/main.ts"></script>
+<script nomodule defer src="/nomodule.js"></script>
 </head>
 <body>
 <main>
@@ -31,6 +32,10 @@
   <div class="status-area" role="status" aria-live="polite">
     <p id="status"></p>
     <p id="note" hidden></p>
+  </div>
+  <div class="status-actions">
+    <button type="button" id="stop" class="more" hidden>Stop</button>
+    <button type="button" id="retry" class="more" hidden>Try again</button>
   </div>
 
   <div id="report" class="report"></div>

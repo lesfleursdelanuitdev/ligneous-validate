@@ -85,6 +85,8 @@ button { font: inherit; cursor: pointer; }
 }
 #status.good { text-align: center; font-size: clamp(1.25rem, 4vw, 1.5rem); color: var(--accent); }
 #note { margin: 0.25rem 0 0; color: var(--muted); font-size: 1rem; }
+.status-actions { display: flex; justify-content: center; gap: 0.6rem; margin-top: 0.75rem; }
+.status-actions:not(:has(button:not([hidden]))) { display: none; }
 
 /* ---------------------------------------------------------------- report */
 
@@ -181,6 +183,9 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--tint); pad
 #repair ul { margin: 0.5rem 0; padding-left: 1.25rem; }
 #repair li { padding: 0.15rem 0; overflow-wrap: anywhere; }
 #repair .counts { color: var(--muted); margin: 0.75rem 0 1rem; }
+#repair .repair-row { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem 1rem; }
+#repair .keep { margin: 0; color: var(--muted); font-size: 1rem; }
+#repair .repair-failed { margin: 0; }
 #repair .note55 { color: var(--muted); font-size: 1rem; margin: 0.75rem 0 0; }
 #downloads { margin-top: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.8rem; }
 #downloads .dl-label { margin: 0; color: var(--muted); flex-basis: 100%; }

@@ -2,7 +2,7 @@
 // thread, so the page never freezes. Loading starts as soon as the worker is
 // created.
 
-import type { FromWorker, RepairOut, Result, ToWorker } from './types';
+import type { Counts, FromWorker, RepairOut, Result, ToWorker } from './types';
 
 interface GoRuntime {
   importObject: WebAssembly.Imports;
@@ -11,7 +11,7 @@ interface GoRuntime {
 
 interface Api {
   check(bytes: Uint8Array): string;
-  repair(bytes: Uint8Array): { data: Uint8Array; json: string };
+  repair(bytes: Uint8Array, before?: Counts): { data: Uint8Array; json: string };
 }
 
 interface WorkerScope {
@@ -47,13 +47,17 @@ async function load(): Promise<Api> {
   const go = new scope.Go();
   const instance = await instantiate(go);
   void go.run(instance); // never settles: main() blocks forever
-  for (let i = 0; i < 500 && !scope.ligneousReady; i++) await new Promise(r => setTimeout(r, 10));
+  // Up to 15 s for main() to start, on a slow phone.
+  for (let i = 0; i < 1500 && !scope.ligneousReady; i++) await new Promise(r => setTimeout(r, 10));
   if (!scope.ligneousReady || !scope.ligneous) throw new Error('checker did not start');
   return scope.ligneous;
 }
 
+let loaded = false;
 const ready = load();
-ready.catch((e: unknown) => post({ type: 'error', message: String(e) }));
+ready.then(
+  () => { loaded = true; post({ type: 'ready' }); },
+  (e: unknown) => post({ type: 'error', message: String(e) }));
 
 function failed(message: string): Result {
   return {
@@ -68,6 +72,7 @@ function failed(message: string): Result {
 
 scope.addEventListener('message', async e => {
   const msg = e.data;
+  if (!loaded && msg.type === 'check') post({ type: 'status', text: 'Getting the checker ready…' });
   let api: Api;
   try {
     api = await ready;
@@ -87,7 +92,7 @@ scope.addEventListener('message', async e => {
     post({ type: 'result', result });
   } else if (msg.type === 'repair') {
     try {
-      const out = api.repair(bytes);
+      const out = api.repair(bytes, msg.before);
       const info = JSON.parse(out.json) as RepairOut;
       const data = out.data.slice().buffer; // its own buffer, sized exactly
       post({ type: 'repaired', data, info }, [data]);

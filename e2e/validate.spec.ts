@@ -97,13 +97,13 @@ test('e2e: utf16 and cr-only reports and repair', async ({ page }) => {
   await expect(page.locator('.finding').first()).toBeVisible();
   await expect(page.locator('#repair')).toBeVisible();
   await expect(page.locator('#repair h2')).toHaveText('We can fix 3 format problems automatically');
-  await expect(page.locator('#repair')).toContainText('converted from UTF-16LE to UTF-8');
+  await expect(page.locator('#repair')).toContainText('Converted from UTF-16LE to UTF-8');
   await expect(page.locator('#downloads')).toBeVisible();
 
   await upload(page, 'cr-only.ged');
   await expect(page.locator('#report dd', { hasText: 'cr-only.ged' })).toBeVisible();
   await expect(page.locator('#repair h2')).toHaveText('We can fix 1 format problem automatically');
-  await expect(page.locator('#repair')).toContainText('changed line endings to CRLF');
+  await expect(page.locator('#repair')).toContainText('Changed line endings to CRLF');
   const { bytes } = await save(page, 'Download repaired file');
   const original = (await readFile(fixture('cr-only.ged'))).toString('latin1');
   expect(bytes.toString('latin1')).toBe(original.replace(/\r(?!\n)/g, '\r\n'));
@@ -489,7 +489,7 @@ test('e2e: 5000 findings', async ({ page }, info) => {
 });
 
 test('e2e: 20 MB file', async ({ page }, info) => {
-  // The check itself takes about two minutes on this shared server (see the report).
+  // The check itself takes about two minutes on this shared server.
   test.setTimeout(300_000);
   const path = scratch('big.ged');
   const rec = (i: number) =>
@@ -511,7 +511,7 @@ test('e2e: 20 MB file', async ({ page }, info) => {
   const t0 = Date.now();
   await page.locator('#file').setInputFiles(path);
   // While it is checked the status line says so, and the button can take focus.
-  await expect(page.locator('#status')).toHaveText(/^(Reading your file…|Checking…)$/);
+  await expect(page.locator('#status')).toHaveText(/^(Reading your file…|Getting the checker ready…|Checking…)$/);
   let sawChecking = false;
   let focusOk = 0;
   const deadline = Date.now() + 280_000;
@@ -521,7 +521,7 @@ test('e2e: 20 MB file', async ({ page }, info) => {
       b.focus();
       return { status: document.getElementById('status')!.textContent, focused: document.activeElement === b };
     });
-    if (state.status === 'Checking…' || state.status === 'Reading your file…') {
+    if (state.status === 'Checking…' || state.status === 'Reading your file…' || state.status === 'Getting the checker ready…') {
       if (state.focused) focusOk++;
       if (state.status === 'Checking…') sawChecking = true;
     } else if (state.status && state.status.startsWith('Checked:')) break;
