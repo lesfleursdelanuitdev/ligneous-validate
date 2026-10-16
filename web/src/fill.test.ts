@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { fill, fillLine } from './fill';
+import { fill, fillLine, fillParts, pageText } from './fill';
 import type { Finding } from './types';
+import catalogText from './testdata/catalog.json?raw';
 
 function finding(over: Partial<Finding> = {}): Finding {
   return {
@@ -103,5 +104,50 @@ describe('fillLine', () => {
     expect(fillLine(1204)).toBe('Line 1,204');
     expect(fillLine(7)).toBe('Line 7');
     expect(fillLine(1234567)).toBe('Line 1,234,567');
+  });
+});
+
+describe('fillParts', () => {
+  it('marks the names from the file, so the page can keep translators off them', () => {
+    const f = finding({ roles: { father: '@I2@', child: '@I1@' }, details: { age: '2' } });
+    expect(fillParts('{father} was {age} when {child} was born', f, names)).toEqual([
+      { text: 'John Smith', name: true },
+      { text: ' was 2 when ', name: false },
+      { text: 'Mary Smith', name: true },
+      { text: ' was born', name: false },
+    ]);
+  });
+  it('marks a bare xref as a name, but not "someone"', () => {
+    expect(fillParts('{person} points to {target}', finding({ roles: { target: '@N9@' } }), names)).toEqual([
+      { text: 'Someone points to ', name: false },
+      { text: '@N9@', name: true },
+    ]);
+  });
+  it('joins to what fill() gives', () => {
+    const f = finding({ roles: { person: '@I1@' }, details: { event: 'MARR', date: '20 JUL' } });
+    const t = '{person}’s {event} date reads "{date}". {mother} too.';
+    expect(fillParts(t, f, names).map(p => p.text).join('')).toBe(fill(t, f, names));
+    expect(fill(t, f, names)).toBe('Mary Smith’s marriage date reads "20 JUL". Someone too.');
+  });
+});
+
+describe('pageText', () => {
+  it('says "on this page" where the catalog says the repaired file is "below"', () => {
+    expect(pageText('Download the repaired file below, which is converted to UTF-8. Or, when you export from your program, pick "UTF-8" as the character set.'))
+      .toBe('Download the repaired file on this page, which is converted to UTF-8. Or, when you export from your program, pick "UTF-8" as the character set.');
+    expect(pageText('Download the repaired file below. Its header matches its contents.'))
+      .toBe('Download the repaired file on this page. Its header matches its contents.');
+    expect(pageText('Download the repaired file below, which says UTF-8 in its header.'))
+      .toBe('Download the repaired file on this page, which says UTF-8 in its header.');
+  });
+  it('leaves every other text alone, including other uses of "below"', () => {
+    const t = 'This line is nested two or more levels below the line above it. Programs may attach it to the wrong thing or drop it.';
+    expect(pageText(t)).toBe(t);
+  });
+  it('covers every catalog text that sends the reader to the repaired file', () => {
+    const catalog = JSON.parse(catalogText) as Record<string, string>[];
+    for (const e of catalog) for (const k of ['Title', 'Meaning', 'HowToFix']) {
+      expect(pageText(e[k]), `${e.Code} ${k}`).not.toMatch(/repaired file below/);
+    }
   });
 });
