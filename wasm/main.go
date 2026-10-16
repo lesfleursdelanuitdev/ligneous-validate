@@ -22,6 +22,16 @@ func bytesIn(v js.Value) []byte {
 	return buf
 }
 
+// progressFrom turns an optional JS function argument into a stage callback.
+// The JS side posts each stage to the page while the check is still running.
+func progressFrom(args []js.Value, i int) func(string) {
+	if len(args) <= i || args[i].Type() != js.TypeFunction {
+		return nil
+	}
+	fn := args[i]
+	return func(stage string) { fn.Invoke(stage) }
+}
+
 func checkFn(_ js.Value, args []js.Value) (ret any) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -31,7 +41,8 @@ func checkFn(_ js.Value, args []js.Value) (ret any) {
 	if len(args) < 1 {
 		return errJSON("check needs a Uint8Array")
 	}
-	b, err := json.Marshal(check.Check(bytesIn(args[0])))
+	// An optional second argument is called with each stage name.
+	b, err := json.Marshal(check.CheckWithProgress(bytesIn(args[0]), progressFrom(args, 1)))
 	if err != nil {
 		return errJSON(err.Error())
 	}
@@ -51,13 +62,14 @@ func repairFn(_ js.Value, args []js.Value) (ret any) {
 		return fail("repair needs a Uint8Array")
 	}
 	// An optional second argument {errors, warnings, hints} is the page's own
-	// count for the original, so it isn't checked a second time.
+	// count for the original, so it isn't checked a second time. An optional
+	// third argument is called with each stage name.
 	var out check.RepairOut
 	var err error
 	if len(args) > 1 && args[1].Type() == js.TypeObject {
 		b := args[1]
 		before := check.Counts{Errors: b.Get("errors").Int(), Warnings: b.Get("warnings").Int(), Hints: b.Get("hints").Int()}
-		out, err = check.RepairWithBefore(bytesIn(args[0]), before)
+		out, err = check.RepairWithProgress(bytesIn(args[0]), before, progressFrom(args, 2))
 	} else {
 		out, err = check.Repair(bytesIn(args[0]))
 	}

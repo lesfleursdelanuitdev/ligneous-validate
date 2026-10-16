@@ -49,7 +49,28 @@ type Finding struct {
 }
 
 // Check parses and validates raw bytes. It never panics on bad input.
-func Check(raw []byte) (res Result) {
+func Check(raw []byte) Result { return CheckWithProgress(raw, nil) }
+
+// Stages that CheckWithProgress reports, in order. The page maps them to
+// percentages (web/src/progress.ts).
+const (
+	StageDecode   = "decode"
+	StageParse    = "parse"
+	StageValidate = "validate"
+	StageSummary  = "summary"
+	StageFinish   = "finish"
+)
+
+// CheckWithProgress is Check with progress: progress (which may be nil) is
+// called once at the start of each stage, in order: decode, parse, validate,
+// summary, finish. A file that can't be parsed stops after parse. The result
+// is the same as Check's.
+func CheckWithProgress(raw []byte, progress func(stage string)) (res Result) {
+	step := func(stage string) {
+		if progress != nil {
+			progress(stage)
+		}
+	}
 	res = Result{Findings: []Finding{}, Names: map[string]string{}, Encoding: gedcom.EncodingInfo{}}
 	defer func() {
 		if r := recover(); r != nil {
@@ -60,11 +81,13 @@ func Check(raw []byte) (res Result) {
 	res.BOM = hasBOM(raw)
 	res.BareCR = hasBareCR(raw)
 
+	step(StageDecode)
 	if text, _, _ := parser.Decode(raw); text != nil {
 		res.Text = strings.TrimPrefix(string(text), "\uFEFF")
 	}
 
 	afterParse()
+	step(StageParse)
 	popts := parser.DefaultOptions()
 	popts.Lenient = true
 	doc, perrs, err := parser.ParseWithOptions(bytes.NewReader(raw), popts)
@@ -80,14 +103,17 @@ func Check(raw []byte) (res Result) {
 		len(doc.Repositories) + len(doc.Media) + len(doc.Submitters)
 	res.IsGedcom = err == nil && (hasHead || records > 0)
 
+	step(StageValidate)
 	vopts := validator.DefaultOptions()
 	vopts.DateConsistency = true
 	verrs := validator.ValidateWithOptions(doc, vopts)
 
+	step(StageSummary)
 	ed := enricher.Enrich(doc)
 	res.Names = buildNames(ed)
 	res.Summary = buildSummary(doc, ed)
 
+	step(StageFinish)
 	idx := newIndex(doc)
 	for _, ve := range verrs {
 		f := newFinding(ve.Code, severityName(int(ve.Severity)), ve.Message, ve.Line, ve.Details, ve.AssociatedXrefs, nil)

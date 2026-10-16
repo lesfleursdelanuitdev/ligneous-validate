@@ -55,6 +55,25 @@ func Repair(raw []byte) (RepairOut, error) {
 // counts the findings of the repaired data with one parse and validation,
 // the same findings Check gives, without its names and summary.
 func RepairWithBefore(raw []byte, before Counts) (RepairOut, error) {
+	return RepairWithProgress(raw, before, nil)
+}
+
+// Stages that RepairWithProgress reports, in order.
+const (
+	StageRepair = "repair"
+	// then StageParse and StageValidate (the repaired copy's counts), then StageFinish.
+)
+
+// RepairWithProgress is RepairWithBefore with progress: progress (which may
+// be nil) is called once at the start of each stage, in order: repair, parse,
+// validate, finish. A failed repair stops after repair.
+func RepairWithProgress(raw []byte, before Counts, progress func(stage string)) (RepairOut, error) {
+	step := func(stage string) {
+		if progress != nil {
+			progress(stage)
+		}
+	}
+	step(StageRepair)
 	res, err := repair.Repair(raw)
 	if err != nil {
 		return RepairOut{}, err
@@ -67,13 +86,14 @@ func RepairWithBefore(raw []byte, before Counts) (RepairOut, error) {
 		out.Left = []string{}
 	}
 	out.Before = before
-	out.After = countsOf(res.Data)
+	out.After = countsOf(res.Data, step)
+	step(StageFinish)
 	return out, nil
 }
 
 // countsOf counts what Check would find in data: the parser's findings and
 // the validator's.
-func countsOf(data []byte) Counts {
+func countsOf(data []byte, step func(string)) Counts {
 	var c Counts
 	add := func(sev string) {
 		switch sev {
@@ -85,12 +105,14 @@ func countsOf(data []byte) Counts {
 			c.Hints++
 		}
 	}
+	step(StageParse)
 	popts := parser.DefaultOptions()
 	popts.Lenient = true
 	doc, perrs, _ := parser.ParseWithOptions(bytes.NewReader(data), popts)
 	for _, pe := range perrs {
 		add(pe.Severity)
 	}
+	step(StageValidate)
 	if doc == nil {
 		return c
 	}
