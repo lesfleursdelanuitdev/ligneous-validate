@@ -25,8 +25,10 @@ interface WorkerScope {
 const scope = globalThis as unknown as WorkerScope;
 const wasmUrl = new URL('./wasm/ligneous.wasm', import.meta.url);
 // wasm_exec.js is Go's plain-script loader, served as-is from public/. This
-// is a module worker, where importScripts() throws, so it is imported.
-const execUrl = '/wasm_exec.js';
+// is a module worker, where importScripts() throws, so it is imported. The
+// full URL keeps the Vite dev server from adding "?import" to it, which
+// makes it refuse to serve a public file.
+const execUrl = new URL('/wasm_exec.js', self.location.origin).href;
 
 const post = (msg: FromWorker, transfer: Transferable[] = []) => scope.postMessage(msg, transfer);
 
