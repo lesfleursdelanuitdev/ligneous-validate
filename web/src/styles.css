@@ -121,9 +121,8 @@ button { font: inherit; cursor: pointer; }
 
 /* ---------------------------------------------------------------- site bar */
 
-/* Last in the source (see index.html), first on screen. */
 .site {
-  order: -1; width: 100%; max-width: 1440px; margin: 0 auto;
+  width: 100%; max-width: 1440px; margin: 0 auto;
   padding: 28px var(--gutter);
   display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 16px;
 }

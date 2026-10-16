@@ -228,8 +228,18 @@ test('e2e: keyboard only', async ({ page }) => {
     return { tag: a?.tagName ?? '', text: (a?.textContent ?? '').trim().slice(0, 40), visible: !!a && a.matches(':focus-visible'),
       outline: a ? getComputedStyle(a).outlineStyle : '', width: a ? getComputedStyle(a).outlineWidth : '' };
   });
-  // From the top of the page, Tab reaches "Choose a file" first.
+  // From the top of the page, Tab goes through the two nav links, each with visible focus,
+  // then reaches "Choose a file".
   await page.evaluate(() => (document.activeElement as HTMLElement | null)?.blur());
+  for (const link of ['Back to Ligneous', 'Source code']) {
+    await page.keyboard.press('Tab');
+    const n = await active();
+    expect(n.tag).toBe('A');
+    expect(n.text).toBe(link);
+    expect(n.visible).toBe(true);
+    expect(n.outline).not.toBe('none');
+    expect(parseFloat(n.width)).toBeGreaterThan(0);
+  }
   await page.keyboard.press('Tab');
   let s = await active();
   expect(s.tag).toBe('BUTTON');
