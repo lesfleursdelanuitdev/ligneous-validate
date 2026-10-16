@@ -1,24 +1,24 @@
 // The two report downloads: a plain-text report to read or print, and a CSV
 // to open in a spreadsheet.
 
-import { fill } from './fill';
-import { SEVERITIES, buildGroups, countBySeverity, countLabel, lineLabel, severityWord, summaryRows } from './render';
-import type { Finding, Result, Role } from './types';
+import { fill, pageText } from './fill';
+import { SEVERITIES, buildGroups, countBySeverity, countLabel, groupChanges, lineLabel, severityWord, summaryRows } from './render';
+import type { Finding, RepairOut, Result, Role } from './types';
 
 const ALL = { error: true, warning: true, hint: true };
 const ROLE_ORDER: Role[] = ['person', 'child', 'father', 'mother', 'family', 'target'];
 
 /** The catalog marks GEDCOM examples with backticks; plain text has no use for them. */
 const plain = (s: string): string => s.replace(/`/g, '');
-const say = (template: string, f: Finding, names: Record<string, string>): string => plain(fill(template, f, names));
+const say = (template: string, f: Finding, names: Record<string, string>): string => plain(fill(pageText(template), f, names));
 
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
 
-/** The report as plain text; `now` is only for tests. */
-export function reportText(file: string, r: Result, now: Date = new Date()): string {
+/** The report as plain text, with the repaired copy's changes when there is one; `now` is only for tests. */
+export function reportText(file: string, r: Result, now: Date = new Date(), repair: RepairOut | null = null): string {
   const out: string[] = [
     `Check report for ${file}`,
-    `Checked on ${isoDate(now)} at ligneous.org (your file was not uploaded)`,
+    `Checked on ${isoDate(now)} at validate.ligneous.org`,
     '',
   ];
   for (const [label, value] of summaryRows(r, file)) {
@@ -39,6 +39,10 @@ export function reportText(file: string, r: Result, now: Date = new Date()): str
       if (f.meaning) out.push(`  ${say(f.meaning, f, r.names)}`);
       if (f.howToFix) out.push(`  How to fix it: ${say(f.howToFix, f, r.names)}`);
     });
+  }
+  if (repair && !repair.error && repair.changes.length) {
+    out.push('', 'REPAIRED COPY', '');
+    for (const c of groupChanges(repair.changes)) out.push(plain(c));
   }
   return out.join('\n') + '\n';
 }

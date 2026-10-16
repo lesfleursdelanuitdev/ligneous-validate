@@ -40,7 +40,7 @@ describe('reportText', () => {
     const now = new Date('2026-10-16T09:30:00Z');
     expect(reportText('Family Tree.ged', two, now)).toBe(
 `Check report for Family Tree.ged
-Checked on 2026-10-16 at ligneous.org (your file was not uploaded)
+Checked on 2026-10-16 at validate.ligneous.org
 
 People: 2,322
 Families: 800
@@ -144,5 +144,23 @@ describe('CSV formula injection', () => {
   it('does not change the text report', () => {
     const r = result([finding({ title: '{person}', roles: { person: '@I2@' } })], { names: { '@I2@': '+cmd' } });
     expect(reportText('a.ged', r, new Date('2026-01-02T00:00:00Z'))).toContain('Line 1: +cmd');
+  });
+});
+
+describe('reportText with a repaired copy', () => {
+  it('lists the changes grouped, as on the page', () => {
+    const now = new Date('2026-10-16T09:30:00Z');
+    const changes = [{ line: 0, what: 'changed line endings to CRLF' },
+      ...Array.from({ length: 7 }, (_, i) => ({ line: i + 2, what: 'removed spaces before the level number' }))];
+    const text = reportText('t.ged', two, now, { changes, left: [], before: { errors: 1, warnings: 1, hints: 0 }, after: { errors: 1, warnings: 0, hints: 0 } });
+    expect(text).toContain(`REPAIRED COPY
+
+Changed line endings to CRLF
+Removed spaces before the level number: 7 lines (2, 3, 4, 5, 6, …)
+`);
+  });
+  it('says "on this page" for the repaired file', () => {
+    const r = result([finding({ code: 'ENCODING_UNDECLARED', group: 'format', howToFix: 'Download the repaired file below, which says UTF-8 in its header.' })]);
+    expect(reportText('t.ged', r)).toContain('How to fix it: Download the repaired file on this page, which says UTF-8 in its header.');
   });
 });

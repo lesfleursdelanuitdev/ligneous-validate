@@ -1,9 +1,11 @@
 import { describe, expect, it } from 'vitest';
+import catalogText from './testdata/catalog.json?raw';
 import {
-  GROUPS, PAGE_SIZE, buildGroups, countBySeverity, doneText, lineLabel, lineViewerAttrs, lineWindow, noProblemsText,
-  codeParts, repairView, severityWord, summaryRows, viewKind, visibleSlice,
+  FAILED, GROUPS, KEEP_ORIGINAL, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
+  lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, repairView, severityWord, sizeNote,
+  summaryRows, viewKind, visibleSlice,
 } from './render';
-import type { Finding, Result, Severity } from './types';
+import type { Finding, Group, Result, Severity } from './types';
 
 let n = 0;
 function f(group: Finding['group'], severity: Severity, line = ++n): Finding {
@@ -97,8 +99,9 @@ describe('viewKind', () => {
   it('is not-gedcom when isGedcom is false, even with findings', () => {
     expect(viewKind(result({ isGedcom: false, findings: [f('format', 'error')] }))).toBe('not-gedcom');
   });
-  it('is not-gedcom when the checker failed', () => {
-    expect(viewKind(result({ error: 'boom' }))).toBe('not-gedcom');
+  it('is failed when the checker failed, whatever isGedcom says', () => {
+    expect(viewKind(result({ error: 'boom' }))).toBe('failed');
+    expect(viewKind(result({ error: 'boom', isGedcom: false }))).toBe('failed');
   });
   it('is clean with no findings', () => {
     expect(viewKind(result())).toBe('clean');
@@ -169,6 +172,12 @@ describe('summaryRows', () => {
 });
 
 describe('doneText', () => {
+  it('gives the checker-failed message, not the not-GEDCOM one', () => {
+    expect(doneText(result({ error: 'out of memory', isGedcom: false }))).toBe(
+      'The checker ran into a problem with this file and had to stop. Your file has not been changed. ' +
+      'If it is very large, try exporting a smaller part of your tree.');
+    expect(FAILED).toBe(doneText(result({ error: 'x' })));
+  });
   it('gives the not-GEDCOM message', () => {
     expect(doneText(result({ isGedcom: false }))).toBe(
       'This doesn\'t look like a GEDCOM file. GEDCOM files usually end in .ged and start with "0 HEAD".');
@@ -204,16 +213,18 @@ describe('repairView', () => {
   });
 
   it('uses the singular heading for one change and the plural for more', () => {
-    expect(repairView(info([{ line: 0, what: 'a' }]), result())!.heading).toBe('We can fix 1 format problem automatically');
-    expect(repairView(info([{ line: 0, what: 'a' }, { line: 4, what: 'b' }]), result())!.heading)
+    // A file with a warning: with no findings at all it is an "Optional tidy-up" (tested below).
+    const withWarning = result({ findings: [f('format', 'warning')] });
+    expect(repairView(info([{ line: 0, what: 'a' }]), withWarning)!.heading).toBe('We can fix 1 format problem automatically');
+    expect(repairView(info([{ line: 0, what: 'a' }, { line: 4, what: 'b' }]), withWarning)!.heading)
       .toBe('We can fix 2 format problems automatically');
-    expect(repairView(info(Array.from({ length: 1500 }, () => ({ line: 1, what: 'x' }))), result())!.heading)
+    expect(repairView(info(Array.from({ length: 1500 }, () => ({ line: 1, what: 'x' }))), withWarning)!.heading)
       .toBe('We can fix 1,500 format problems automatically');
   });
 
-  it('lists "Line N: what", and just "what" for line 0', () => {
-    const v = repairView(info([{ line: 1204, what: 'Fixed a thing' }, { line: 0, what: 'Added a trailer' }]), result())!;
-    expect(v.changes).toEqual(['Line 1,204: Fixed a thing', 'Added a trailer']);
+  it('lists the changes grouped by what was done, with line counts', () => {
+    const v = repairView(info([{ line: 0, what: 'added a trailer' }, { line: 1204, what: 'fixed a thing' }]), result())!;
+    expect(v.changes).toEqual(['Added a trailer', 'Fixed a thing: 1 line (1,204)']);
   });
 
   it('gives the counts before and after', () => {
@@ -258,7 +269,148 @@ describe('catalog backticks in the repair view', () => {
     const info = { changes: [{ line: 3, what: 'added `0 TRLR`' }], left: ['X'], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 } };
     const x = { ...f('format', 'warning', 2), code: 'X', title: 'Missing `0 TRLR`' };
     const v = repairView(info, result({ findings: [x] }))!;
-    expect(v.changes).toEqual(['Line 3: added `0 TRLR`']);
+    expect(v.changes).toEqual(['Added `0 TRLR`: 1 line (3)']);
     expect(v.left[0].title).toBe('Missing `0 TRLR`');
+  });
+});
+
+describe('groupChanges', () => {
+  it('groups by what, with a count and up to five example lines', () => {
+    const changes = [
+      { line: 0, what: 'changed line endings to CRLF' },
+      ...Array.from({ length: 120_007 }, (_, i) => ({ line: i + 2, what: 'removed spaces before the level number' })),
+      { line: 7, what: 'removed a blank line' },
+      { line: 9, what: 'removed a blank line' },
+    ];
+    expect(groupChanges(changes)).toEqual([
+      'Changed line endings to CRLF',
+      'Removed spaces before the level number: 120,007 lines (2, 3, 4, 5, 6, …)',
+      'Removed a blank line: 2 lines (7, 9)',
+    ]);
+  });
+  it('shows exactly five examples without "…" for five lines', () => {
+    const changes = [3, 4, 5, 6, 1_204].map(line => ({ line, what: 'x' }));
+    expect(groupChanges(changes)).toEqual(['X: 5 lines (3, 4, 5, 6, 1,204)']);
+  });
+  it('copes with 280,000 changes quickly', () => {
+    const changes = Array.from({ length: 280_000 }, (_, i) => ({ line: i + 1, what: i % 2 ? 'a' : 'b' }));
+    const t = performance.now();
+    expect(groupChanges(changes)).toEqual(['B: 140,000 lines (1, 3, 5, 7, 9, …)', 'A: 140,000 lines (2, 4, 6, 8, 10, …)']);
+    expect(performance.now() - t).toBeLessThan(1000);
+  });
+});
+
+describe('repairView headings and notes', () => {
+  const one = { changes: [{ line: 0, what: 'removed the byte order mark' }], left: [], before: { errors: 0, warnings: 0, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 } };
+  it('calls it an optional tidy-up for a file with no findings', () => {
+    expect(repairView(one, result())!.heading).toBe('Optional tidy-up');
+  });
+  it('calls it an optional tidy-up when there are only hints', () => {
+    expect(repairView(one, result({ findings: [f('names', 'hint'), f('dates', 'hint')] }))!.heading).toBe('Optional tidy-up');
+  });
+  it('keeps "We can fix" when there is a warning or an error', () => {
+    expect(repairView(one, result({ findings: [f('names', 'hint'), f('format', 'warning')] }))!.heading)
+      .toBe('We can fix 1 format problem automatically');
+  });
+  it('has the strings the slot shows', () => {
+    expect(REPAIR_FAILED).toBe("We couldn't make a repaired copy of this file.");
+    expect(KEEP_ORIGINAL).toBe('Keep your original file. This is a new copy.');
+  });
+});
+
+describe('sizeNote', () => {
+  const MB = 1024 * 1024;
+  it('says nothing under 2 MB', () => {
+    expect(sizeNote(2 * MB - 1)).toBe('');
+  });
+  it('says up to a minute from 2 to 10 MB', () => {
+    const t = 'This is a large file, so checking may take up to a minute. You can use other tabs meanwhile.';
+    expect(sizeNote(2 * MB)).toBe(t);
+    expect(sizeNote(10 * MB)).toBe(t);
+  });
+  it('says a few minutes above 10 MB', () => {
+    expect(sizeNote(10 * MB + 1)).toBe('This is a large file, so checking may take a few minutes. You can use other tabs meanwhile.');
+    expect(sizeNote(200 * MB)).toBe('This is a large file, so checking may take a few minutes. You can use other tabs meanwhile.');
+  });
+});
+
+describe('repairPlan', () => {
+  const MB = 1024 * 1024;
+  const clean = (over: Partial<Result> = {}) => result({ bom: false, bareCR: false, ...over });
+  it('skips a file with no format findings that is UTF-8 or ASCII with no BOM and no bare CR', () => {
+    expect(repairPlan(clean({ findings: [f('dates', 'error')] }), 1000)).toBe('skip');
+    expect(repairPlan(clean({ encoding: { detected: 'ASCII', declared: 'ASCII', reason: '' } }), 1000)).toBe('skip');
+    expect(repairPlan(clean(), 50 * MB)).toBe('skip');
+  });
+  it('repairs a small file that has something to fix', () => {
+    expect(repairPlan(clean({ findings: [f('format', 'warning')] }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ findings: [f('', 'warning')] }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ bom: true }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ bareCR: true }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ encoding: { detected: 'ANSEL', declared: 'ANSEL', reason: '' } }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ findings: [f('format', 'warning')] }), 5 * MB)).toBe('auto');
+  });
+  it('only offers the repair above 5 MB', () => {
+    expect(repairPlan(clean({ findings: [f('format', 'warning')] }), 5 * MB + 1)).toBe('offer');
+  });
+  it('never repairs a file that is not GEDCOM or that the checker failed on', () => {
+    expect(repairPlan(clean({ isGedcom: false, bom: true }), 10)).toBe('skip');
+    expect(repairPlan(clean({ error: 'x', bom: true }), 10)).toBe('skip');
+  });
+});
+
+// Every title in the library's catalog (web/src/testdata/catalog.json, kept in
+// step by check/catalog_fixture_test.go).
+interface Entry { Code: string; Group: Group; Title: string }
+const catalog = JSON.parse(catalogText) as Entry[];
+
+describe('leftItems: what the repair leaves, without anyone\'s name', () => {
+  const hit = (e: Entry, roles: Finding['roles'] = { person: '@I1@', child: '@I2@', father: '@I3@', mother: '@I4@', family: '@F1@', target: '@X9@' }): Finding =>
+    ({ code: e.Code, severity: 'warning', group: e.Group, title: e.Title, meaning: '', howToFix: '', line: 3,
+       details: { age: '13', count: '2', encoding: 'ANSEL', declared: 'ANSI', tag: '_X', pointer_tag: 'NOTE' }, xrefs: [], roles });
+  const names = { '@I1@': 'Mary Smith', '@I2@': 'Kid Smith', '@I3@': 'John Smith', '@I4@': 'Ann Lee', '@F1@': 'John Smith & Ann Lee' };
+
+  it('reads well for every catalog title', () => {
+    expect(catalog.length).toBeGreaterThan(40);
+    for (const e of catalog) {
+      const items = leftItems([e.Code], result({ findings: [hit(e), hit(e)], names }));
+      expect(items).toHaveLength(1);
+      const text = items[0].title;
+      // No braces, no names, no details, no dangling words, a capital first letter.
+      expect(text, e.Code).not.toMatch(/[{}]/);
+      expect(text, e.Code).not.toMatch(/Smith|Lee|@I|@F|@X|ANSEL|ANSI|\b13\b/);
+      expect(text, e.Code).not.toMatch(/ (at|to|was|of|from|in|it's)$/);
+      expect(text, e.Code).not.toMatch(/ ,|\( ?\)|  /);
+      expect(text[0], e.Code).toBe(text[0].toUpperCase());
+      expect(items[0].count).toBe(2);
+    }
+  });
+
+  it('uses generic words for roles', () => {
+    const by = (code: string) => catalog.find(e => e.Code === code)!;
+    const one = (code: string) => leftItems([code], result({ findings: [hit(by(code))], names }))[0];
+    expect(one('DEATH_BEFORE_BIRTH')).toEqual({ title: 'Someone died before they were born', count: 1 });
+    expect(one('CHILD_BORN_BEFORE_FATHER')).toEqual({ title: 'A child was born before their father', count: 1 });
+    expect(one('ENCODING_NOT_UTF8')).toEqual({ title: 'This file uses an older character encoding', count: 1 });
+  });
+
+  it('falls back to the group heading when a detail is part of the sentence, and adds those up', () => {
+    const by = (code: string) => catalog.find(e => e.Code === code)!;
+    const r = result({ findings: [hit(by('MARRIED_BELOW_MINIMUM_AGE')), hit(by('AGE_AT_DEATH_EXCEEDS_120')), hit(by('AGE_AT_DEATH_EXCEEDS_120'))], names });
+    expect(leftItems(['AGE_AT_DEATH_EXCEEDS_120', 'MARRIED_BELOW_MINIMUM_AGE'], r))
+      .toEqual([{ title: "Dates that don't add up", count: 3, heading: true }]);
+  });
+
+  it('adds up codes that read the same', () => {
+    const r = result({ findings: [hit(catalog.find(e => e.Code === 'LINE_TOO_LONG')!), hit(catalog.find(e => e.Code === 'LINE_EXCEEDS_MAX_PHYSICAL_LENGTH')!)] });
+    expect(leftItems(['LINE_EXCEEDS_MAX_PHYSICAL_LENGTH', 'LINE_TOO_LONG'], r))
+      .toEqual([{ title: 'A line is longer than GEDCOM allows', count: 2 }]);
+  });
+
+  it('is what repairView lists', () => {
+    const e = catalog.find(x => x.Code === 'DEATH_BEFORE_BIRTH')!;
+    const info = { changes: [{ line: 1, what: 'a' }], left: [e.Code], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 1, hints: 0 } };
+    expect(repairView(info, result({ findings: [hit(e)], names }))!.left)
+      .toEqual([{ title: 'Someone died before they were born', count: 1 }]);
   });
 });

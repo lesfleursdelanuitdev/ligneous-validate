@@ -1,4 +1,4 @@
-// Mirrors check/check.go, check/summary.go and check/repair.go (Task 1).
+// Mirrors check/check.go, check/summary.go and check/repair.go.
 
 export type Severity = 'error' | 'warning' | 'hint';
 export type Group = 'format' | 'header' | 'links' | 'dates' | 'names';
@@ -45,8 +45,12 @@ export interface Result {
   names: Record<string, string>;
   text: string;
   isGedcom: boolean;
-  /** Set when the checker panicked. */
+  /** Set when the checker failed (a recovered panic, or a crash in the worker). */
   error?: string;
+  /** The raw file starts with a byte order mark. */
+  bom?: boolean;
+  /** Some line ends in a lone CR. */
+  bareCR?: boolean;
 }
 
 export interface Counts {
@@ -65,10 +69,11 @@ export interface RepairOut {
 
 export type ToWorker =
   | { type: 'check'; bytes: ArrayBuffer }
-  | { type: 'repair'; bytes: ArrayBuffer };
+  | { type: 'repair'; bytes: ArrayBuffer; before?: Counts };
 
 export type FromWorker =
   | { type: 'status'; text: string }
+  | { type: 'ready' }
   | { type: 'result'; result: Result }
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
   | { type: 'error'; message: string };
