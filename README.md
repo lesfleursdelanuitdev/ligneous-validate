@@ -19,7 +19,7 @@ You need Go 1.23+ and Node.js.
     npm run build     # builds the wasm checker, then the page into web/dist/
     npm run check     # go tests, unit tests, build, and browser (Playwright) tests
 
-`npm run dev` serves the page locally. The e2e tests need a Chromium for Playwright; the 20 MB file test takes a couple of minutes.
+`npm run dev` serves the page locally. The e2e tests need a Chromium for Playwright. They use `chromium_headless_shell-1243` from `~/.cache/ms-playwright` when it is there, and otherwise Playwright's default Chromium (`npx playwright install chromium`). The 20 MB file test takes a couple of minutes.
 
 ## Layout
 
