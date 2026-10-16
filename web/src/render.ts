@@ -327,12 +327,22 @@ function filled(template: string, f: Finding, names: Record<string, string>): No
 }
 
 function summaryCard(r: Result, fileName: string): HTMLElement {
-  const dl = el('dl');
-  for (const [k, v] of summaryRows(r, fileName)) {
-    dl.append(el('div', { class: 'row' }, el('dt', {}, k), el('dd', k === 'File' ? { translate: 'no' } : {}, v)));
+  // The strip: the file name and the counts on the first row; years and
+  // program, then version and encoding, as two groups that wrap on their own.
+  const rows = summaryRows(r, fileName);
+  const pair = ([k, v]: [string, string], cls: string) =>
+    el('div', { class: cls }, el('dt', {}, k), el('dd', k === 'File' ? { translate: 'no' } : {}, v));
+  const top = el('dl', { class: 'top' }, pair(rows[0], 'name'));
+  for (const row of rows.slice(1, 4)) top.append(pair(row, 'stat'));
+  const inner = el('div', { class: 'facts-in' });
+  for (const group of [rows.slice(4, 6), rows.slice(6, 8)]) {
+    const dl = el('dl', {});
+    for (const row of group) dl.append(pair(row, 'fact'));
+    inner.append(dl);
   }
-  return el('section', { class: 'card', 'aria-labelledby': 'about-file' },
-    el('h2', { id: 'about-file' }, 'About this file'), dl);
+  const facts = el('div', { class: 'facts' }, inner);
+  return el('section', { class: 'card file', 'aria-labelledby': 'about-file' },
+    el('h2', { id: 'about-file' }, 'About this file'), top, facts);
 }
 
 /** The line viewer's attributes: a focusable (it scrolls sideways), named region. */
@@ -435,7 +445,8 @@ function filterControls(counts: Record<Severity, number>, show: SeverityFilter, 
       show[s] = input.checked;
       onChange();
     });
-    fs.append(el('label', { class: `chip ${s}` }, input, el('span', { class: `sev ${s}` }, countLabel(s, counts[s]))));
+    fs.append(el('label', { class: `chip ${s}` }, input, el('span', { class: 'box', 'aria-hidden': 'true' }),
+      el('span', { class: `sev ${s}` }, countLabel(s, counts[s]))));
   }
   return fs;
 }
@@ -508,10 +519,24 @@ export function fillRepairBusy(slot: HTMLElement): void {
   slot.hidden = false;
 }
 
+const SVG = 'http://www.w3.org/2000/svg';
+
+/** The 14×14 download arrow on the report buttons; decoration only. */
+function downloadIcon(): SVGSVGElement {
+  const svg = document.createElementNS(SVG, 'svg');
+  for (const [k, v] of Object.entries({ viewBox: '0 0 14 14', width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
+    svg.setAttribute(k, v);
+  }
+  const path = document.createElementNS(SVG, 'path');
+  path.setAttribute('d', 'M7 1.5v7.5M3.75 5.75 7 9l3.25-3.25M2 12.25h10');
+  svg.append(path);
+  return svg;
+}
+
 /** Fills the downloads slot with the two report buttons. */
 export function fillDownloads(slot: HTMLElement, onText: () => void, onCsv: () => void): void {
   const mk = (label: string, fn: () => void) => {
-    const b = el('button', { type: 'button', class: 'more' }, label);
+    const b = el('button', { type: 'button', class: 'more download' }, downloadIcon(), label);
     b.addEventListener('click', fn);
     return b;
   };
@@ -554,6 +579,8 @@ export function renderReport(root: HTMLElement, r: Result, fileName: string): Re
       : [el('p', { class: 'empty' }, 'Nothing to show. Tick Errors, Warnings or Hints above.')]));
   };
   drawGroups();
-  root.replaceChildren(card, filterControls(counts, show, drawGroups), repair, downloads, groups);
+  // The toolbar (filters and the report downloads), then the repair card, then the findings.
+  const toolbar = el('div', { class: 'toolbar' }, filterControls(counts, show, drawGroups), downloads);
+  root.replaceChildren(card, toolbar, repair, groups);
   return { repair, downloads };
 }
