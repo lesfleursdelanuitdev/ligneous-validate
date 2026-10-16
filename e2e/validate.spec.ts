@@ -147,7 +147,7 @@ test('e2e: repaired file loads back without format problems', async ({ page }) =
     for (let i = 0; i < n; i++) {
       await opened.nth(i).locator('summary').click();
       const marked = await opened.nth(i).locator('.lines .row.hit').innerText();
-      expect(marked).not.toMatch(/\d\s+(NOTE|CONT|CONC|TEXT)\b/);
+      expect(marked).not.toMatch(/\d\s+(@\S+@\s+)?(NOTE|SNOTE|CONT|CONC|TEXT)\b/);
     }
   }
   // Error and warning totals are not higher than before.
@@ -195,7 +195,6 @@ test('e2e: names are inert text', async ({ page }) => {
 test('e2e: phone width has no sideways scroll and the line viewer scrolls inside itself', async ({ page }) => {
   await page.setViewportSize({ width: 360, height: 740 });
   const long = 'x'.repeat(1500);
-  await uploadText(page, 'wide.ged', GEDCOM_HEAD + `0 @I1@ INDI\n1 NAME Jane /Smith/\n1 NOTE ${long}\n0 TRLR\n`);
   await upload(page, 'royal92.ged');
   await expect(page.locator('.finding').first()).toBeVisible();
   const fits = () => page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth);
@@ -301,6 +300,56 @@ test('e2e: a failed repair does not poison the next file', async ({ page }) => {
   await expect(page.locator('#report dd', { hasText: 'clean.ged' })).toBeVisible();
 });
 
+test('e2e: late messages from a replaced worker are ignored', async ({ page }) => {
+  // The first worker's repair is held back. The next file replaces that worker; then the old
+  // worker's late answers arrive: a failed repair and a result for the old file.
+  await page.addInitScript(() => {
+    const Real = window.Worker;
+    const w = window as unknown as { __made: number; __late: () => void };
+    w.__made = 0;
+    let first: { listeners: ((e: unknown) => void)[] } | null = null;
+    window.Worker = class extends Real {
+      listeners: ((e: unknown) => void)[] = [];
+      constructor(...a: ConstructorParameters<typeof Worker>) {
+        super(...a);
+        w.__made++;
+        first ??= this;
+      }
+      addEventListener(type: string, fn: never, ...rest: never[]) {
+        if (type === 'message') this.listeners.push(fn);
+        super.addEventListener(type, fn, ...rest);
+      }
+      postMessage(msg: { type: string }, transfer?: never) {
+        if (msg.type === 'repair' && first === this) return; // held back for good
+        super.postMessage(msg, transfer as never);
+      }
+    } as typeof Worker;
+    w.__late = () => {
+      const zero = { errors: 0, warnings: 0, hints: 0 };
+      const summary = { people: 99, families: 0, sources: 0, notes: 0, media: 0, years: null, program: '', programVersion: '', gedcomVersion: '', lines: 0 };
+      const result = { encoding: { detected: 'UTF-8', declared: 'UTF-8', reason: '' }, summary, findings: [], names: {}, text: '', isGedcom: true };
+      for (const f of first!.listeners) {
+        f({ data: { type: 'repaired', data: new ArrayBuffer(0), info: { changes: [], left: [], before: zero, after: zero, error: 'late' } } });
+        f({ data: { type: 'result', result } });
+      }
+    };
+  });
+  await page.goto('/');
+  await upload(page, 'cr-only.ged');
+  await expect(page.locator('#report dd', { hasText: 'cr-only.ged' })).toBeVisible();
+  await page.waitForTimeout(300); // the repair request is now held back
+  await upload(page, 'clean.ged');
+  await expect(page.locator('#status')).toHaveText('No problems found in 1 person.');
+  const made = await page.evaluate(() => (window as unknown as { __made: number }).__made);
+  expect(made).toBe(2);
+  await page.evaluate(() => (window as unknown as { __late: () => void }).__late());
+  await page.waitForTimeout(300);
+  await expect(page.locator('#status')).toHaveText('No problems found in 1 person.');
+  await expect(page.locator('#report dd', { hasText: 'clean.ged' })).toBeVisible();
+  await expect(page.locator('#report dd', { hasText: /^99$/ })).toHaveCount(0);
+  expect(await page.evaluate(() => (window as unknown as { __made: number }).__made)).toBe(made); // no second restart
+});
+
 // ------------------------------------------------------------------ privacy
 
 function distFiles(): Set<string> {
@@ -317,26 +366,42 @@ function distFiles(): Set<string> {
   return out;
 }
 
-/** Everything that isn't a same-origin request for the page or one of the build's own files. */
-function strays(urls: string[], origin: string, allowed: Set<string>): string[] {
-  return urls.filter(u => {
+interface Seen { url: string; method: string; body: string | null }
+const seenOf = (r: { url(): string; method(): string; postData(): string | null }): Seen =>
+  ({ url: r.url(), method: r.method(), body: r.postData() });
+
+/**
+ * Everything that isn't a plain GET, with no query and no body, of the page or one of the
+ * build's own files on the same origin.
+ */
+function strays(reqs: Seen[], origin: string, allowed: Set<string>): Seen[] {
+  return reqs.filter(r => {
     let url: URL;
-    try { url = new URL(u); } catch { return true; }
+    try { url = new URL(r.url); } catch { return true; }
     if (url.origin !== origin) return true; // other hosts, and data:/blob:/about: (origin "null")
+    if (r.method !== 'GET' || url.search !== '' || r.body) return true;
     return !allowed.has(url.pathname);
   });
 }
 
 test('e2e: privacy monitor flags stray requests', async ({ page, baseURL }) => {
-  // A control: the same listener and rules must catch a request that isn't the build's.
-  const seen: string[] = [];
-  page.on('request', r => seen.push(r.url()));
+  // A control: the same listener and rules must catch what isn't the build's own traffic.
+  const seen: Seen[] = [];
+  page.on('request', r => seen.push(seenOf(r)));
   await page.goto('/');
-  await page.evaluate(() => { new Image().src = '/not-in-the-build?leak=1'; });
-  await expect.poll(() => seen.some(u => u.includes('/not-in-the-build'))).toBe(true);
+  await page.evaluate(() => {
+    new Image().src = '/not-in-the-build';
+    void fetch('/', { method: 'POST', body: 'secret=1' });
+    void fetch('/?x=1');
+  });
+  await expect.poll(() => seen.some(r => r.method === 'POST') && seen.some(r => r.url.endsWith('/?x=1')) &&
+    seen.some(r => r.url.endsWith('/not-in-the-build'))).toBe(true);
   const origin = new URL(baseURL!).origin;
-  expect(strays(seen, origin, distFiles())).toEqual([expect.stringContaining('/not-in-the-build')]);
-  expect(strays(['https://example.com/x', 'data:text/plain,hi', 'blob:http://localhost:5199/abc'], origin, distFiles())).toHaveLength(3);
+  const bad = strays(seen, origin, distFiles());
+  expect(bad.map(r => `${r.method} ${new URL(r.url).pathname}${new URL(r.url).search}`).sort())
+    .toEqual(['GET /?x=1', 'GET /not-in-the-build', 'POST /']);
+  const other = (url: string): Seen => ({ url, method: 'GET', body: null });
+  expect(strays(['https://example.com/x', 'data:text/plain,hi', 'blob:http://localhost:5199/abc'].map(other), origin, distFiles())).toHaveLength(3);
 });
 
 test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
@@ -344,10 +409,10 @@ test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
   const page = await context.newPage();
   const origin = new URL(baseURL!).origin;
   const allowed = distFiles();
-  const urls: string[] = [];
+  const urls: Seen[] = [];
   // Listen before the first navigation, on the page and on the whole context (workers, popups).
-  page.on('request', r => urls.push(r.url()));
-  context.on('request', r => urls.push(r.url()));
+  page.on('request', r => urls.push(seenOf(r)));
+  context.on('request', r => urls.push(seenOf(r)));
   const sockets: string[] = [];
   page.on('websocket', w => sockets.push(w.url()));
   await context.addInitScript(() => {
@@ -376,7 +441,10 @@ test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
   await expect(page.locator('#report')).toBeEmpty();
   await page.waitForTimeout(500); // let any late request show up
 
-  expect(urls.length).toBeGreaterThan(0); // the listener really saw the page load
+  // The listener really saw the page load and the worker's traffic.
+  expect(urls.some(r => /\/assets\/ligneous-.*\.wasm$/.test(r.url))).toBe(true);
+  expect(urls.some(r => /\/assets\/worker-.*\.js$/.test(r.url))).toBe(true);
+  expect(urls.some(r => r.url.endsWith('/wasm_exec.js'))).toBe(true);
   expect(strays(urls, origin, allowed)).toEqual([]);
   expect(sockets).toEqual([]);
   expect(await page.evaluate(() => (window as unknown as { __beacons: unknown[] }).__beacons)).toEqual([]);
@@ -457,6 +525,7 @@ test('e2e: 20 MB file', async ({ page }, info) => {
       if (state.focused) focusOk++;
       if (state.status === 'Checking…') sawChecking = true;
     } else if (state.status && state.status.startsWith('Checked:')) break;
+    else if (state.status) throw new Error(`The 20 MB file ended with: ${state.status}`);
     await page.waitForTimeout(100);
   }
   const ms = Date.now() - t0;

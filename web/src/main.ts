@@ -87,8 +87,9 @@ function onMessage(e: MessageEvent<FromWorker>) {
 
 function start(): Worker {
   const w = new Worker(new URL('./worker.ts', import.meta.url), { type: 'module' });
-  w.addEventListener('message', onMessage);
-  w.addEventListener('error', showBroken);
+  // Anything from a worker that has been replaced is stale and ignored.
+  w.addEventListener('message', ev => { if (w === worker) onMessage(ev); });
+  w.addEventListener('error', () => { if (w === worker) showBroken(); });
   return w;
 }
 
