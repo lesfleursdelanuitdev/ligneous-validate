@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  GROUPS, PAGE_SIZE, buildGroups, countBySeverity, doneText, lineLabel, lineWindow, noProblemsText,
+  GROUPS, PAGE_SIZE, buildGroups, countBySeverity, doneText, lineLabel, lineViewerAttrs, lineWindow, noProblemsText,
   severityWord, summaryRows, viewKind, visibleSlice,
 } from './render';
 import type { Finding, Result, Severity } from './types';
@@ -179,5 +179,17 @@ describe('doneText', () => {
   it('gives the counts, leaving out none', () => {
     expect(doneText(result({ findings: [f('dates', 'error'), f('dates', 'warning'), f('dates', 'warning')] })))
       .toBe('Checked: 1 error, 2 warnings, 0 hints.');
+  });
+});
+
+describe('lineViewerAttrs', () => {
+  it('is a focusable, named region so its label is announced', () => {
+    expect(lineViewerAttrs(1201, 1207)).toEqual({
+      class: 'lines',
+      role: 'region',
+      tabindex: '0',
+      translate: 'no',
+      'aria-label': 'Lines 1,201 to 1,207 of your file',
+    });
   });
 });

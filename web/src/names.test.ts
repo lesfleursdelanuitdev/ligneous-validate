@@ -21,6 +21,18 @@ describe('downloadName', () => {
     expect(downloadName('export.txt', 'repaired')).toBe('export-repaired.ged');
   });
 
+  it('strips a trailing dot', () => {
+    expect(downloadName('tree.', 'repaired')).toBe('tree-repaired.ged');
+    expect(downloadName('tree.', 'report-csv')).toBe('tree-report.csv');
+  });
+
+  it('drops only .ged and .txt, in any case', () => {
+    expect(downloadName('Smith.2024', 'repaired')).toBe('Smith.2024-repaired.ged');
+    expect(downloadName('Smith.2024.GED', 'repaired')).toBe('Smith.2024-repaired.ged');
+    expect(downloadName('tree.TXT', 'report-txt')).toBe('tree-report.txt');
+    expect(downloadName('tree.backup', 'repaired')).toBe('tree.backup-repaired.ged');
+  });
+
   it('keeps dots that are not an extension', () => {
     expect(downloadName('J. Smith', 'repaired')).toBe('J. Smith-repaired.ged');
     expect(downloadName('smith.v2.ged', 'repaired')).toBe('smith.v2-repaired.ged');

@@ -76,6 +76,12 @@ func rolesFor(e *validator.ValidationError, x index) map[string]string {
 		}
 	}
 
+	// "{person}'s {event} date reads …" on a family event (MARR, DIV, …):
+	// the couple is the person, so the page fills in the family's name.
+	if code == "EVENT_DATE_UNPARSEABLE" && roles["person"] == "" && x.isFamily(e.Xref) {
+		roles["person"] = e.Xref
+	}
+
 	if t := d["target"]; t != "" {
 		roles["target"] = t
 	} else if t := d["pointer"]; t != "" {

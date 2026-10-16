@@ -190,17 +190,23 @@ function summaryCard(r: Result, fileName: string): HTMLElement {
     el('h2', { id: 'about-file' }, 'About this file'), dl);
 }
 
+/** The line viewer's attributes: a focusable (it scrolls sideways), named region. */
+export function lineViewerAttrs(first: number, last: number): Record<string, string> {
+  return {
+    class: 'lines',
+    role: 'region',
+    tabindex: '0',
+    translate: 'no',
+    'aria-label': `Lines ${formatNumber(first)} to ${formatNumber(last)} of your file`,
+  };
+}
+
 function lineViewer(r: Result, line: number): HTMLElement | null {
   const rows = lineWindow(r.text, line);
   if (rows.length === 0) return null;
   const first = rows[0].n;
   const last = rows[rows.length - 1].n;
-  const pre = el('pre', {
-    class: 'lines',
-    tabindex: '0',
-    translate: 'no',
-    'aria-label': `Lines ${formatNumber(first)} to ${formatNumber(last)} of your file`,
-  });
+  const pre = el('pre', lineViewerAttrs(first, last));
   const width = formatNumber(last).length;
   for (const row of rows) {
     const num = el('span', { class: 'ln', 'aria-hidden': 'true' }, formatNumber(row.n).padStart(width, ' '));

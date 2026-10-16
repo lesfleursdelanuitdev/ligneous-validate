@@ -31,9 +31,44 @@ describe('fill', () => {
     expect(fill('{person}’s {event} date reads "{date}".', f, names)).toBe('Someone’s marriage date reads "20 JUL".');
   });
 
-  it('says "someone" for a role whose xref has no name', () => {
+  it('shows the bare xref for a role whose xref has no name', () => {
     const f = finding({ roles: { child: '@I99@' } });
-    expect(fill('Check {child} first', f, names)).toBe('Check someone first');
+    expect(fill('Check {child} first', f, names)).toBe('Check @I99@ first');
+  });
+
+  // Templates copied from the catalog (explain/catalog.go). The target of a
+  // broken link is never in the file, so it has no name.
+  it('ORPHANED_FAMC: names the person, shows the missing family as its xref', () => {
+    const f = finding({ roles: { person: '@I1@', target: '@F9@' } });
+    expect(fill("{person} is a child of a family that doesn't exist", f, names))
+      .toBe("Mary Smith is a child of a family that doesn't exist");
+    expect(fill("The file links {person} to family {target} as a child, but there's no such family in the file. The link is lost on import.", f, names))
+      .toBe("The file links Mary Smith to family @F9@ as a child, but there's no such family in the file. The link is lost on import.");
+  });
+
+  it('ORPHANED_HUSB: names the family, shows the missing husband as its xref', () => {
+    const f = finding({ roles: { family: '@F1@', target: '@I9@' } });
+    expect(fill("Family {family} names {target} as husband, but there's no such person in the file.", f, names))
+      .toBe("Family John Smith and Mary Smith names @I9@ as husband, but there's no such person in the file.");
+  });
+
+  it('ORPHANED_SOUR: shows the missing source as its xref', () => {
+    const f = finding({ roles: { person: '@I2@', target: '@S9@' } });
+    expect(fill("{person} cites source {target}, but there's no such source in the file. The citation is lost on import.", f, names))
+      .toBe("John Smith cites source @S9@, but there's no such source in the file. The citation is lost on import.");
+  });
+
+  it('ORPHANED_NOTE on a family record (seen live): no person role, so the sentence opens with "Someone"', () => {
+    // rolesFor sets person only when the record holding the pointer is a person;
+    // a FAM with "1 NOTE @N9@" gives roles {family, target}.
+    const f = finding({ roles: { target: '@N9@' } });
+    expect(fill("{person} points to note {target}, but there's no such note in the file.", f, names))
+      .toBe("Someone points to note @N9@, but there's no such note in the file.");
+  });
+
+  it('reads the marriage-type event tags as words', () => {
+    const words = ['ANUL', 'MARB', 'MARC', 'MARL', 'MARS', 'DIVF'].map(event => fill('{event}', finding({ details: { event } }), names));
+    expect(words).toEqual(['annulment', 'marriage banns', 'marriage contract', 'marriage licence', 'marriage settlement', 'divorce filing']);
   });
 
   it('drops a missing detail key and the extra space, leaving no braces', () => {

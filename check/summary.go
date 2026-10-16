@@ -105,7 +105,7 @@ func buildNames(ed *enricher.EnrichedDocument) map[string]string {
 		case w != "":
 			names[f.Xref] = w
 		default:
-			names[f.Xref] = "Family " + f.Xref
+			names[f.Xref] = f.Xref // the catalog already says "Family {family}"
 		}
 	}
 	return names

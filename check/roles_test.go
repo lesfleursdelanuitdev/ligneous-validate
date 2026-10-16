@@ -33,6 +33,11 @@ func TestRoles(t *testing.T) {
 		{"orphaned husb", "ORPHANED_HUSB",
 			"0 @F1@ FAM\n1 HUSB @I9@\n",
 			map[string]string{"family": "@F1@", "target": "@I9@"}},
+		{"unparseable marriage date", "EVENT_DATE_UNPARSEABLE",
+			"0 @I1@ INDI\n1 NAME A /B/\n1 FAMS @F1@\n" +
+				"0 @I2@ INDI\n1 NAME C /D/\n1 FAMS @F1@\n" +
+				"0 @F1@ FAM\n1 HUSB @I1@\n1 WIFE @I2@\n1 MARR\n2 DATE 20 JUL\n",
+			map[string]string{"family": "@F1@", "person": "@F1@"}},
 		{"death before birth", "DEATH_BEFORE_BIRTH",
 			"0 @I1@ INDI\n1 NAME A /B/\n1 BIRT\n2 DATE 1900\n1 DEAT\n2 DATE 1800\n",
 			map[string]string{"person": "@I1@"}},
@@ -81,7 +86,7 @@ func TestNames(t *testing.T) {
 		"@I9@": "Unnamed person (@I9@)",
 		"@F1@": "John Smith & Ann Lee",
 		"@F2@": "John Smith",
-		"@F3@": "Family @F3@",
+		"@F3@": "@F3@",
 	}
 	for k, v := range want {
 		if r.Names[k] != v {
