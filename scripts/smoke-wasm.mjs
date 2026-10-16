@@ -6,7 +6,9 @@ import { createRequire } from 'node:module';
 
 const here = path.dirname(fileURLToPath(import.meta.url));
 const root = path.join(here, '..');
-const file = process.argv[2];
+const args = process.argv.slice(2);
+const doRepair = args.includes('--repair');
+const file = args.find(a => a !== '--repair');
 if (!file) { console.error('usage: smoke-wasm.mjs <file>'); process.exit(2); }
 
 const wasmPath = path.join(root, 'web/src/wasm/ligneous.wasm');
@@ -32,3 +34,12 @@ console.log('isGedcom', res.isGedcom);
 console.log('people', res.summary?.people ?? 0);
 console.log('findings', (res.findings || []).length);
 console.log('time', ms + ' ms');
+
+if (doRepair) {
+  const r = globalThis.ligneous.repair(bytes);
+  const out = JSON.parse(r.json);
+  if (out.error) { console.error('repair error: ' + out.error); process.exit(1); }
+  console.log('repair changes', out.changes.length, 'data bytes', r.data.length);
+  console.log('before', JSON.stringify(out.before));
+  console.log('after', JSON.stringify(out.after));
+}
