@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' 'wasm-unsafe-eval'; connect-src 'self'; style-src 'self'; img-src 'self' data:; worker-src 'self'">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Check your GEDCOM file · Ligneous</title>
+<meta name="description" content="See every problem in your family tree file in plain English, with the line it's on. Your file stays on your computer.">
+<meta name="color-scheme" content="light dark">
+<meta name="theme-color" content="#f8f6f1" media="(prefers-color-scheme: light)">
+<meta name="theme-color" content="#141815" media="(prefers-color-scheme: dark)">
+<link rel="stylesheet" href="/src/styles.css">
+<script type="module" src="/src/main.ts"></script>
+</head>
+<body>
+<main>
+  <header class="intro">
+    <h1>Check your GEDCOM file</h1>
+    <hr class="rule">
+    <p class="lead">See every problem in your family tree file in plain English, with the line it's on.</p>
+  </header>
+
+  <div class="drop" id="drop">
+    <button type="button" id="choose" class="primary">Choose a file</button>
+    <span class="hint" aria-hidden="true">or drop it here</span>
+    <input type="file" id="file" hidden>
+  </div>
+  <p class="privacy">Your file stays on your computer. Nothing is uploaded.</p>
+  <noscript><p class="notice">This checker needs JavaScript turned on. It runs in your browser, so your file is never uploaded.</p></noscript>
+
+  <div class="status-area" role="status" aria-live="polite">
+    <p id="status"></p>
+    <p id="note" hidden></p>
+  </div>
+
+  <div id="report" class="report"></div>
+</main>
+<footer>
+  <a href="https://ligneous.org/">Made by Ligneous</a>
+  <span aria-hidden="true">·</span>
+  <a href="https://github.com/lesfleursdelanuitdev/ligneous-validate">Source code</a>
+</footer>
+</body>
+</html>

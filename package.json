@@ -1,0 +1,20 @@
+{
+  "name": "ligneous-validate",
+  "private": true,
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "build": "bash scripts/build-wasm.sh && vite build web",
+    "dev": "vite web",
+    "preview": "vite preview web",
+    "test": "vitest run",
+    "e2e": "playwright test",
+    "check": "go test ./... && npm test && npm run build && npm run e2e"
+  },
+  "devDependencies": {
+    "@playwright/test": "1.63.0",
+    "typescript": "7.0.2",
+    "vite": "8.3.0",
+    "vitest": "5.0.3"
+  }
+}

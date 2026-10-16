@@ -1,0 +1,74 @@
+// Mirrors check/check.go, check/summary.go and check/repair.go (Task 1).
+
+export type Severity = 'error' | 'warning' | 'hint';
+export type Group = 'format' | 'header' | 'links' | 'dates' | 'names';
+export type Role = 'person' | 'child' | 'father' | 'mother' | 'family' | 'target';
+
+export interface EncodingInfo {
+  detected: string;
+  declared: string;
+  reason: string;
+}
+
+export interface Summary {
+  people: number;
+  families: number;
+  sources: number;
+  notes: number;
+  media: number;
+  years: [number, number] | null;
+  program: string;
+  programVersion: string;
+  gedcomVersion: string;
+  lines: number;
+}
+
+export interface Finding {
+  code: string;
+  severity: Severity;
+  /** "" when the code has no catalog entry. */
+  group: Group | '';
+  title: string;
+  meaning: string;
+  howToFix: string;
+  /** 0 means the whole file. */
+  line: number;
+  details: Record<string, string>;
+  xrefs: string[];
+  roles: Partial<Record<Role, string>>;
+}
+
+export interface Result {
+  encoding: EncodingInfo;
+  summary: Summary;
+  findings: Finding[];
+  names: Record<string, string>;
+  text: string;
+  isGedcom: boolean;
+  /** Set when the checker panicked. */
+  error?: string;
+}
+
+export interface Counts {
+  errors: number;
+  warnings: number;
+  hints: number;
+}
+
+export interface RepairOut {
+  changes: { line: number; what: string }[];
+  left: string[];
+  before: Counts;
+  after: Counts;
+  error?: string;
+}
+
+export type ToWorker =
+  | { type: 'check'; bytes: ArrayBuffer }
+  | { type: 'repair'; bytes: ArrayBuffer };
+
+export type FromWorker =
+  | { type: 'status'; text: string }
+  | { type: 'result'; result: Result }
+  | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
+  | { type: 'error'; message: string };
