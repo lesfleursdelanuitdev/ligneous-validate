@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GROUPS, PAGE_SIZE, buildGroups, countBySeverity, doneText, lineLabel, lineViewerAttrs, lineWindow, noProblemsText,
-  severityWord, summaryRows, viewKind, visibleSlice,
+  repairView, severityWord, summaryRows, viewKind, visibleSlice,
 } from './render';
 import type { Finding, Result, Severity } from './types';
 
@@ -191,5 +191,52 @@ describe('lineViewerAttrs', () => {
       translate: 'no',
       'aria-label': 'Lines 1,201 to 1,207 of your file',
     });
+  });
+});
+
+describe('repairView', () => {
+  const info = (changes: { line: number; what: string }[], left: string[] = []) => ({
+    changes, left, before: { errors: 3, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 1, hints: 0 },
+  });
+
+  it('is null when nothing can be fixed', () => {
+    expect(repairView(info([]), result())).toBeNull();
+  });
+
+  it('uses the singular heading for one change and the plural for more', () => {
+    expect(repairView(info([{ line: 0, what: 'a' }]), result())!.heading).toBe('We can fix 1 format problem automatically');
+    expect(repairView(info([{ line: 0, what: 'a' }, { line: 4, what: 'b' }]), result())!.heading)
+      .toBe('We can fix 2 format problems automatically');
+    expect(repairView(info(Array.from({ length: 1500 }, () => ({ line: 1, what: 'x' }))), result())!.heading)
+      .toBe('We can fix 1,500 format problems automatically');
+  });
+
+  it('lists "Line N: what", and just "what" for line 0', () => {
+    const v = repairView(info([{ line: 1204, what: 'Fixed a thing' }, { line: 0, what: 'Added a trailer' }]), result())!;
+    expect(v.changes).toEqual(['Line 1,204: Fixed a thing', 'Added a trailer']);
+  });
+
+  it('gives the counts before and after', () => {
+    const v = repairView(info([{ line: 0, what: 'a' }]), result())!;
+    expect(v.before).toBe('3 errors, 1 warning, 0 hints');
+    expect(v.after).toBe('0 errors, 1 warning, 0 hints');
+  });
+
+  it('shows the GEDCOM 5.5 note only for exactly 5.5', () => {
+    const one = info([{ line: 0, what: 'a' }]);
+    const r55 = result({ summary: { ...result().summary, gedcomVersion: '5.5' } });
+    expect(repairView(one, r55)!.note).toBe("Your file is GEDCOM 5.5, which doesn't officially list UTF-8. Almost every program reads it anyway.");
+    expect(repairView(one, result())!.note).toBeNull();
+  });
+
+  it('maps the codes left to titles with their counts in the current result', () => {
+    const a = { ...f('links', 'error', 5), code: 'ORPHANED_FAMC', title: 'Broken family link' };
+    const b = { ...f('links', 'error', 9), code: 'ORPHANED_FAMC', title: 'Broken family link' };
+    const c = { ...f('dates', 'warning', 7), code: 'DATE_ORDER', title: 'Dates in the wrong order' };
+    const v = repairView(info([{ line: 0, what: 'a' }], ['DATE_ORDER', 'ORPHANED_FAMC', 'GONE']), result({ findings: [a, b, c] }))!;
+    expect(v.left).toEqual([
+      { title: 'Dates in the wrong order', count: 1 },
+      { title: 'Broken family link', count: 2 },
+    ]);
   });
 });

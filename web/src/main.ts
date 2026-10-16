@@ -1,5 +1,8 @@
-import { doneText, renderReport, viewKind } from './render';
-import type { FromWorker } from './types';
+import { reportCsv, reportText } from './export';
+import { downloadName } from './names';
+import { doneText, fillDownloads, fillRepair, renderReport, viewKind } from './render';
+import type { ReportSlots } from './render';
+import type { FromWorker, Result } from './types';
 
 const BIG = 50 * 1024 * 1024;
 const NO_WASM = "This browser couldn't start the checker. Try a current version of Firefox, Chrome, Safari or Edge.";
@@ -16,6 +19,19 @@ let worker: Worker | null = null;
 let busy = false;
 let broken = false;
 let current: File | null = null;
+let shown: { file: File; result: Result; slots: ReportSlots } | null = null;
+
+/** Saves text or bytes under `name` through a temporary link; nothing is sent anywhere. */
+function save(data: BlobPart, type: string, name: string) {
+  const url = URL.createObjectURL(new Blob([data], { type }));
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.append(a);
+  a.click();
+  a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 10_000);
+}
 
 function say(text: string, extra = '', tone: '' | 'problem' | 'good' = '') {
   status.textContent = text;
@@ -41,9 +57,22 @@ function onMessage(e: MessageEvent<FromWorker>) {
     busy = false;
     const kind = viewKind(msg.result);
     say(doneText(msg.result), '', kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
-    renderReport(report, msg.result, current?.name ?? '');
-    // Task 4: when the file is GEDCOM, ask the worker to repair and fill the slots.
+    const file = current!;
+    const slots = renderReport(report, msg.result, file.name);
+    shown = { file, result: msg.result, slots };
+    if (kind === 'report') {
+      fillDownloads(slots.downloads,
+        () => save(reportText(file.name, msg.result), 'text/plain;charset=utf-8', downloadName(file.name, 'report-txt')),
+        () => save(reportCsv(msg.result), 'text/csv;charset=utf-8', downloadName(file.name, 'report-csv')));
+    }
     if (msg.result.error) restart(); // a fresh runtime for the next file
+    else if (kind !== 'not-gedcom') void askRepair(file);
+  } else if (msg.type === 'repaired') {
+    // Only for the file on screen: a late answer for an earlier file is dropped.
+    if (!shown || shown.file !== current || msg.info.error) return;
+    const { file, result, slots } = shown;
+    fillRepair(slots.repair, msg.info, result, () =>
+      save(msg.data, 'text/plain;charset=utf-8', downloadName(file.name, 'repaired')));
   }
 }
 
@@ -59,12 +88,22 @@ function restart() {
   worker = start();
 }
 
+async function askRepair(file: File) {
+  try {
+    const bytes = await file.arrayBuffer();
+    if (current === file) worker?.postMessage({ type: 'repair', bytes }, [bytes]);
+  } catch {
+    // The report is already showing; the repair part just doesn't appear.
+  }
+}
+
 async function check(file: File) {
   if (broken) return;
   current = file;
   // A file chosen while another is being checked replaces it.
   if (busy) restart();
   busy = true;
+  shown = null;
   report.replaceChildren();
   say('Reading your file…', file.size > BIG ? 'This is a big file. Checking may take a minute.' : '');
   let bytes: ArrayBuffer;

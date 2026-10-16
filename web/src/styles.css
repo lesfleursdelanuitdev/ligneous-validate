@@ -172,6 +172,19 @@ code { font-family: var(--mono); font-size: 0.88em; background: var(--tint); pad
 
 .empty { color: var(--muted); font-style: italic; margin-top: 2rem; }
 
+/* ---------------------------------------------------------------- repair and downloads */
+
+.slot[hidden] { display: none; }
+#repair { margin-top: 1.25rem; border: 1px solid var(--accent); border-radius: 14px; padding: 1rem 1.25rem 1.25rem; }
+#repair h2 { font-size: 1.25rem; font-weight: 500; margin: 0 0 0.5rem; }
+#repair h3 { font-size: 1.0625rem; font-weight: 500; margin: 1.5rem 0 0.4rem; }
+#repair ul { margin: 0.5rem 0; padding-left: 1.25rem; }
+#repair li { padding: 0.15rem 0; overflow-wrap: anywhere; }
+#repair .counts { color: var(--muted); margin: 0.75rem 0 1rem; }
+#repair .note55 { color: var(--muted); font-size: 1rem; margin: 0.75rem 0 0; }
+#downloads { margin-top: 1.25rem; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem 0.8rem; }
+#downloads .dl-label { margin: 0; color: var(--muted); flex-basis: 100%; }
+
 /* ---------------------------------------------------------------- footer */
 
 footer {

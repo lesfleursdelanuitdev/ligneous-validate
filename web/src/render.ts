@@ -3,7 +3,7 @@
 // (covered by the e2e tests).
 
 import { fill, fillLine } from './fill';
-import type { Finding, Group, Result, Severity } from './types';
+import type { Counts, Finding, Group, RepairOut, Result, Severity } from './types';
 
 // ---------------------------------------------------------------- view model
 
@@ -156,6 +156,42 @@ export function summaryRows(r: Result, fileName: string): [string, string][] {
   ];
 }
 
+export const NOTE_55 =
+  "Your file is GEDCOM 5.5, which doesn't officially list UTF-8. Almost every program reads it anyway.";
+
+export interface RepairView {
+  heading: string;
+  changes: string[];
+  before: string;
+  after: string;
+  /** Shown under the button; null when it doesn't apply. */
+  note: string | null;
+  /** Problems the repair can't fix, with how many there are in the file. */
+  left: { title: string; count: number }[];
+}
+
+const countsText = (c: Counts): string =>
+  `${countLabel('error', c.errors)}, ${countLabel('warning', c.warnings)}, ${countLabel('hint', c.hints)}`;
+
+/** What the repair section shows; null (section hidden) when nothing can be fixed. */
+export function repairView(info: RepairOut, r: Result): RepairView | null {
+  const n = info.changes.length;
+  if (n === 0) return null;
+  const left: RepairView['left'] = [];
+  for (const code of info.left) {
+    const hits = r.findings.filter(f => f.code === code);
+    if (hits.length) left.push({ title: fill(hits[0].title, hits[0], r.names), count: hits.length });
+  }
+  return {
+    heading: `We can fix ${formatNumber(n)} format ${n === 1 ? 'problem' : 'problems'} automatically`,
+    changes: info.changes.map(c => (c.line > 0 ? `${fillLine(c.line)}: ${c.what}` : c.what)),
+    before: countsText(info.before),
+    after: countsText(info.after),
+    note: r.summary.gedcomVersion === '5.5' ? NOTE_55 : null,
+    left,
+  };
+}
+
 // ---------------------------------------------------------------- DOM
 
 type Kids = (Node | string | null | undefined | false)[];
@@ -296,10 +332,51 @@ function filterControls(counts: Record<Severity, number>, show: SeverityFilter, 
 }
 
 export interface ReportSlots {
-  /** Where Task 4 puts "We can fix N format problems automatically". */
+  /** Filled by fillRepair() once the repair has run. */
   repair: HTMLElement;
-  /** Where Task 4 puts the report downloads. */
+  /** Filled by fillDownloads(). */
   downloads: HTMLElement;
+}
+
+/** Fills the repair slot; leaves it hidden when there is nothing to fix. */
+export function fillRepair(slot: HTMLElement, info: RepairOut, r: Result, onDownload: () => void): void {
+  const v = repairView(info, r);
+  if (!v) {
+    slot.replaceChildren();
+    slot.hidden = true;
+    return;
+  }
+  const button = el('button', { type: 'button', class: 'primary' }, 'Download repaired file');
+  button.addEventListener('click', onDownload);
+  const parts: Kids = [
+    el('h2', { id: 'repair-h' }, v.heading),
+    el('ul', { class: 'changes' }, ...v.changes.map(c => el('li', {}, c))),
+    el('p', { class: 'counts' }, `Before: ${v.before}. After: ${v.after}.`),
+    button,
+    v.note ? el('p', { class: 'note55' }, v.note) : null,
+  ];
+  if (v.left.length) {
+    parts.push(
+      el('h3', {}, 'These need fixing in your family tree program:'),
+      el('ul', { class: 'left' }, ...v.left.map(l => el('li', {}, `${l.title} (${formatNumber(l.count)})`))));
+  }
+  slot.replaceChildren(...parts.filter((p): p is Node | string => !!p));
+  slot.setAttribute('aria-labelledby', 'repair-h');
+  slot.hidden = false;
+}
+
+/** Fills the downloads slot with the two report buttons. */
+export function fillDownloads(slot: HTMLElement, onText: () => void, onCsv: () => void): void {
+  const mk = (label: string, fn: () => void) => {
+    const b = el('button', { type: 'button', class: 'more' }, label);
+    b.addEventListener('click', fn);
+    return b;
+  };
+  slot.replaceChildren(
+    el('p', { class: 'dl-label' }, 'Save this report:'),
+    mk('Download report (text)', onText),
+    mk('Download report (spreadsheet)', onCsv));
+  slot.hidden = false;
 }
 
 /**

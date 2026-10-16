@@ -27,8 +27,9 @@ function value(key: string, f: Finding, names: Record<string, string>): string {
 
 /**
  * Fills {role} placeholders with names (or the bare xref when it has no
- * name) and {key} placeholders with the finding's details. A detail that is missing disappears together with one
- * of the spaces around it, so no "{…}" and no double space is left.
+ * name) and {key} placeholders with the finding's details. A detail that is
+ * missing disappears together with one of the spaces around it, so no "{…}"
+ * and no double space is left.
  */
 export function fill(template: string, f: Finding, names: Record<string, string>): string {
   const out = template.replace(/( ?)\{(\w+)\}( ?)/g, (_m, pre: string, key: string, post: string) => {

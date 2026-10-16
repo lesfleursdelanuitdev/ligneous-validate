@@ -58,9 +58,9 @@ describe('fill', () => {
       .toBe("John Smith cites source @S9@, but there's no such source in the file. The citation is lost on import.");
   });
 
-  it('ORPHANED_NOTE on a family record (seen live): no person role, so the sentence opens with "Someone"', () => {
-    // rolesFor sets person only when the record holding the pointer is a person;
-    // a FAM with "1 NOTE @N9@" gives roles {family, target}.
+  it('ORPHANED_NOTE on a record that is neither a person nor a family: no person role, so the sentence opens with "Someone"', () => {
+    // The Go side sets person to the person (or, for a family, to the family).
+    // A broken "1 NOTE @N9@" on a SOUR record has neither, so roles is {target}.
     const f = finding({ roles: { target: '@N9@' } });
     expect(fill("{person} points to note {target}, but there's no such note in the file.", f, names))
       .toBe("Someone points to note @N9@, but there's no such note in the file.");
