@@ -17,6 +17,7 @@ const report = $<HTMLElement>('report');
 
 let worker: Worker | null = null;
 let busy = false;
+let repairing = false; // a repair has been asked for and not answered yet
 let broken = false;
 let current: File | null = null;
 let shown: { file: File; result: Result; slots: ReportSlots } | null = null;
@@ -68,8 +69,16 @@ function onMessage(e: MessageEvent<FromWorker>) {
     if (msg.result.error) restart(); // a fresh runtime for the next file
     else if (kind !== 'not-gedcom') void askRepair(file);
   } else if (msg.type === 'repaired') {
+    // A failed repair (e.g. out of memory on a huge file) can leave the checker's runtime
+    // dead, so the next file would be reported as "not GEDCOM". Start a fresh one.
+    repairing = false;
+    if (msg.info.error) {
+      if (busy && current) void check(current); // restarts, then checks the file again
+      else restart();
+      return;
+    }
     // Only for the file on screen: a late answer for an earlier file is dropped.
-    if (!shown || shown.file !== current || msg.info.error) return;
+    if (!shown || shown.file !== current) return;
     const { file, result, slots } = shown;
     fillRepair(slots.repair, msg.info, result, () =>
       save(msg.data, 'text/plain;charset=utf-8', downloadName(file.name, 'repaired')));
@@ -85,13 +94,17 @@ function start(): Worker {
 
 function restart() {
   worker?.terminate();
+  repairing = false;
   worker = start();
 }
 
 async function askRepair(file: File) {
   try {
     const bytes = await file.arrayBuffer();
-    if (current === file) worker?.postMessage({ type: 'repair', bytes }, [bytes]);
+    if (current === file) {
+      repairing = true;
+      worker?.postMessage({ type: 'repair', bytes }, [bytes]);
+    }
   } catch {
     // The report is already showing; the repair part just doesn't appear.
   }
@@ -100,8 +113,9 @@ async function askRepair(file: File) {
 async function check(file: File) {
   if (broken) return;
   current = file;
-  // A file chosen while another is being checked replaces it.
-  if (busy) restart();
+  // A file chosen while another is being checked, or while a repair is still running, gets a
+  // fresh runtime: the old one is busy, or may have died.
+  if (busy || repairing) restart();
   busy = true;
   shown = null;
   report.replaceChildren();
