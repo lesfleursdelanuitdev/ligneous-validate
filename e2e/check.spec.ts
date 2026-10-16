@@ -1,4 +1,5 @@
 import { expect, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 
 const fixture = (name: string) => join('e2e', 'fixtures', name);
@@ -50,25 +51,30 @@ test('e2e: second file resets the report', async ({ page }) => {
 });
 
 test('e2e: downloads', async ({ page }) => {
-  await page.locator('#file').setInputFiles(fixture('cr-only.ged'));
+  // A file with no end marker: the repair adds "0 TRLR", and the catalog's `0 TRLR` shows as <code>.
+  await page.locator('#file').setInputFiles(fixture('no-trailer.ged'));
   await expect(page.locator('#repair')).toBeVisible();
-  await expect(page.locator('#repair h2')).toHaveText(/^We can fix \d+ format problems? automatically$/);
+  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 format problem automatically');
+  await expect(page.locator('#report')).not.toContainText('`');
+  await expect(page.locator('.finding .meaning code').first()).toHaveText('0 TRLR');
 
   const grab = async (label: string) => {
-    const [dl] = await Promise.all([page.waitForEvent("download"), page.getByRole('button', { name: label }).click()]);
-    const { readFile } = await import('node:fs/promises');
-    return { name: dl.suggestedFilename(), body: await readFile((await dl.path())!, 'utf8') };
+    const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: label }).click()]);
+    return { name: dl.suggestedFilename(), bytes: await readFile((await dl.path())!) };
   };
 
   const fixed = await grab('Download repaired file');
-  expect(fixed.name).toBe('cr-only-repaired.ged');
-  expect(fixed.body).toMatch(/^0 HEAD\r\n1 GEDC\r\n/);
+  expect(fixed.name).toBe('no-trailer-repaired.ged');
+  expect(fixed.bytes.equals(await readFile(fixture('no-trailer.repaired.ged')))).toBe(true);
 
   const txt = await grab('Download report (text)');
-  expect(txt.name).toBe('cr-only-report.txt');
-  expect(txt.body).toMatch(/^Check report for cr-only\.ged\n/);
+  expect(txt.name).toBe('no-trailer-report.txt');
+  const text = txt.bytes.toString('utf8');
+  expect(text).toMatch(/^Check report for no-trailer\.ged\n/);
+  expect(text).not.toContain('`');
 
   const csv = await grab('Download report (spreadsheet)');
-  expect(csv.name).toBe('cr-only-report.csv');
-  expect(csv.body.startsWith('﻿"severity","code","line"')).toBe(true);
+  expect(csv.name).toBe('no-trailer-report.csv');
+  expect([...csv.bytes.subarray(0, 3)]).toEqual([0xef, 0xbb, 0xbf]);
+  expect(csv.bytes.toString('utf8').slice(1)).toMatch(/^"severity","code","line"/);
 });

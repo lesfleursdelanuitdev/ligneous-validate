@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   GROUPS, PAGE_SIZE, buildGroups, countBySeverity, doneText, lineLabel, lineViewerAttrs, lineWindow, noProblemsText,
-  repairView, severityWord, summaryRows, viewKind, visibleSlice,
+  codeParts, repairView, severityWord, summaryRows, viewKind, visibleSlice,
 } from './render';
 import type { Finding, Result, Severity } from './types';
 
@@ -238,5 +238,27 @@ describe('repairView', () => {
       { title: 'Dates in the wrong order', count: 1 },
       { title: 'Broken family link', count: 2 },
     ]);
+  });
+});
+
+describe('codeParts', () => {
+  it('splits catalog text on backticks into plain and code parts', () => {
+    expect(codeParts('End with `0 TRLR`, always.')).toEqual([
+      { text: 'End with ', code: false }, { text: '0 TRLR', code: true }, { text: ', always.', code: false },
+    ]);
+  });
+  it('gives one plain part when there are no backticks', () => {
+    expect(codeParts('plain')).toEqual([{ text: 'plain', code: false }]);
+    expect(codeParts('')).toEqual([]);
+  });
+});
+
+describe('catalog backticks in the repair view', () => {
+  it('keeps them in the view model so the page can draw <code>', () => {
+    const info = { changes: [{ line: 3, what: 'added `0 TRLR`' }], left: ['X'], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 } };
+    const x = { ...f('format', 'warning', 2), code: 'X', title: 'Missing `0 TRLR`' };
+    const v = repairView(info, result({ findings: [x] }))!;
+    expect(v.changes).toEqual(['Line 3: added `0 TRLR`']);
+    expect(v.left[0].title).toBe('Missing `0 TRLR`');
   });
 });

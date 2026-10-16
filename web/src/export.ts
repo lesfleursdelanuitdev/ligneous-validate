@@ -8,6 +8,10 @@ import type { Finding, Result, Role } from './types';
 const ALL = { error: true, warning: true, hint: true };
 const ROLE_ORDER: Role[] = ['person', 'child', 'father', 'mother', 'family', 'target'];
 
+/** The catalog marks GEDCOM examples with backticks; plain text has no use for them. */
+const plain = (s: string): string => s.replace(/`/g, '');
+const say = (template: string, f: Finding, names: Record<string, string>): string => plain(fill(template, f, names));
+
 const isoDate = (d: Date): string => d.toISOString().slice(0, 10);
 
 /** The report as plain text; `now` is only for tests. */
@@ -31,15 +35,23 @@ export function reportText(file: string, r: Result, now: Date = new Date()): str
     out.push('', g.heading.toUpperCase(), '');
     g.findings.forEach((f, i) => {
       if (i > 0) out.push('');
-      out.push(`[${severityWord(f.severity)}] ${lineLabel(f.line)}: ${fill(f.title, f, r.names)}`);
-      if (f.meaning) out.push(`  ${fill(f.meaning, f, r.names)}`);
-      if (f.howToFix) out.push(`  How to fix it: ${fill(f.howToFix, f, r.names)}`);
+      out.push(`[${severityWord(f.severity)}] ${lineLabel(f.line)}: ${say(f.title, f, r.names)}`);
+      if (f.meaning) out.push(`  ${say(f.meaning, f, r.names)}`);
+      if (f.howToFix) out.push(`  How to fix it: ${say(f.howToFix, f, r.names)}`);
     });
   }
   return out.join('\n') + '\n';
 }
 
-const quote = (v: string | number): string => '"' + String(v).replace(/"/g, '""') + '"';
+/**
+ * One CSV field. A field that starts with = + - @ tab or CR would be run as a
+ * formula by Excel and LibreOffice (names come from the visitor's file), so
+ * it gets a leading apostrophe. Then RFC 4180 quoting.
+ */
+export function csvField(v: string): string {
+  const safe = /^[=+\-@\t\r]/.test(v) ? "'" + v : v;
+  return '"' + safe.replace(/"/g, '""') + '"';
+}
 
 function people(f: Finding, names: Record<string, string>): string {
   const seen: string[] = [];
@@ -57,8 +69,8 @@ export function reportCsv(r: Result): string {
   const rows: string[][] = [['severity', 'code', 'line', 'title', 'people', 'meaning']];
   for (const g of buildGroups(r.findings, ALL)) {
     for (const f of g.findings) {
-      rows.push([f.severity, f.code, String(f.line), fill(f.title, f, r.names), people(f, r.names), fill(f.meaning, f, r.names)]);
+      rows.push([f.severity, f.code, String(f.line), say(f.title, f, r.names), people(f, r.names), say(f.meaning, f, r.names)]);
     }
   }
-  return '﻿' + rows.map(row => row.map(quote).join(',') + '\r\n').join('');
+  return '﻿' + rows.map(row => row.map(csvField).join(',') + '\r\n').join('');
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { reportCsv, reportText } from './export';
+import { csvField, reportCsv, reportText } from './export';
 import type { Finding, Result } from './types';
 
 function finding(over: Partial<Finding>): Finding {
@@ -56,7 +56,7 @@ BROKEN LINKS
 
 [Error] Line 1,204: Mary Smith is a child of a family that doesn't exist
   The link to @F9@ is lost on import.
-  How to fix it: Remove the \`FAMC\` line.
+  How to fix it: Remove the FAMC line.
 
 DATES THAT DON'T ADD UP
 
@@ -99,5 +99,50 @@ describe('reportCsv', () => {
 
   it('gives only the header row for no findings', () => {
     expect(reportCsv(result([]))).toBe('﻿"severity","code","line","title","people","meaning"\r\n');
+  });
+});
+
+describe('backticks in catalog text', () => {
+  const r = result([finding({ title: 'End `0 TRLR` missing', meaning: 'Add `0 TRLR`.', howToFix: 'Type `0 TRLR`.' })]);
+  it('are stripped from the text report', () => {
+    const t = reportText('a.ged', r, new Date('2026-01-02T00:00:00Z'));
+    expect(t).not.toContain('`');
+    expect(t).toContain('End 0 TRLR missing');
+    expect(t).toContain('How to fix it: Type 0 TRLR.');
+  });
+  it('are stripped from the CSV', () => {
+    expect(reportCsv(r)).not.toContain('`');
+    expect(reportCsv(r)).toContain('"End 0 TRLR missing"');
+  });
+});
+
+describe('CSV formula injection', () => {
+  it.each(['=', '+', '-', '@', '\t', '\r'])('prefixes an apostrophe to a field starting with %j', ch => {
+    expect(csvField(ch + 'x')).toBe(`"'${ch}x"`);
+  });
+  it('leaves ordinary fields alone', () => {
+    expect(csvField('Mary')).toBe('"Mary"');
+    expect(csvField('a=b')).toBe('"a=b"');
+    expect(csvField('')).toBe('""');
+  });
+  it('protects person names in title, people and meaning', () => {
+    const evil = '=HYPERLINK("http://x","y")';
+    const r = result(
+      [
+        finding({ title: '{person} is odd', meaning: '{person}', roles: { person: '@I1@' } }),
+        finding({ title: '{person}', meaning: 'm', roles: { person: '@I2@' } }),
+      ],
+      { names: { '@I1@': evil, '@I2@': '+cmd' } });
+    const rows = reportCsv(r).slice(1).split('\r\n');
+    const all = rows.join('\n');
+    expect(all).toContain(`"'=HYPERLINK(""http://x"",""y"")"`);
+    expect(all).toContain(`"'+cmd"`);
+    expect(all).not.toMatch(/(^|,)"[=+@-]/m);
+    // the title starts with the name, so it is protected too
+    expect(rows[2]).toContain(`,"'+cmd",`);
+  });
+  it('does not change the text report', () => {
+    const r = result([finding({ title: '{person}', roles: { person: '@I2@' } })], { names: { '@I2@': '+cmd' } });
+    expect(reportText('a.ged', r, new Date('2026-01-02T00:00:00Z'))).toContain('Line 1: +cmd');
   });
 });

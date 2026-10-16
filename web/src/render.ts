@@ -208,12 +208,19 @@ function el<K extends keyof HTMLElementTagNameMap>(
   return e;
 }
 
+/** Catalog text split on backticks, which mark GEDCOM examples. */
+export function codeParts(text: string): { text: string; code: boolean }[] {
+  const out: { text: string; code: boolean }[] = [];
+  text.split('`').forEach((part, i) => {
+    if (part) out.push({ text: part, code: i % 2 === 1 });
+  });
+  return out;
+}
+
 /** Text with `code` spans, as the catalog writes GEDCOM examples. */
 function withCode(text: string): Node {
   const frag = document.createDocumentFragment();
-  text.split('`').forEach((part, i) => {
-    if (part) frag.append(i % 2 ? el('code', { translate: 'no' }, part) : part);
-  });
+  for (const p of codeParts(text)) frag.append(p.code ? el('code', { translate: 'no' }, p.text) : p.text);
   return frag;
 }
 
@@ -258,8 +265,8 @@ function findingItem(f: Finding, r: Result): HTMLElement {
     el('span', { class: 'meta' },
       el('span', { class: `sev ${f.severity}` }, severityWord(f.severity)),
       el('span', { class: 'at' }, lineLabel(f.line))),
-    el('span', { class: 'title' }, fill(f.title, f, r.names)),
-    f.meaning ? el('span', { class: 'meaning' }, fill(f.meaning, f, r.names)) : null);
+    el('span', { class: 'title' }, withCode(fill(f.title, f, r.names))),
+    f.meaning ? el('span', { class: 'meaning' }, withCode(fill(f.meaning, f, r.names))) : null);
   details.append(summary);
   // The lines and the fix are built when the finding is first opened, so
   // thousands of findings stay cheap.
@@ -350,7 +357,7 @@ export function fillRepair(slot: HTMLElement, info: RepairOut, r: Result, onDown
   button.addEventListener('click', onDownload);
   const parts: Kids = [
     el('h2', { id: 'repair-h' }, v.heading),
-    el('ul', { class: 'changes' }, ...v.changes.map(c => el('li', {}, c))),
+    el('ul', { class: 'changes' }, ...v.changes.map(c => el('li', {}, withCode(c)))),
     el('p', { class: 'counts' }, `Before: ${v.before}. After: ${v.after}.`),
     button,
     v.note ? el('p', { class: 'note55' }, v.note) : null,
@@ -358,7 +365,7 @@ export function fillRepair(slot: HTMLElement, info: RepairOut, r: Result, onDown
   if (v.left.length) {
     parts.push(
       el('h3', {}, 'These need fixing in your family tree program:'),
-      el('ul', { class: 'left' }, ...v.left.map(l => el('li', {}, `${l.title} (${formatNumber(l.count)})`))));
+      el('ul', { class: 'left' }, ...v.left.map(l => el('li', {}, withCode(l.title), ` (${formatNumber(l.count)})`))));
   }
   slot.replaceChildren(...parts.filter((p): p is Node | string => !!p));
   slot.setAttribute('aria-labelledby', 'repair-h');
