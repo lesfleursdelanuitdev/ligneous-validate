@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import catalogText from './testdata/catalog.json?raw';
 import {
-  FAILED, GROUPS, KEEP_ORIGINAL, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
+  FAILED, GROUPS, KEEP_ORIGINAL, OFFER_NOTE, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
   lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, repairView, severityWord, sizeNote,
   summaryRows, viewKind, visibleSlice,
 } from './render';
@@ -320,17 +320,17 @@ describe('repairView headings and notes', () => {
 
 describe('sizeNote', () => {
   const MB = 1024 * 1024;
-  it('says nothing under 2 MB', () => {
-    expect(sizeNote(2 * MB - 1)).toBe('');
+  it('says nothing under 10 MB', () => {
+    expect(sizeNote(2 * MB)).toBe('');
+    expect(sizeNote(10 * MB - 1)).toBe('');
   });
-  it('says up to a minute from 2 to 10 MB', () => {
-    const t = 'This is a large file, so checking may take up to a minute. You can use other tabs meanwhile.';
-    expect(sizeNote(2 * MB)).toBe(t);
+  it('says a minute or so from 10 MB', () => {
+    const t = 'This is a large file, so checking may take a minute or so. You can use other tabs meanwhile.';
     expect(sizeNote(10 * MB)).toBe(t);
+    expect(sizeNote(200 * MB)).toBe(t);
   });
-  it('says a few minutes above 10 MB', () => {
-    expect(sizeNote(10 * MB + 1)).toBe('This is a large file, so checking may take a few minutes. You can use other tabs meanwhile.');
-    expect(sizeNote(200 * MB)).toBe('This is a large file, so checking may take a few minutes. You can use other tabs meanwhile.');
+  it('the repair offer says a minute or so', () => {
+    expect(OFFER_NOTE).toBe('This may take a minute or so.');
   });
 });
 

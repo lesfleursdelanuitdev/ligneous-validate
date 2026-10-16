@@ -19,7 +19,7 @@ The chosen design is **Layout C: compact header and a 2-column grid**.
   - **Error badge:** a soft red tint with dark red text.
   - **Hint badge:** an accent tint with accent text.
   - **Phone width:** one card column below about 640px.
-  - **An opened finding** spans both columns. It shows the line viewer and "How to fix it".
+  - **An opened finding** opens in place, in its own column. It shows the line viewer (which scrolls sideways inside itself) and "How to fix it". (At first it spanned both columns, but that reflowed every card below it; changed 2026-10-16.)
   - **The repair section:** a white card in the same style, placed between the toolbar and the findings.
   - **Dark mode** is derived from the same tokens.
 - **Wording and behaviour stay exactly as before.** Only the look changes.

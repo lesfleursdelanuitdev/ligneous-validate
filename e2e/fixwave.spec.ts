@@ -50,8 +50,10 @@ async function instrument(page: Page) {
     const Real = window.Worker;
     const w = window as unknown as {
       __made: number; __sent: string[]; __fakes: Record<string, unknown>; __crashOn: string | null;
+      /** Message types that are swallowed, so the check or repair stays running. */
+      __hold: string[];
     };
-    w.__made = 0; w.__sent = []; w.__fakes = {}; w.__crashOn = null;
+    w.__made = 0; w.__sent = []; w.__fakes = {}; w.__crashOn = null; w.__hold = [];
     window.Worker = class extends Real {
       listeners: ((e: unknown) => void)[] = [];
       constructor(...a: ConstructorParameters<typeof Worker>) { super(...a); w.__made++; }
@@ -66,6 +68,7 @@ async function instrument(page: Page) {
           setTimeout(() => this.dispatchEvent(new ErrorEvent('error', { message: 'out of memory' })), 50);
           return;
         }
+        if (w.__hold.includes(msg.type)) return;
         const fake = w.__fakes[msg.type];
         if (fake) {
           delete w.__fakes[msg.type];
@@ -137,14 +140,17 @@ test('e2e: 280,000 repair changes are grouped, not listed', async ({ page }) => 
 
 // ------------------------------------------------------------------ item 3
 
+const SIZE_NOTE = 'This is a large file, so checking may take a minute or so. You can use other tabs meanwhile.';
+
 test('e2e: a large file gets a size note and can be stopped', async ({ page }) => {
   test.setTimeout(120_000);
   await instrument(page);
   await page.goto('/');
-  const path = bigFile(3 * 1024 * 1024);
+  // The check is held, so Stop is pressed while it runs (checks are fast now).
+  await page.evaluate(() => { (window as unknown as { __hold: string[] }).__hold.push('check'); });
+  const path = bigFile(10 * 1024 * 1024);
   await page.locator('#file').setInputFiles(path);
-  await expect(page.locator('#note')).toHaveText(
-    'This is a large file, so checking may take up to a minute. You can use other tabs meanwhile.');
+  await expect(page.locator('#note')).toHaveText(SIZE_NOTE);
   const stop = page.getByRole('button', { name: 'Stop' });
   await expect(stop).toBeVisible();
   await stop.click();
@@ -154,16 +160,19 @@ test('e2e: a large file gets a size note and can be stopped', async ({ page }) =
   await expect(page.locator('#note')).toBeHidden();
   expect(await made(page)).toBe(2);
   // Start state: the next file is checked normally.
+  await page.evaluate(() => { (window as unknown as { __hold: string[] }).__hold.length = 0; });
   await upload(page, 'clean.ged');
   await expect(page.locator('#status')).toHaveText('No problems found in 1 person.');
 });
 
-test('e2e: above 10 MB the note says a few minutes', async ({ page }) => {
+test('e2e: under 10 MB there is no size note', async ({ page }) => {
   test.setTimeout(120_000);
+  await instrument(page);
   await page.goto('/');
-  await page.locator('#file').setInputFiles(bigFile(10 * 1024 * 1024 + 100));
-  await expect(page.locator('#note')).toHaveText(
-    'This is a large file, so checking may take a few minutes. You can use other tabs meanwhile.');
+  await page.evaluate(() => { (window as unknown as { __hold: string[] }).__hold.push('check'); });
+  await page.locator('#file').setInputFiles(bigFile(10 * 1024 * 1024 - 1000));
+  await expect(page.locator('#status')).toHaveText(/^(Reading your file…|Getting the checker ready…|Checking…)$/);
+  await expect(page.locator('#note')).toBeHidden();
   await page.getByRole('button', { name: 'Stop' }).click();
   await expect(page.locator('#status')).toHaveText('Stopped.');
 });
@@ -177,7 +186,7 @@ test('e2e: above 5 MB the repair waits for a click and runs in a fresh worker', 
   await expect(page.locator('#status')).toHaveText(/^Checked: /, { timeout: 240_000 });
   const make = page.getByRole('button', { name: 'Make a repaired copy' });
   await expect(make).toBeVisible();
-  await expect(page.locator('#repair')).toContainText('This may take several minutes.');
+  await expect(page.locator('#repair')).toContainText('This may take a minute or so.');
   expect(await sent(page)).not.toContain('repair');
   const before = await made(page);
   await make.click();

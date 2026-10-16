@@ -15,6 +15,10 @@ export interface Bar {
 
 const FADE_AFTER = 400;
 const FADE_FOR = 200;
+const ENTER_FOR = 150;
+
+const reducedMotion = () =>
+  typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
 
 export function progressBar(root: HTMLElement): Bar {
   const stepEl = root.querySelector<HTMLElement>('#progress-step')!;
@@ -44,7 +48,8 @@ export function progressBar(root: HTMLElement): Bar {
     }
     pctEl.textContent = `${value}%`;
     track.setAttribute('aria-valuenow', String(value));
-    track.setAttribute('aria-valuetext', `${step} ${value}%`);
+    // The name (aria-labelledby) is the step; the value text is the percentage.
+    track.setAttribute('aria-valuetext', `${value}%`);
   };
 
   const bar: Bar = {
@@ -52,6 +57,16 @@ export function progressBar(root: HTMLElement): Bar {
       clearTimers();
       const wasHidden = root.hidden;
       root.hidden = false;
+      // Ease the bar in, so the dropzone below glides down instead of jumping
+      // under the pointer. It starts from no height and no margins: exactly
+      // the space a hidden bar takes.
+      if (wasHidden && !reducedMotion() && typeof root.animate === 'function') {
+        const cs = getComputedStyle(root);
+        root.animate([
+          { height: '0px', marginTop: '0px', marginBottom: '0px', opacity: 0, overflow: 'hidden' },
+          { height: `${root.offsetHeight}px`, marginTop: cs.marginTop, marginBottom: cs.marginBottom, opacity: 1, overflow: 'hidden' },
+        ], { duration: ENTER_FOR, easing: 'ease-out' });
+      }
       if (next !== step || wasHidden) {
         step = next;
         stepEl.textContent = next;
@@ -73,8 +88,7 @@ export function progressBar(root: HTMLElement): Bar {
       if (value < 100) { value = 100; paint(false); }
       timers.push(window.setTimeout(() => {
         // Fade, and close up the space it took, so the page below glides up instead of jumping.
-        const still = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
-        if (still || typeof root.animate !== 'function') { bar.hide(); return; }
+        if (reducedMotion() || typeof root.animate !== 'function') { bar.hide(); return; }
         const cs = getComputedStyle(root);
         fadeOut = root.animate([
           { opacity: 1, height: `${root.offsetHeight}px`, marginTop: cs.marginTop, marginBottom: cs.marginBottom, overflow: 'hidden' },

@@ -168,15 +168,14 @@ export const NOTE_55 =
 
 export const REPAIR_FAILED = "We couldn't make a repaired copy of this file.";
 export const KEEP_ORIGINAL = 'Keep your original file. This is a new copy.';
-export const OFFER_NOTE = 'This may take several minutes.';
+export const OFFER_NOTE = 'This may take a minute or so.';
 
 const MB = 1024 * 1024;
 
-/** The note under the status line while a big file is checked; '' under 2 MB. */
+/** The note under the status line while a big file is checked; '' under 10 MB. */
 export function sizeNote(bytes: number): string {
-  if (bytes < 2 * MB) return '';
-  const time = bytes > 10 * MB ? 'a few minutes' : 'up to a minute';
-  return `This is a large file, so checking may take ${time}. You can use other tabs meanwhile.`;
+  if (bytes < 10 * MB) return '';
+  return 'This is a large file, so checking may take a minute or so. You can use other tabs meanwhile.';
 }
 
 /**

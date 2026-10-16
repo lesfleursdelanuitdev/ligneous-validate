@@ -66,11 +66,7 @@ const (
 // summary, finish. A file that can't be parsed stops after parse. The result
 // is the same as Check's.
 func CheckWithProgress(raw []byte, progress func(stage string)) (res Result) {
-	step := func(stage string) {
-		if progress != nil {
-			progress(stage)
-		}
-	}
+	step := stepper(progress)
 	res = Result{Findings: []Finding{}, Names: map[string]string{}, Encoding: gedcom.EncodingInfo{}}
 	defer func() {
 		if r := recover(); r != nil {
@@ -121,6 +117,19 @@ func CheckWithProgress(raw []byte, progress func(stage string)) (res Result) {
 		res.Findings = append(res.Findings, f)
 	}
 	return res
+}
+
+// stepper turns an optional progress callback into a step function that can
+// never affect the result: a callback that panics (in the page, a JS callback
+// that throws) is recovered and ignored.
+func stepper(progress func(stage string)) func(string) {
+	return func(stage string) {
+		if progress == nil {
+			return
+		}
+		defer func() { _ = recover() }()
+		progress(stage)
+	}
 }
 
 func severityName(s int) string {

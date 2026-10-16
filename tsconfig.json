@@ -11,5 +11,5 @@
     "skipLibCheck": true,
     "noUnusedLocals": true
   },
-  "include": ["web/src", "web/vite.config.ts", "web/node-fs.d.ts", "vitest.config.ts"]
+  "include": ["web/src", "web/vite.config.ts", "web/node-fs.d.ts", "web/wasm-size.ts", "vitest.config.ts"]
 }

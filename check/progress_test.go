@@ -65,3 +65,32 @@ func TestRepairWithProgressStages(t *testing.T) {
 		}
 	}
 }
+
+// A progress callback that panics (in the page: a JS callback that throws)
+// never changes the result.
+func TestCheckWithProgressPanickingCallback(t *testing.T) {
+	raw := read(t, "testdata/royal92.ged")
+	calls := 0
+	res := CheckWithProgress(raw, func(string) { calls++; panic("callback broke") })
+	if calls != 5 {
+		t.Errorf("callback called %d times, want 5 (once per stage, even after panicking)", calls)
+	}
+	if !reflect.DeepEqual(res, Check(raw)) {
+		t.Fatalf("result differs from Check: error=%q", res.Error)
+	}
+}
+
+func TestRepairWithProgressPanickingCallback(t *testing.T) {
+	for _, p := range []string{"testdata/repair/cr-only.ged", "testdata/royal92.ged"} {
+		raw := read(t, p)
+		before := countFindings(Check(raw))
+		out, err := RepairWithProgress(raw, before, func(string) { panic("callback broke") })
+		if err != nil {
+			t.Fatalf("%s: err = %v", p, err)
+		}
+		ref, _ := Repair(raw)
+		if !reflect.DeepEqual(out, ref) {
+			t.Fatalf("%s: result differs from Repair", p)
+		}
+	}
+}

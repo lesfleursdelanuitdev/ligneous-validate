@@ -68,11 +68,7 @@ const (
 // be nil) is called once at the start of each stage, in order: repair, parse,
 // validate, finish. A failed repair stops after repair.
 func RepairWithProgress(raw []byte, before Counts, progress func(stage string)) (RepairOut, error) {
-	step := func(stage string) {
-		if progress != nil {
-			progress(stage)
-		}
-	}
+	step := stepper(progress)
 	step(StageRepair)
 	res, err := repair.Repair(raw)
 	if err != nil {

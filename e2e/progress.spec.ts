@@ -69,24 +69,99 @@ test('e2e: progress bar above the dropzone, rising through real stages, then gon
   expect(new Set(checking).size).toBeGreaterThanOrEqual(3);
   expect(checking.at(-1)).toBe(100);
   // valuetext is the step plus the percentage.
-  await expect(page.locator('#progress-bar')).toHaveAttribute('aria-valuetext', 'Checking… 100%');
+  // The name is the step; the value text is just the percentage.
+  await expect(page.locator('#progress-bar')).toHaveAttribute('aria-valuetext', '100%');
 });
 
-test('e2e: Stop hides the bar at once', async ({ page }) => {
-  test.setTimeout(120_000);
-  await page.locator('#file').setInputFiles(bigFile(3 * 1024 * 1024));
-  const bar = page.getByRole('progressbar');
-  await expect(bar).toBeVisible();
+/** Clicks Stop and reports whether the bar was hidden in the same task. */
+const stopNow = (page: Page) => page.evaluate(() => {
+  (document.getElementById('stop') as HTMLButtonElement).click();
+  return document.getElementById('progress')!.hidden;
+});
+
+test('e2e: Stop while the checker downloads hides the bar at once', async ({ page }) => {
+  // The first checker download is held until the end of the test; later ones go through.
+  let release: () => void = () => {};
+  let held = false;
+  await page.route('**/*.wasm', async route => {
+    if (held) { await route.continue().catch(() => {}); return; }
+    held = true;
+    await new Promise<void>(r => { release = r; });
+    await route.abort().catch(() => {});
+  });
+  await page.goto('/');
+  await page.locator('#file').setInputFiles(fixture('clean.ged'));
+  await expect(page.locator('#progress-step')).toHaveText('Getting the checker ready…');
   const stop = page.getByRole('button', { name: 'Stop' });
   await expect(stop).toBeVisible();
   // Stop sits on the bar's label row.
   expect(await stop.evaluate(b => b.closest('#progress') !== null)).toBe(true);
-  const hiddenRightAway = await page.evaluate(() => {
-    (document.getElementById('stop') as HTMLButtonElement).click();
-    return document.getElementById('progress')!.hidden;
-  });
-  expect(hiddenRightAway).toBe(true);
+  expect(await stopNow(page)).toBe(true);
   await expect(page.locator('#status')).toHaveText('Stopped.');
+  release();
+  // A fresh checker loads, and the next file is checked.
+  await page.locator('#file').setInputFiles(fixture('clean.ged'));
+  await expect(page.locator('#status')).toHaveText('No problems found in 1 person.');
+});
+
+test('e2e: Stop during the check hides the bar at once', async ({ page }) => {
+  // The worker's answer is held back from the page, so the check stays "running"
+  // at its last real stage for as long as the test needs.
+  await page.addInitScript(() => {
+    const add = Worker.prototype.addEventListener;
+    Worker.prototype.addEventListener = function (this: Worker, type: string, fn: EventListenerOrEventListenerObject, ...rest: unknown[]) {
+      if (type !== 'message') return add.call(this, type, fn, ...(rest as []));
+      const wrapped = (e: Event) => {
+        if ((e as MessageEvent).data?.type === 'result') return;
+        (typeof fn === 'function' ? fn : fn.handleEvent.bind(fn))(e);
+      };
+      return add.call(this, type, wrapped, ...(rest as []));
+    } as typeof Worker.prototype.addEventListener;
+  });
+  await page.goto('/');
+  await page.locator('#file').setInputFiles(fixture('royal92.ged'));
+  // The finish stage has started (85%): the wasm reported every stage.
+  await expect(page.locator('#progress-bar')).toHaveAttribute('aria-valuenow', '85');
+  await expect(page.locator('#progress-step')).toHaveText('Checking…');
+  expect(await stopNow(page)).toBe(true);
+  await expect(page.locator('#status')).toHaveText('Stopped.');
+  await expect(page.locator('#report')).toBeEmpty();
+});
+
+/** Samples the dropzone's top every frame from the moment the bar appears. */
+async function sampleEntrance(page: Page) {
+  await page.evaluate(() => {
+    const w = window as unknown as { __drop: { t: number; y: number }[]; __dropBefore: number };
+    const drop = document.getElementById('drop')!;
+    const bar = document.getElementById('progress')!;
+    w.__drop = [];
+    w.__dropBefore = drop.getBoundingClientRect().top + scrollY;
+    new MutationObserver((_, obs) => {
+      if (bar.hidden) return;
+      obs.disconnect();
+      const t0 = performance.now();
+      const tick = () => {
+        w.__drop.push({ t: performance.now() - t0, y: drop.getBoundingClientRect().top + scrollY });
+        if (performance.now() - t0 < 400) requestAnimationFrame(tick);
+      };
+      tick();
+    }).observe(bar, { attributes: true, attributeFilter: ['hidden'] });
+  });
+}
+const entrance = (page: Page) => page.evaluate(() => {
+  const w = window as unknown as { __drop: { t: number; y: number }[]; __dropBefore: number };
+  return { before: w.__dropBefore, samples: w.__drop };
+});
+
+test('e2e: the bar eases in, so the dropzone does not jump', async ({ page }) => {
+  await sampleEntrance(page);
+  await page.locator('#file').setInputFiles(fixture('royal92.ged'));
+  await expect(page.locator('#report .card').first()).toBeVisible();
+  const { before, samples } = await entrance(page);
+  expect(samples.length).toBeGreaterThan(3);
+  expect(samples[0].y).toBeLessThan(before + 4); // it starts where it was
+  const moving = new Set(samples.filter(s => s.t < 150).map(s => Math.round(s.y)));
+  expect(moving.size).toBeGreaterThanOrEqual(2); // and glides down
 });
 
 test('e2e: on a slow connection the first load shows real download progress', async ({ page }) => {
@@ -219,6 +294,14 @@ test('e2e: Enter on a focused summary opens it, and the line viewer is built', a
 
 test.describe('reduced motion', () => {
   test.use({ reducedMotion: 'reduce' });
+
+  test('e2e: with reduced motion the bar appears at once', async ({ page }) => {
+    await sampleEntrance(page);
+    await page.locator('#file').setInputFiles(fixture('royal92.ged'));
+    await expect(page.locator('#report .card').first()).toBeVisible();
+    const { before, samples } = await entrance(page);
+    expect(samples[0].y).toBeGreaterThan(before + 40); // already pushed down by the whole bar
+  });
 
   test('e2e: with reduced motion a card opens at once', async ({ page }) => {
     await royalReport(page);

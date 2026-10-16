@@ -29,7 +29,11 @@ func progressFrom(args []js.Value, i int) func(string) {
 		return nil
 	}
 	fn := args[i]
-	return func(stage string) { fn.Invoke(stage) }
+	return func(stage string) {
+		// A callback that throws must never change the result.
+		defer func() { _ = recover() }()
+		fn.Invoke(stage)
+	}
 }
 
 func checkFn(_ js.Value, args []js.Value) (ret any) {
