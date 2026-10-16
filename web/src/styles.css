@@ -183,6 +183,25 @@ h1 em { font-style: italic; }
   background: var(--card); border: 1px solid var(--border); border-left: 3px solid var(--error); border-radius: 10px;
 }
 
+/* ---------------------------------------------------------------- progress */
+
+/* The bar above the dropzone while a file is checked or a repaired copy made. */
+/* The -16px collapses with the dropzone's 32px top margin: 16px between bar
+   and dropzone. The fade-out animates both margins to 0, which lands on the
+   dropzone's own 32px, so nothing jumps when the bar is gone. */
+.progress { margin: 32px 0 -16px; text-align: left; }
+.progress-row { display: flex; align-items: center; justify-content: space-between; gap: 8px 16px; min-height: 36px; margin-bottom: 10px; }
+.progress-step { font-family: var(--sans); font-size: 14px; font-weight: 400; color: var(--muted); min-width: 0; }
+.progress-end { display: flex; align-items: center; gap: 14px; flex: none; }
+.progress-pct { font-size: 14px; font-weight: 500; color: var(--text); font-variant-numeric: tabular-nums; }
+.progress-track { height: 6px; border-radius: 100px; background: var(--border); overflow: hidden; }
+.progress-fill {
+  height: 100%; width: 100%; border-radius: inherit; background: var(--accent);
+  transform: scaleX(0); transform-origin: left center;
+  transition: transform 300ms ease-out;
+}
+.progress-fill.jump { transition: none; }
+
 /* ---------------------------------------------------------------- status */
 
 .status-area { margin-top: 28px; }
@@ -192,6 +211,10 @@ h1 em { font-style: italic; }
   color: var(--muted); text-wrap: balance;
 }
 #status:empty { display: none; }
+/* While the bar shows the step, the status line is only heard: it stays the live region. */
+#status.quiet {
+  position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap;
+}
 #status.good { font-style: normal; font-size: clamp(22px, 2.4vw, 28px); color: var(--accent); }
 #status.problem {
   font-family: var(--sans); font-style: normal; font-size: 15px; font-weight: 400; line-height: 1.55;
@@ -314,7 +337,8 @@ h1 em { font-style: italic; }
   display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; align-items: start;
 }
 .findings > li { min-width: 0; }
-.findings > li:has(> details[open]) { grid-column: 1 / -1; }
+/* An opened finding stays in its own column (spanning both made every card
+   below jump); the line viewer scrolls sideways inside itself. */
 @media (max-width: 640px) {
   .findings { grid-template-columns: minmax(0, 1fr); }
   .file .name { flex-basis: 100%; }
@@ -333,9 +357,11 @@ h1 em { font-style: italic; }
 .meta::after {
   content: ""; margin-left: auto; width: 7px; height: 7px; flex: none;
   border: solid var(--light); border-width: 0 1.5px 1.5px 0; transform: translateY(-2px) rotate(45deg);
-  transition: transform 150ms ease;
+  transition: transform 200ms ease-out;
 }
-.finding[open] .meta::after { transform: translateY(2px) rotate(-135deg); }
+/* is-open follows where the card is heading (src/toggle.ts), so the chevron
+   turns 180° in step with the open and close. */
+.finding.is-open .meta::after { transform: translateY(2px) rotate(-135deg); }
 .finding .sev {
   padding: 3px 10px; border-radius: 4px; font-size: 11px; font-weight: 600; line-height: 1.35;
   letter-spacing: 0.5px; text-transform: uppercase;

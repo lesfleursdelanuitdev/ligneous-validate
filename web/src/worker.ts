@@ -2,7 +2,11 @@
 // thread, so the page never freezes. Loading starts as soon as the worker is
 // created.
 
+import { downloadPercent, readWithProgress } from './progress';
 import type { Counts, FromWorker, RepairOut, Result, ToWorker } from './types';
+
+/** The size of ligneous.wasm, baked in at build time (web/vite.config.ts). */
+declare const __WASM_SIZE__: number;
 
 interface GoRuntime {
   importObject: WebAssembly.Imports;
@@ -10,8 +14,8 @@ interface GoRuntime {
 }
 
 interface Api {
-  check(bytes: Uint8Array): string;
-  repair(bytes: Uint8Array, before?: Counts): { data: Uint8Array; json: string };
+  check(bytes: Uint8Array, progress?: (stage: string) => void): string;
+  repair(bytes: Uint8Array, before?: Counts, progress?: (stage: string) => void): { data: Uint8Array; json: string };
 }
 
 interface WorkerScope {
@@ -32,14 +36,20 @@ const execUrl = new URL('/wasm_exec.js', self.location.origin).href;
 
 const post = (msg: FromWorker, transfer: Transferable[] = []) => scope.postMessage(msg, transfer);
 
+/**
+ * Downloads the checker, posting how far it has got, and starts it. The bytes
+ * are read as a stream and counted, so the page shows real progress; a
+ * cached response is read the same way.
+ */
 async function instantiate(go: GoRuntime): Promise<WebAssembly.Instance> {
-  try {
-    return (await WebAssembly.instantiateStreaming(fetch(wasmUrl), go.importObject)).instance;
-  } catch {
-    // e.g. a server that doesn't send application/wasm
-    const bytes = await (await fetch(wasmUrl)).arrayBuffer();
-    return (await WebAssembly.instantiate(bytes, go.importObject)).instance;
-  }
+  const res = await fetch(wasmUrl);
+  if (!res.ok) throw new Error(`checker download failed: ${res.status}`);
+  let last = -1;
+  const bytes = await readWithProgress(res, __WASM_SIZE__, (loaded, total) => {
+    const percent = downloadPercent(loaded, total);
+    if (percent !== last) { last = percent; post({ type: 'download', percent }); }
+  });
+  return (await WebAssembly.instantiate(bytes, go.importObject)).instance;
 }
 
 async function load(): Promise<Api> {
@@ -84,7 +94,8 @@ scope.addEventListener('message', async e => {
     post({ type: 'status', text: 'Checking…' });
     let result: Result;
     try {
-      const parsed = JSON.parse(api.check(bytes)) as Result | { error: string };
+      // Each stage is posted while the check is still running; the page gets it at once.
+      const parsed = JSON.parse(api.check(bytes, stage => post({ type: 'stage', job: 'check', stage }))) as Result | { error: string };
       result = 'findings' in parsed ? parsed : failed(parsed.error);
     } catch (err) {
       result = failed(String(err));
@@ -92,7 +103,7 @@ scope.addEventListener('message', async e => {
     post({ type: 'result', result });
   } else if (msg.type === 'repair') {
     try {
-      const out = api.repair(bytes, msg.before);
+      const out = api.repair(bytes, msg.before, stage => post({ type: 'stage', job: 'repair', stage }));
       const info = JSON.parse(out.json) as RepairOut;
       const data = out.data.slice().buffer; // its own buffer, sized exactly
       post({ type: 'repaired', data, info }, [data]);

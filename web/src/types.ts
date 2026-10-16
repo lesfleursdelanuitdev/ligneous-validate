@@ -74,6 +74,10 @@ export type ToWorker =
 export type FromWorker =
   | { type: 'status'; text: string }
   | { type: 'ready' }
+  /** How much of the checker has downloaded, 0-99 (whole percent). */
+  | { type: 'download'; percent: number }
+  /** A stage the Go checker has reached, sent while it is still running. */
+  | { type: 'stage'; job: 'check' | 'repair'; stage: string }
   | { type: 'result'; result: Result }
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
   | { type: 'error'; message: string };

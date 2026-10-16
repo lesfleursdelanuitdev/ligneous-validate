@@ -3,6 +3,7 @@
 // (covered by the e2e tests).
 
 import { fillParts, genericTitle, pageText } from './fill';
+import { smoothDetails } from './toggle';
 import type { Counts, Finding, Group, RepairOut, Result, Severity } from './types';
 
 // ---------------------------------------------------------------- view model
@@ -381,9 +382,8 @@ function findingItem(f: Finding, r: Result): HTMLElement {
     f.meaning ? el('span', { class: 'meaning' }, filled(f.meaning, f, r.names)) : null);
   details.append(summary);
   // The lines and the fix are built when the finding is first opened, so
-  // thousands of findings stay cheap.
-  details.addEventListener('toggle', () => {
-    if (!details.open || details.childElementCount > 1) return;
+  // thousands of findings stay cheap. It opens and closes smoothly.
+  smoothDetails(details as HTMLDetailsElement, () => {
     const body = el('div', { class: 'body' });
     if (f.line > 0) {
       const viewer = lineViewer(r, f.line);
@@ -392,7 +392,7 @@ function findingItem(f: Finding, r: Result): HTMLElement {
     if (f.howToFix) {
       body.append(el('h3', {}, 'How to fix it'), el('p', {}, filled(f.howToFix, f, r.names)));
     }
-    details.append(body);
+    return body;
   });
   return el('li', {}, details);
 }

@@ -28,6 +28,20 @@
       <p class="lead">See every problem in your family tree file in plain English, with the line it's on.</p>
     </div>
 
+    <div class="progress" id="progress" hidden>
+      <div class="progress-row">
+        <span class="progress-step" id="progress-step"></span>
+        <span class="progress-end">
+          <span class="progress-pct" id="progress-pct" aria-hidden="true">0%</span>
+          <button type="button" id="stop" class="more" hidden>Stop</button>
+        </span>
+      </div>
+      <div class="progress-track" role="progressbar" id="progress-bar" aria-labelledby="progress-step"
+        aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="progress-fill" id="progress-fill"></div>
+      </div>
+    </div>
+
     <div class="drop" id="drop">
       <svg class="drop-icon" viewBox="0 0 36 36" width="36" height="36" aria-hidden="true" focusable="false">
         <path d="M18 23V8M12 14l6-6 6 6M7 22v4.5A2.5 2.5 0 0 0 9.5 29h17a2.5 2.5 0 0 0 2.5-2.5V22"/>
@@ -44,7 +58,6 @@
       <p id="note" hidden></p>
     </div>
     <div class="status-actions">
-      <button type="button" id="stop" class="more" hidden>Stop</button>
       <button type="button" id="retry" class="more" hidden>Try again</button>
     </div>
   </section>

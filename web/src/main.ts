@@ -1,5 +1,7 @@
+import { progressBar } from './bar';
 import { reportCsv, reportText } from './export';
 import { downloadName } from './names';
+import { CHECK_STAGES, REPAIR_STAGES, stagePercent } from './progress';
 import {
   FAILED, countBySeverity, doneText, fillDownloads, fillRepair, fillRepairBusy, fillRepairFailed, fillRepairOffer, renderReport,
   repairPlan, sizeNote, viewKind,
@@ -19,6 +21,10 @@ const note = $<HTMLElement>('note');
 const report = $<HTMLElement>('report');
 const stop = $<HTMLButtonElement>('stop');
 const retry = $<HTMLButtonElement>('retry');
+const bar = progressBar($<HTMLElement>('progress'));
+
+const LOADING = 'Getting the checker ready…';
+const MAKING_REPAIR = 'Making a repaired copy…';
 
 let worker: Worker | null = null;
 let ready = false; // the current worker has loaded the checker
@@ -27,6 +33,8 @@ let repairing = false; // a repair has been asked for and not answered yet
 let broken = false;
 let current: File | null = null;
 let shown: { file: File; result: Result; slots: ReportSlots; repair: RepairOut | null } | null = null;
+let loadPercent = 0; // how much of the current worker's checker has downloaded
+let barRepair = false; // the bar is showing a repair the visitor asked for
 
 /** Saves text or bytes under `name` through a temporary link; nothing is sent anywhere. */
 function save(data: BlobPart, type: string, name: string) {
@@ -42,19 +50,22 @@ function save(data: BlobPart, type: string, name: string) {
 
 function say(text: string, extra = '', tone: '' | 'problem' | 'good' = '') {
   status.textContent = text;
-  status.className = tone;
+  // While a check runs, the bar above the dropzone shows the step, so the
+  // status line is only heard (it is still the live region that announces it).
+  status.className = tone || (busy ? 'quiet' : '');
   note.textContent = extra;
   note.hidden = extra === '';
 }
 
-/** Stop shows while a check or a repair runs. */
+/** Stop shows, on the progress bar's row, while a check or an asked-for repair runs. */
 function controls() {
-  stop.hidden = !(busy || repairing);
+  stop.hidden = !(busy || (repairing && barRepair));
 }
 
 function showNoWasm() {
   broken = true;
   busy = false;
+  bar.hide();
   report.replaceChildren();
   say(NO_WASM, '', 'problem');
   controls();
@@ -65,6 +76,7 @@ function showLoadFailed() {
   broken = true;
   busy = false;
   repairing = false;
+  bar.hide();
   report.replaceChildren();
   say(LOAD_FAILED, '', 'problem');
   retry.hidden = false;
@@ -75,6 +87,7 @@ function showLoadFailed() {
 function showFailed() {
   busy = false;
   shown = null;
+  bar.hide();
   report.replaceChildren();
   say(FAILED, '', 'problem');
   restart();
@@ -83,6 +96,7 @@ function showFailed() {
 
 function onResult(result: Result) {
   busy = false;
+  if (result.error) bar.hide(); else bar.done();
   const kind = viewKind(result);
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
@@ -108,12 +122,22 @@ function offerRepair() {
   const { file, slots } = shown;
   fillRepairOffer(slots.repair, () => {
     fillRepairBusy(slots.repair);
+    barRepair = true;
+    bar.show(MAKING_REPAIR, 0);
     void askRepair(file, true);
   });
 }
 
+/** The asked-for repair has ended: the bar fills and fades, or goes at once on a failure. */
+function repairBarEnd(ok: boolean) {
+  if (!barRepair) return;
+  barRepair = false;
+  if (ok) bar.done(); else bar.hide();
+}
+
 function onRepaired(data: ArrayBuffer, info: RepairOut) {
   repairing = false;
+  repairBarEnd(!info.error);
   // A failed repair (e.g. out of memory on a huge file) can leave the checker's runtime
   // dead, so the next file would fail too. Start a fresh one.
   if (info.error) restart();
@@ -132,7 +156,17 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
 function onMessage(e: MessageEvent<FromWorker>) {
   const msg = e.data;
   if (msg.type === 'status') {
-    if (busy) say(msg.text, note.textContent ?? '');
+    if (busy) {
+      say(msg.text, note.textContent ?? '');
+      bar.show(msg.text, msg.text === LOADING ? loadPercent : 0);
+    }
+  } else if (msg.type === 'download') {
+    loadPercent = Math.max(loadPercent, msg.percent);
+    if (busy && !ready) bar.show(LOADING, loadPercent);
+  } else if (msg.type === 'stage') {
+    const p = stagePercent(msg.job === 'check' ? CHECK_STAGES : REPAIR_STAGES, msg.stage);
+    if (msg.job === 'check' && busy && p >= 0) bar.set(p);
+    else if (msg.job === 'repair' && barRepair && p >= 0) bar.set(p);
   } else if (msg.type === 'ready') {
     ready = true;
   } else if (msg.type === 'error') {
@@ -153,6 +187,7 @@ function onWorkerError() {
     showFailed();
   } else if (repairing) {
     repairing = false;
+    repairBarEnd(false);
     restart();
     if (shown && shown.file === current) fillRepairFailed(shown.slots.repair);
     controls();
@@ -173,6 +208,7 @@ function restart() {
   worker?.terminate();
   repairing = false;
   ready = false;
+  loadPercent = 0;
   worker = start();
 }
 
@@ -183,9 +219,10 @@ async function askRepair(file: File, fresh: boolean) {
     bytes = await file.arrayBuffer();
   } catch {
     if (shown && shown.file === file) fillRepairFailed(shown.slots.repair);
+    repairBarEnd(false);
     return;
   }
-  if (current !== file || !shown) return;
+  if (current !== file || !shown) { repairBarEnd(false); return; }
   if (fresh) restart();
   const c = countBySeverity(shown.result.findings);
   repairing = true;
@@ -200,15 +237,18 @@ async function check(file: File) {
   // fresh runtime: the old one is busy, or may have died.
   if (busy || repairing) restart();
   busy = true;
+  barRepair = false;
   shown = null;
   report.replaceChildren();
   say('Reading your file…', sizeNote(file.size));
+  bar.show('Reading your file…', 0);
   controls();
   let bytes: ArrayBuffer;
   try {
     bytes = await file.arrayBuffer();
   } catch {
     busy = false;
+    bar.hide();
     say("We couldn't read that file. Try choosing it again.");
     controls();
     return;
@@ -218,6 +258,8 @@ async function check(file: File) {
 }
 
 stop.addEventListener('click', () => {
+  bar.hide();
+  barRepair = false;
   if (busy) {
     // Back to the start state.
     busy = false;
