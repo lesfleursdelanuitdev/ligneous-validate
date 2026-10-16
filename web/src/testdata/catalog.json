@@ -1,0 +1,380 @@
+[
+  {
+    "Code": "ENCODING_NOT_UTF8",
+    "Group": "format",
+    "Title": "This file uses an older character encoding ({encoding})",
+    "Meaning": "Most programs today expect UTF-8. Some will show accented letters wrongly when they import this file.",
+    "HowToFix": "Download the repaired file below, which is converted to UTF-8. Or, when you export from your program, pick \"UTF-8\" as the character set."
+  },
+  {
+    "Code": "ENCODING_MISLABELED",
+    "Group": "format",
+    "Title": "The file says it's {declared}, but it's really {encoding}",
+    "Meaning": "The header names one character set, but the letters in the file are written in another. A program that trusts the header will show accented letters as gibberish.",
+    "HowToFix": "Download the repaired file below. Its header matches its contents."
+  },
+  {
+    "Code": "ENCODING_UNDECLARED",
+    "Group": "format",
+    "Title": "The file doesn't say which character set it uses",
+    "Meaning": "We read it as UTF-8. Another program might guess differently.",
+    "HowToFix": "Download the repaired file below, which says UTF-8 in its header."
+  },
+  {
+    "Code": "ENCODING_BAD_BYTES",
+    "Group": "format",
+    "Title": "{count} characters couldn't be read",
+    "Meaning": "These bytes don't match any letter in the file's character set. They show as � here. The letters were probably damaged before this file was made.",
+    "HowToFix": "Find these people in your program and retype the names or places shown with �."
+  },
+  {
+    "Code": "ENCODING_STRAY_BYTES",
+    "Group": "format",
+    "Title": "Some characters were in a different encoding",
+    "Meaning": "{count} characters were in a different encoding from the rest of the file. We've read them as best we can — check the names and places on these lines.",
+    "HowToFix": "Look at the names and places on these lines in your program and correct any letter that looks wrong. The repaired file keeps the letters as we read them."
+  },
+  {
+    "Code": "LINE_TOO_LONG",
+    "Group": "format",
+    "Title": "A line is longer than GEDCOM allows",
+    "Meaning": "GEDCOM lines may be at most 255 characters. Some programs cut longer lines short and lose the end of the text.",
+    "HowToFix": "The repaired file splits long notes into continuation lines. For other kinds of line, shorten the text in your program."
+  },
+  {
+    "Code": "LINE_EXCEEDS_MAX_PHYSICAL_LENGTH",
+    "Group": "format",
+    "Title": "A line is longer than GEDCOM allows",
+    "Meaning": "GEDCOM lines may be at most 255 characters. Some programs cut longer lines short and lose the end of the text.",
+    "HowToFix": "The repaired file splits long notes into continuation lines. For other kinds of line, shorten the text in your program."
+  },
+  {
+    "Code": "EMPTY_LINE",
+    "Group": "format",
+    "Title": "Blank line",
+    "Meaning": "GEDCOM files shouldn't have blank lines. Most programs skip them, but a few stop reading.",
+    "HowToFix": "The repaired file removes them."
+  },
+  {
+    "Code": "LEADING_WHITESPACE",
+    "Group": "format",
+    "Title": "A line starts with spaces",
+    "Meaning": "Every line should start with its level number. Some programs reject lines that start with a space.",
+    "HowToFix": "The repaired file removes the spaces."
+  },
+  {
+    "Code": "BAD_LINE",
+    "Group": "format",
+    "Title": "A line we couldn't read",
+    "Meaning": "Every line needs a level number and a tag, like `1 NAME`. This one doesn't, so we skipped it. Anything it held is missing from the check.",
+    "HowToFix": "Open the file in a text editor at this line and see what it should be. The most common cause is a note whose text runs onto a new line without a `CONT` tag."
+  },
+  {
+    "Code": "BAD_LEVEL",
+    "Group": "format",
+    "Title": "A line's level number isn't a number",
+    "Meaning": "Every line starts with a number that shows how it nests under the line above. We skipped this line.",
+    "HowToFix": "Usually a note whose text broke onto a new line. Fix it in a text editor, or re-export from your program."
+  },
+  {
+    "Code": "XREF_WITHOUT_TAG",
+    "Group": "format",
+    "Title": "A record has an id but no type",
+    "Meaning": "This line has an id like `@I1@` but doesn't say whether it is a person, a family or something else. We skipped it.",
+    "HowToFix": "Re-export from your program. If it happens again, tell the program's makers."
+  },
+  {
+    "Code": "TOO_DEEP",
+    "Group": "format",
+    "Title": "Lines nest too deeply",
+    "Meaning": "This line is nested more than 100 levels deep, which no real file needs. The file is probably damaged.",
+    "HowToFix": "Re-export from your program."
+  },
+  {
+    "Code": "LEVEL_JUMP",
+    "Group": "format",
+    "Title": "A line skips a level",
+    "Meaning": "This line is nested two or more levels below the line above it. Programs may attach it to the wrong thing or drop it.",
+    "HowToFix": "Find this person or family in your program and check the event or fact near this line. If it looks right there, re-export."
+  },
+  {
+    "Code": "LINES_BEFORE_HEAD",
+    "Group": "format",
+    "Title": "There's text before the file's header",
+    "Meaning": "A GEDCOM file must begin with `0 HEAD`. We ignored {count} lines before it.",
+    "HowToFix": "Open the file in a text editor and delete everything above `0 HEAD`, or re-export from your program."
+  },
+  {
+    "Code": "UNKNOWN_RECORD",
+    "Group": "format",
+    "Title": "A kind of record we don't read",
+    "Meaning": "Your program saved some of its own records here (`{tag}`). Other programs usually ignore them. Nothing is wrong with your tree.",
+    "HowToFix": "Nothing to do, unless you need this information in another program."
+  },
+  {
+    "Code": "MISSING_HEADER",
+    "Group": "format",
+    "Title": "The file has no header",
+    "Meaning": "A GEDCOM file must start with `0 HEAD`. Without it, most programs won't open the file.",
+    "HowToFix": "Re-export from your program."
+  },
+  {
+    "Code": "MISSING_TRAILER",
+    "Group": "format",
+    "Title": "The file has no end marker",
+    "Meaning": "A GEDCOM file should end with `0 TRLR`. Without it, the file may have been cut short while it was copied or downloaded.",
+    "HowToFix": "Check that the file's last people are all there. The repaired file adds the end marker."
+  },
+  {
+    "Code": "READ_ERROR",
+    "Group": "format",
+    "Title": "We couldn't read the whole file",
+    "Meaning": "Something stopped us reading the file to the end. It may be damaged, or it may not be a GEDCOM file.",
+    "HowToFix": "Export the file from your program again and check the new copy."
+  },
+  {
+    "Code": "HEADER_MISSING_SUBM",
+    "Group": "header",
+    "Title": "The file doesn't say who made it",
+    "Meaning": "GEDCOM {gedcom_version} expects the header to name a submitter, meaning the person who made the file. Most programs don't mind.",
+    "HowToFix": "In your program, fill in your name as the researcher or submitter, then export again."
+  },
+  {
+    "Code": "XREF_EXCEEDS_VERSION_LIMIT",
+    "Group": "header",
+    "Title": "An id is longer than this GEDCOM version allows",
+    "Meaning": "Ids like `@I123@` may be at most 20 characters in GEDCOM before 7.0. Some programs reject longer ones.",
+    "HowToFix": "Usually nothing you can change in your program. If an import fails, tell the program's makers."
+  },
+  {
+    "Code": "MISSING_XREF_INDIVIDUAL",
+    "Group": "links",
+    "Title": "A person has no id",
+    "Meaning": "Every person needs an id such as `@I1@` so families can point to them. Nothing can link to this person.",
+    "HowToFix": "Re-export from your program."
+  },
+  {
+    "Code": "MISSING_XREF_FAMILY",
+    "Group": "links",
+    "Title": "A family has no id",
+    "Meaning": "Every family needs an id such as `@F1@` so people can point to it.",
+    "HowToFix": "Re-export from your program."
+  },
+  {
+    "Code": "ORPHANED_FAMC",
+    "Group": "links",
+    "Title": "{person} is a child of a family that doesn't exist",
+    "Meaning": "The file links {person} to family {target} as a child, but there's no such family in the file. The link is lost on import.",
+    "HowToFix": "Open {person} in your program and check their parents. Remove the broken link and add the parents again."
+  },
+  {
+    "Code": "ORPHANED_FAMS",
+    "Group": "links",
+    "Title": "{person} is a spouse in a family that doesn't exist",
+    "Meaning": "The file links {person} to family {target} as a partner, but there's no such family.",
+    "HowToFix": "Open {person} in your program and check their spouses or partners."
+  },
+  {
+    "Code": "ORPHANED_HUSB",
+    "Group": "links",
+    "Title": "A family's husband doesn't exist",
+    "Meaning": "Family {family} names {target} as husband, but there's no such person in the file.",
+    "HowToFix": "Open the family in your program and choose the husband again."
+  },
+  {
+    "Code": "ORPHANED_WIFE",
+    "Group": "links",
+    "Title": "A family's wife doesn't exist",
+    "Meaning": "Family {family} names {target} as wife, but there's no such person in the file.",
+    "HowToFix": "Open the family in your program and choose the wife again."
+  },
+  {
+    "Code": "ORPHANED_CHIL",
+    "Group": "links",
+    "Title": "A family's child doesn't exist",
+    "Meaning": "Family {family} lists {target} as a child, but there's no such person in the file.",
+    "HowToFix": "Open the family in your program and check its children."
+  },
+  {
+    "Code": "ORPHANED_SOUR",
+    "Group": "links",
+    "Title": "A source that doesn't exist",
+    "Meaning": "{person} cites source {target}, but there's no such source in the file. The citation is lost on import.",
+    "HowToFix": "Open the citation in your program and choose the source again."
+  },
+  {
+    "Code": "ORPHANED_NOTE",
+    "Group": "links",
+    "Title": "A note that doesn't exist",
+    "Meaning": "{person} points to note {target}, but there's no such note in the file.",
+    "HowToFix": "Open {person} in your program and check their notes."
+  },
+  {
+    "Code": "ORPHANED_XREF_OTHER",
+    "Group": "links",
+    "Title": "A link to something that doesn't exist",
+    "Meaning": "A `{pointer_tag}` line points to {target}, but there's no such record in the file.",
+    "HowToFix": "Find the record at this line in your program and remove or redo the link."
+  },
+  {
+    "Code": "MISSING_ASSOCIATE_XREF",
+    "Group": "links",
+    "Title": "An association with no person",
+    "Meaning": "{person} has an association (godparent, witness and so on) that doesn't say who with.",
+    "HowToFix": "Open {person} in your program and fix or remove the association."
+  },
+  {
+    "Code": "ORPHANED_ASSOCIATE_XREF",
+    "Group": "links",
+    "Title": "An association with someone who doesn't exist",
+    "Meaning": "{person} is associated with {target}, but there's no such person in the file.",
+    "HowToFix": "Open {person} in your program and fix or remove the association."
+  },
+  {
+    "Code": "INVALID_ASSOCIATE_TARGET",
+    "Group": "links",
+    "Title": "An association that doesn't point to a person",
+    "Meaning": "{person}'s association points to {target}, which is a {target_tag}, not a person.",
+    "HowToFix": "Open {person} in your program and choose the associated person again."
+  },
+  {
+    "Code": "MISSING_ASSOCIATE_RELA",
+    "Group": "links",
+    "Title": "An association that doesn't say what the relationship is",
+    "Meaning": "{person} is associated with {target} but the file doesn't say how, for example godparent or witness.",
+    "HowToFix": "Open the association in your program and fill in the relationship."
+  },
+  {
+    "Code": "EMPTY_FAMILY",
+    "Group": "links",
+    "Title": "A family with nobody in it",
+    "Meaning": "This family has no husband, wife or children. It's usually left over from deleting people.",
+    "HowToFix": "Find the empty family in your program and delete it."
+  },
+  {
+    "Code": "DEATH_BEFORE_BIRTH",
+    "Group": "dates",
+    "Title": "{person} died before they were born",
+    "Meaning": "Death year {death_year} is before birth year {birth_year}. One of the dates is probably mistyped.",
+    "HowToFix": "Open {person} in your program and check both dates against your sources."
+  },
+  {
+    "Code": "AGE_AT_DEATH_EXCEEDS_120",
+    "Group": "dates",
+    "Title": "{person} lived to {age}",
+    "Meaning": "Possible, but rare. Often a typo in a year, or two people with the same name combined into one.",
+    "HowToFix": "Check {person}'s birth and death dates against your sources."
+  },
+  {
+    "Code": "BAPTISM_BEFORE_BIRTH",
+    "Group": "dates",
+    "Title": "{person} was baptised before they were born",
+    "Meaning": "Baptism ({bapm}) is before birth ({birt}).",
+    "HowToFix": "Check both dates. Sometimes the baptism date was entered as the birth date."
+  },
+  {
+    "Code": "BURIAL_BEFORE_DEATH",
+    "Group": "dates",
+    "Title": "{person} was buried before they died",
+    "Meaning": "Burial ({buri}) is before death ({deat}).",
+    "HowToFix": "Check both dates against your sources."
+  },
+  {
+    "Code": "CHILD_BORN_BEFORE_FATHER",
+    "Group": "dates",
+    "Title": "{child} was born before their father",
+    "Meaning": "{child} was born before {father}. Usually a mistyped year, or the child linked to the wrong family.",
+    "HowToFix": "Check both birth dates, and that {child} is in the right family."
+  },
+  {
+    "Code": "CHILD_BORN_BEFORE_MOTHER",
+    "Group": "dates",
+    "Title": "{child} was born before their mother",
+    "Meaning": "{child} was born before {mother}. Usually a mistyped year, or the child linked to the wrong family.",
+    "HowToFix": "Check both birth dates, and that {child} is in the right family."
+  },
+  {
+    "Code": "FATHER_TOO_YOUNG_AT_CHILD_BIRTH",
+    "Group": "dates",
+    "Title": "{father} was {age} when {child} was born",
+    "Meaning": "That's younger than usual for a father. It may be right, but it's often a typo or the wrong family.",
+    "HowToFix": "Check both birth dates and {child}'s parents."
+  },
+  {
+    "Code": "MOTHER_TOO_YOUNG_AT_CHILD_BIRTH",
+    "Group": "dates",
+    "Title": "{mother} was {age} when {child} was born",
+    "Meaning": "That's younger than usual for a mother. It may be right, but it's often a typo or the wrong family.",
+    "HowToFix": "Check both birth dates and {child}'s parents."
+  },
+  {
+    "Code": "FATHER_TOO_OLD_AT_CHILD_BIRTH",
+    "Group": "dates",
+    "Title": "{father} was {age} when {child} was born",
+    "Meaning": "That's older than usual for a father. It's often two men with the same name combined into one.",
+    "HowToFix": "Check both birth dates and {child}'s parents."
+  },
+  {
+    "Code": "MOTHER_TOO_OLD_AT_CHILD_BIRTH",
+    "Group": "dates",
+    "Title": "{mother} was {age} when {child} was born",
+    "Meaning": "That's well past the age women usually have children. It's often a typo or the wrong family.",
+    "HowToFix": "Check both birth dates and {child}'s parents."
+  },
+  {
+    "Code": "MARRIAGE_BEFORE_SPOUSE_BIRTH",
+    "Group": "dates",
+    "Title": "{person} married before they were born",
+    "Meaning": "The marriage in {marriage_year} is before {person}'s birth.",
+    "HowToFix": "Check the marriage date and {person}'s birth date."
+  },
+  {
+    "Code": "MARRIED_BELOW_MINIMUM_AGE",
+    "Group": "dates",
+    "Title": "{person} married at {age}",
+    "Meaning": "That's younger than usual. It may be right for the time and place, or a mistyped year.",
+    "HowToFix": "Check the marriage date and {person}'s birth date."
+  },
+  {
+    "Code": "EVENT_DATE_UNPARSEABLE",
+    "Group": "dates",
+    "Title": "A date we couldn't understand",
+    "Meaning": "{person}'s {event} date reads \"{date}\". Programs may ignore it or read it differently.",
+    "HowToFix": "Rewrite it as a GEDCOM date, such as `12 MAR 1850`, `ABT 1850`, `BEF 1850` or `BET 1850 AND 1855`. Free text belongs in a note."
+  },
+  {
+    "Code": "SWAPPED_OPPOSITE_SEX_SPOUSE_TAGS",
+    "Group": "dates",
+    "Title": "The husband and wife may be swapped",
+    "Meaning": "In this family, the person entered as husband is female and the person entered as wife is male.",
+    "HowToFix": "Open the family in your program and check who is in which place, and each person's sex."
+  },
+  {
+    "Code": "MISSING_NAME",
+    "Group": "names",
+    "Title": "A person with no name",
+    "Meaning": "Person {person} has no name in the file. They'll show as \"unknown\" in most programs.",
+    "HowToFix": "Open the person in your program and add a name, even a partial one."
+  },
+  {
+    "Code": "NAME_TAG_EMPTY",
+    "Group": "names",
+    "Title": "A name that's blank",
+    "Meaning": "{person} has a name line with nothing in it.",
+    "HowToFix": "Open {person} in your program and fill in or remove the empty name."
+  },
+  {
+    "Code": "NAME_MISSING_SURNAME_SLASH",
+    "Group": "names",
+    "Title": "We can't tell which part of the name is the surname",
+    "Meaning": "GEDCOM marks the surname with slashes, as in `John /Smith/`. This name has none, so other programs may sort it wrongly.",
+    "HowToFix": "In your program, put the surname in the surname field. If the person has no known surname, this is fine."
+  },
+  {
+    "Code": "INVALID_SEX",
+    "Group": "names",
+    "Title": "A sex value other programs won't understand",
+    "Meaning": "{person}'s sex is \"{sex}\". GEDCOM allows M, F, U (unknown), X (intersex) and N (not recorded).",
+    "HowToFix": "Open {person} in your program and choose their sex again."
+  }
+]
