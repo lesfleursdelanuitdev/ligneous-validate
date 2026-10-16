@@ -80,7 +80,7 @@ func buildNames(ed *enricher.EnrichedDocument) map[string]string {
 		n := cleanName(p.FullName)
 		plain[p.Xref] = n
 		if n == "" {
-			names[p.Xref] = "Unnamed person (" + p.Xref + ")"
+			names[p.Xref] = p.Xref // an unnamed person reads as the bare xref
 			continue
 		}
 		b, hasB := yearOf(ed, p.BirthDateIndex)

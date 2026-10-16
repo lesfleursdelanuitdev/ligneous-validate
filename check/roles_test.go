@@ -87,7 +87,7 @@ func TestNames(t *testing.T) {
 		"@I2@": "Mary Smith (b. 1850)",
 		"@I3@": "Mary Smith (d. 1921)",
 		"@I4@": "Mary Smith",
-		"@I9@": "Unnamed person (@I9@)",
+		"@I9@": "@I9@",
 		"@F1@": "John Smith & Ann Lee",
 		"@F2@": "John Smith",
 		"@F3@": "@F3@",

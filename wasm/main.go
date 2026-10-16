@@ -50,7 +50,17 @@ func repairFn(_ js.Value, args []js.Value) (ret any) {
 	if len(args) < 1 {
 		return fail("repair needs a Uint8Array")
 	}
-	out, err := check.Repair(bytesIn(args[0]))
+	// An optional second argument {errors, warnings, hints} is the page's own
+	// count for the original, so it isn't checked a second time.
+	var out check.RepairOut
+	var err error
+	if len(args) > 1 && args[1].Type() == js.TypeObject {
+		b := args[1]
+		before := check.Counts{Errors: b.Get("errors").Int(), Warnings: b.Get("warnings").Int(), Hints: b.Get("hints").Int()}
+		out, err = check.RepairWithBefore(bytesIn(args[0]), before)
+	} else {
+		out, err = check.Repair(bytesIn(args[0]))
+	}
 	if err != nil {
 		return fail(err.Error())
 	}

@@ -4,6 +4,7 @@ package check
 
 import (
 	"bytes"
+	"fmt"
 	"strings"
 
 	"github.com/lesfleursdelanuitdev/ligneous-gedcom-lib/enricher"
@@ -21,7 +22,17 @@ type Result struct {
 	Names    map[string]string   `json:"names"`
 	Text     string              `json:"text"`
 	IsGedcom bool                `json:"isGedcom"`
+	// Error is set when the checker itself failed (a recovered panic).
+	Error string `json:"error,omitempty"`
+	// BOM and BareCR describe the raw bytes: a byte order mark, and a line
+	// ending in a lone CR. The library has no finding for either, but the
+	// repair fixes both.
+	BOM    bool `json:"bom"`
+	BareCR bool `json:"bareCR"`
 }
+
+// afterParse runs right after parsing; tests use it to make Check panic.
+var afterParse = func() {}
 
 // Finding is one problem, with its plain-English explanation.
 type Finding struct {
@@ -43,13 +54,17 @@ func Check(raw []byte) (res Result) {
 	defer func() {
 		if r := recover(); r != nil {
 			res.IsGedcom = false
+			res.Error = fmt.Sprint(r)
 		}
 	}()
+	res.BOM = hasBOM(raw)
+	res.BareCR = hasBareCR(raw)
 
 	if text, _, _ := parser.Decode(raw); text != nil {
 		res.Text = strings.TrimPrefix(string(text), "\uFEFF")
 	}
 
+	afterParse()
 	popts := parser.DefaultOptions()
 	popts.Lenient = true
 	doc, perrs, err := parser.ParseWithOptions(bytes.NewReader(raw), popts)
@@ -111,4 +126,25 @@ func newFinding(code, severity, message string, line int, details map[string]str
 		f.Title = code
 	}
 	return f
+}
+
+// hasBOM reports whether raw starts with a UTF-8 or UTF-16 byte order mark.
+func hasBOM(raw []byte) bool {
+	return bytes.HasPrefix(raw, []byte{0xEF, 0xBB, 0xBF}) ||
+		bytes.HasPrefix(raw, []byte{0xFF, 0xFE}) || bytes.HasPrefix(raw, []byte{0xFE, 0xFF})
+}
+
+// hasBareCR reports whether some line ends in a CR with no LF after it.
+func hasBareCR(raw []byte) bool {
+	for i := bytes.IndexByte(raw, '\r'); i >= 0; {
+		if i+1 >= len(raw) || raw[i+1] != '\n' {
+			return true
+		}
+		j := bytes.IndexByte(raw[i+1:], '\r')
+		if j < 0 {
+			return false
+		}
+		i += 1 + j
+	}
+	return false
 }

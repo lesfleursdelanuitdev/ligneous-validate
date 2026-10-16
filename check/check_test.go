@@ -118,3 +118,71 @@ func TestRepairCounts(t *testing.T) {
 		})
 	}
 }
+
+// A panic inside Check (a library bug on some input) is reported as a failure
+// of the checker, not as "this isn't a GEDCOM file".
+func TestCheckRecoverSetsError(t *testing.T) {
+	old := afterParse
+	t.Cleanup(func() { afterParse = old })
+	afterParse = func() { panic("boom") }
+	r := Check(read(t, "testdata/repair/leading-space.ged"))
+	if r.Error == "" {
+		t.Fatalf("Error is empty after a panic: %+v", r)
+	}
+	if !strings.Contains(r.Error, "boom") {
+		t.Errorf("Error = %q, want it to mention the panic", r.Error)
+	}
+	afterParse = old
+	if r := Check(read(t, "testdata/repair/leading-space.ged")); r.Error != "" {
+		t.Errorf("Error set without a panic: %q", r.Error)
+	}
+}
+
+// RepairWithBefore takes the Before counts from the page and never checks the
+// original again; After equals a Check of the repaired data.
+func TestRepairWithBefore(t *testing.T) {
+	raw := read(t, "testdata/repair/leading-space.ged")
+	sentinel := Counts{Errors: 99, Warnings: 98, Hints: 97}
+	out, err := RepairWithBefore(raw, sentinel)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if out.Before != sentinel {
+		t.Errorf("Before = %+v, want the given %+v", out.Before, sentinel)
+	}
+	if got := countFindings(Check(out.Data)); got != out.After {
+		t.Errorf("After = %+v, Check(out.Data) = %+v", out.After, got)
+	}
+	plain, err := Repair(raw)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if plain.Before != countFindings(Check(raw)) || plain.After != out.After || !bytes.Equal(plain.Data, out.Data) {
+		t.Errorf("Repair = %+v / %+v, RepairWithBefore = %+v", plain.Before, plain.After, out.After)
+	}
+}
+
+// The page skips the automatic repair of a file with no format findings only
+// when it is UTF-8 or ASCII with no byte order mark and no bare CR line ends.
+func TestCheckBOMAndBareCR(t *testing.T) {
+	min := "0 HEAD\r\n1 GEDC\r\n2 VERS 5.5.1\r\n1 CHAR UTF-8\r\n0 TRLR\r\n"
+	for _, c := range []struct {
+		name      string
+		raw       string
+		bom, bare bool
+	}{
+		{"crlf", min, false, false},
+		{"lf", strings.ReplaceAll(min, "\r\n", "\n"), false, false},
+		{"bom", "\xEF\xBB\xBF" + min, true, false},
+		{"cr", strings.ReplaceAll(min, "\r\n", "\r"), false, true},
+		{"one cr", strings.Replace(min, "\r\n", "\r", 1), false, true},
+	} {
+		r := Check([]byte(c.raw))
+		if r.BOM != c.bom || r.BareCR != c.bare {
+			t.Errorf("%s: bom %v bareCR %v, want %v %v", c.name, r.BOM, r.BareCR, c.bom, c.bare)
+		}
+	}
+	if r := Check(read(t, "testdata/repair/cr-only.ged")); !r.BareCR {
+		t.Error("cr-only.ged: BareCR false")
+	}
+}
