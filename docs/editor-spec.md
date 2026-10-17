@@ -59,6 +59,8 @@ The existing progress bar shows inside the toolbar while **Check again** runs.
 3. Replace the report and the markers.
 4. Keep the editor open, with the cursor where it was.
 
+Check again checks what Download edited file would give: the text first goes through `SaveUTF8`, so its CHAR is set as the download sets it, and the report matches the downloaded file (decided 2026-10-17).
+
 Findings that disappeared are simply gone. The counts in the toolbar update.
 
 ## Download edited file

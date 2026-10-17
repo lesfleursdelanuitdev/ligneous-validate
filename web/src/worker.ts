@@ -90,8 +90,16 @@ scope.addEventListener('message', async e => {
   } catch {
     return; // the error was posted when loading failed
   }
-  const bytes = new Uint8Array(msg.bytes);
+  let bytes: Uint8Array = new Uint8Array(msg.bytes);
   if (msg.type === 'check') {
+    // The editor's Check again checks the file Download would give, with its CHAR
+    // set the same way. If that can't be made (no GEDCOM line), the text as it is.
+    if (msg.save) {
+      try {
+        const out = api.save(bytes);
+        if (!(JSON.parse(out.json) as { error?: string }).error) bytes = out.data;
+      } catch { /* the text as it is */ }
+    }
     post({ type: 'status', text: 'Checking…' });
     let result: Result;
     try {

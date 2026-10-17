@@ -24,7 +24,7 @@ import { fill } from '../fill';
 import { filled, formatNumber, icon, severityWord } from '../render';
 import type { Finding, Result } from '../types';
 import { gedcomHighlighter, gedcomLanguage, tokenizeLine, valueStart } from './gedcom';
-import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, toDiagnosticSeverity, windowed } from './markers';
+import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, textChange, toDiagnosticSeverity, windowed } from './markers';
 import { recordLine } from './pointers';
 import { editorTheme } from './theme';
 import './editor.css';
@@ -533,8 +533,12 @@ export function createEditor(hostApi: EditorHost): Editor {
       checking = false;
       if (s && s.pending) {
         if (result && result.isGedcom && !result.error) {
-          // The checked text is what was sent; edits made while it ran stay "since".
-          s.basis = newBasis(result, s.pending.doc, s.pending.since);
+          // What was checked is the text sent, as Download gives it (its CHAR line may
+          // differ): that change, then the edits made while it ran, are "since".
+          const checked = s.view.state.toText(result.text);
+          const c = textChange(checked.toString(), s.pending.doc.toString());
+          const toSent = c ? ChangeSet.of(c, checked.length) : ChangeSet.empty(checked.length);
+          s.basis = newBasis(result, checked, toSent.compose(s.pending.since));
           s.stale = !s.pending.since.empty;
           s.current = -1;
           s.positions = null;

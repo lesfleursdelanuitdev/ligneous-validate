@@ -209,6 +209,31 @@ test('e2e editor: when Check again finds nothing left, the editor can still be r
   await expect(page.locator('#ed-edited')).toBeVisible();
 });
 
+test('e2e editor: Check again checks what Download gives, so an ANSEL file is not called mislabelled', async ({ page }) => {
+  await report(page, 'ansel.ged');
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.locator('.cm-line', { hasText: 'René /Dupré/' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Jr');
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(live(page)).toHaveText(/^Checked: /);
+  const status = await live(page).innerText();
+  // No "The file says it's ANSEL, but it's really UTF-8".
+  await expect(page.locator('#report')).not.toContainText("but it's really");
+  const cards = async () => (await page.locator('.finding summary').allInnerTexts()).sort();
+  const afterCheck = await cards();
+  // The downloaded file, checked as a file of its own, gives the same report.
+  const [download] = await Promise.all([
+    page.waitForEvent('download'),
+    page.getByRole('button', { name: 'Download edited file' }).click(),
+  ]);
+  const bytes = await readFile((await download.path())!);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.locator('#file').setInputFiles({ name: 'ansel.ged', mimeType: 'text/plain', buffer: bytes });
+  await expect(page.locator('#status')).toHaveText(status);
+  expect(await cards()).toEqual(afterCheck);
+});
+
 test('e2e editor: Ctrl-click on a pointer jumps to its record', async ({ page }) => {
   await report(page, 'editor.ged');
   await page.getByRole('button', { name: 'Open the editor' }).click();

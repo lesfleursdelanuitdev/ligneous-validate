@@ -68,7 +68,8 @@ export interface RepairOut {
 }
 
 export type ToWorker =
-  | { type: 'check'; bytes: ArrayBuffer }
+  /** `save`: check what Download edited file gives (the editor's Check again). */
+  | { type: 'check'; bytes: ArrayBuffer; save?: boolean }
   | { type: 'repair'; bytes: ArrayBuffer; before?: Counts }
   /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
   | { type: 'save'; bytes: ArrayBuffer };

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ChangeSet, Text } from '@codemirror/state';
-import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, toDiagnosticSeverity, windowed } from './markers';
+import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, textChange, toDiagnosticSeverity, windowed } from './markers';
 import type { Finding } from '../types';
 
 const f = (line: number, severity: Finding['severity'] = 'warning', code = 'X'): Finding => ({
@@ -95,5 +95,33 @@ describe('line breaks', () => {
     expect(lineBreakOf('0 HEAD\r1 CHAR UTF-8\r')).toBe('\r');
     expect(lineBreakOf('0 HEAD\n')).toBe('\n');
     expect(lineBreakOf('0 HEAD')).toBe('\n');
+  });
+});
+
+describe('the change from the checked text to the editor text', () => {
+  const apply = (a: string, c: { from: number; to: number; insert: string }) => a.slice(0, c.from) + c.insert + a.slice(c.to);
+
+  it('is empty when they are the same', () => {
+    expect(textChange('0 HEAD\n0 TRLR\n', '0 HEAD\n0 TRLR\n')).toBeNull();
+  });
+
+  it('is the one replaced CHAR line', () => {
+    const checked = '0 HEAD\n1 CHAR UTF-8\n0 @I1@ INDI\n';
+    const sent = '0 HEAD\n1 CHAR ANSEL\n0 @I1@ INDI\n';
+    const c = textChange(checked, sent)!;
+    expect(apply(checked, c)).toBe(sent);
+    expect(c.to - c.from).toBeLessThanOrEqual('UTF-8'.length);
+  });
+
+  it('is the one inserted CHAR line, so later lines map back one up', () => {
+    const checked = '0 HEAD\n1 GEDC\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME A\n';
+    const sent = '0 HEAD\n1 GEDC\n0 @I1@ INDI\n1 NAME A\n';
+    const c = textChange(checked, sent)!;
+    expect(apply(checked, c)).toBe(sent);
+    const t = Text.of(checked.split('\n'));
+    const changes = ChangeSet.of(c, t.length);
+    // Line 5 of the checked text ("1 NAME A") is line 4 of the editor's.
+    const at = mapLine(t, changes, 5)!;
+    expect(changes.apply(t).lineAt(at.from).number).toBe(4);
   });
 });

@@ -94,3 +94,19 @@ export function lineBreakOf(text: string): string {
   if (i < 0) return '\n';
   return text.startsWith('\r\n', i) ? '\r\n' : text[i];
 }
+
+/**
+ * The one change that turns `checked` into `sent`, or null when they are the
+ * same. Check again checks what Download gives (SaveUTF8): that can set or
+ * insert the header's CHAR line, so the checked text differs from the
+ * editor's by at most that. The common start and end are kept.
+ */
+export function textChange(checked: string, sent: string): { from: number; to: number; insert: string } | null {
+  if (checked === sent) return null;
+  const max = Math.min(checked.length, sent.length);
+  let pre = 0;
+  while (pre < max && checked.charCodeAt(pre) === sent.charCodeAt(pre)) pre++;
+  let post = 0;
+  while (post < max - pre && checked.charCodeAt(checked.length - 1 - post) === sent.charCodeAt(sent.length - 1 - post)) post++;
+  return { from: pre, to: checked.length - post, insert: sent.slice(pre, sent.length - post) };
+}

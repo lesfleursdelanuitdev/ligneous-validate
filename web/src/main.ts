@@ -282,7 +282,7 @@ async function check(file: File, fromEditor = false) {
     return;
   }
   if (current !== file) return;
-  worker!.postMessage({ type: 'check', bytes }, [bytes]);
+  worker!.postMessage({ type: 'check', bytes, save: fromEditor }, [bytes]);
 }
 
 stop.addEventListener('click', () => {
