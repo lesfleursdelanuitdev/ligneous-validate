@@ -429,6 +429,47 @@ export function createEditor(hostApi: EditorHost): Editor {
 
   let returnTo: HTMLElement | null = null;
 
+  // ------------------------------------------------------------ the page behind
+
+  // While the editor is open the page behind is pinned where it was (editor.css,
+  // html.ed-lock), so neither a swipe nor CodeMirror keeping the cursor in view
+  // scrolls it; closing puts it back. The dialog follows the visual viewport, so
+  // an on-screen keyboard shrinks it instead of pushing its top or bottom off
+  // the screen. Custom properties set through the CSSOM, which the CSP allows.
+  let locked: { x: number; y: number } | null = null;
+  const root = document.documentElement;
+  const vv = window.visualViewport;
+  const fitViewport = () => {
+    // Only for the keyboard: under pinch zoom the dialog stays the page's size.
+    if (vv && Math.abs(vv.scale - 1) < 0.01 && Math.round(vv.height) < window.innerHeight) {
+      dialog.style.setProperty('--ed-vv-height', `${vv.height}px`);
+      dialog.style.setProperty('--ed-vv-top', `${vv.offsetTop}px`);
+    } else {
+      dialog.style.removeProperty('--ed-vv-height');
+      dialog.style.removeProperty('--ed-vv-top');
+    }
+  };
+  const lockPage = () => {
+    if (locked) return;
+    locked = { x: window.scrollX, y: window.scrollY };
+    root.style.setProperty('--ed-lock-top', `${-locked.y}px`);
+    root.classList.add('ed-lock');
+    vv?.addEventListener('resize', fitViewport);
+    vv?.addEventListener('scroll', fitViewport);
+    fitViewport();
+  };
+  const unlockPage = () => {
+    if (!locked) return;
+    vv?.removeEventListener('resize', fitViewport);
+    vv?.removeEventListener('scroll', fitViewport);
+    dialog.style.removeProperty('--ed-vv-height');
+    dialog.style.removeProperty('--ed-vv-top');
+    root.classList.remove('ed-lock');
+    root.style.removeProperty('--ed-lock-top');
+    window.scrollTo(locked.x, locked.y);
+    locked = null;
+  };
+
   const open = (fileName: string, result: Result | null, line: number, opener: HTMLElement, code?: string) => {
     if (!s) {
       if (!result) return;
@@ -445,7 +486,10 @@ export function createEditor(hostApi: EditorHost): Editor {
     s.openerCode = code;
     showCount();
     showFlags();
-    if (!dialog.open) dialog.showModal();
+    if (!dialog.open) {
+      lockPage();
+      dialog.showModal();
+    }
     s.view.requestMeasure();
     let gone = 0;
     if (line > 0) {
@@ -485,6 +529,7 @@ export function createEditor(hostApi: EditorHost): Editor {
   };
   // However the dialog closes (Close, Esc, or the browser), focus goes back and the bar moves home.
   dialog.addEventListener('close', () => {
+    unlockPage();
     if (!s) return;
     if (searchPanelOpen(s.view.state)) closeSearchPanel(s.view);
     hostApi.closed(returnTo, checkedLine(s.openerPos), s.openerCode);

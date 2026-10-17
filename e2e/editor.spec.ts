@@ -511,6 +511,79 @@ test('e2e editor: line wrapping is off, with a toggle', async ({ page }) => {
   expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth)).toBe(true);
 });
 
+test('e2e editor: the dialog fits the viewport at every size, long lines scroll only inside, the page behind stays put', async ({ page, isMobile }) => {
+  // A 5,000-character line with no spaces, and a long line of words.
+  const ged = HEAD + `0 @I1@ INDI\n1 NAME Jane /Smith/\n1 NOTE ${'x'.repeat(5000)}\n1 NOTE ${'word '.repeat(1000).trim()}\n0 TRLR\n`;
+  await page.locator('#file').setInputFiles({ name: 'long-lines.ged', mimeType: 'text/plain', buffer: Buffer.from(ged) });
+  await expect(page.locator('#status')).toHaveText(/^Checked: /);
+  const open = page.getByRole('button', { name: 'Open the editor' });
+  await open.scrollIntoViewIfNeeded();
+  const before = await page.evaluate(() => window.scrollY);
+  expect(before).toBeGreaterThan(0); // so "the page stays put" means something
+  await open.click();
+  await expect(page.locator('.cm-content')).toBeVisible();
+  await expect(page.locator('html')).toHaveClass(/\bed-lock\b/);
+  const scroller = page.locator('.cm-scroller');
+
+  const measure = () => page.evaluate(() => {
+    const d = document.querySelector<HTMLDialogElement>('dialog.editor')!;
+    const r = d.getBoundingClientRect();
+    const de = document.documentElement;
+    const sc = document.querySelector('.ed-host')!.shadowRoot!.querySelector('.cm-scroller')!;
+    return {
+      pageWide: de.scrollWidth - de.clientWidth,
+      dialog: [r.left, r.top, r.width, r.height],
+      viewport: [0, 0, window.innerWidth, window.innerHeight],
+      dialogScrolls: [d.scrollWidth - d.clientWidth, d.scrollHeight - d.clientHeight],
+      bodyOverflow: getComputedStyle(document.body).overflow,
+      bodyPosition: getComputedStyle(document.body).position,
+      innerWide: sc.scrollWidth > sc.clientWidth,
+    };
+  });
+  for (const [width, height] of [[1280, 800], [768, 1024], [390, 844]]) {
+    await page.setViewportSize({ width, height });
+    for (const wrap of [false, true]) {
+      await page.getByLabel('Wrap lines').setChecked(wrap);
+      // The cursor to the end of the 5,000-character line, then some typing there.
+      await page.locator('.cm-line', { hasText: /^1 NOTE x+/ }).click();
+      await page.keyboard.press('End');
+      await page.keyboard.type('!');
+      await expect.poll(() => scroller.evaluate(e => e.scrollWidth > e.clientWidth), `${width} wrap ${wrap}`).toBe(!wrap);
+      const m = await measure();
+      const at = `${width}x${height}, wrap ${wrap}`;
+      expect(m.pageWide, at).toBe(0);
+      expect(m.dialog, at).toEqual(m.viewport);
+      expect(m.dialogScrolls, at).toEqual([0, 0]);
+      expect(m.bodyOverflow, at).toBe('hidden');
+      expect(m.bodyPosition, at).toBe('fixed');
+      // Every control is on screen, and the toolbar wraps instead of widening anything.
+      for (const name of ['Previous problem', 'Next problem', 'Check again', 'Download edited file', 'Close', 'Find and replace']) {
+        const box = (await page.getByRole('button', { name, exact: true }).boundingBox())!;
+        expect(box.x, `${name} ${at}`).toBeGreaterThanOrEqual(0);
+        expect(box.x + box.width, `${name} ${at}`).toBeLessThanOrEqual(width);
+        expect(box.y + box.height, `${name} ${at}`).toBeLessThanOrEqual(height);
+      }
+      // A wheel over the toolbar scrolls nothing behind it.
+      await page.mouse.move(width / 2, 4);
+      await page.mouse.wheel(300, 600);
+      await expect.poll(() => page.evaluate(() => [window.scrollX, window.scrollY, document.documentElement.scrollWidth - document.documentElement.clientWidth])).toEqual([0, 0, 0]);
+    }
+  }
+  // Phones: the text is at least 16px, or iOS zooms the whole page in when it is tapped.
+  if (isMobile) {
+    const px = await page.locator('.cm-content').evaluate(e => parseFloat(getComputedStyle(e).fontSize));
+    expect(px).toBeGreaterThanOrEqual(16);
+  }
+  // Closing unpins the page, back where it was.
+  page.once('dialog', d => d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(dialog(page)).toBeHidden();
+  await expect(page.locator('html')).not.toHaveClass(/\bed-lock\b/);
+  expect(await page.evaluate(() => getComputedStyle(document.body).position)).toBe('static');
+  await page.setViewportSize({ width: 1280, height: 800 });
+  await expect(open).toBeInViewport();
+});
+
 test('e2e editor: undo and redo, and search and replace', async ({ page }) => {
   await report(page, 'editor.ged');
   await page.getByRole('button', { name: 'Open the editor' }).click();

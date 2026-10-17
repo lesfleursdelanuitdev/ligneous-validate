@@ -26,11 +26,19 @@
   --gx-space: rgba(242, 160, 160, 0.2); --gx-active: rgba(143, 201, 181, 0.06); --gx-sel: rgba(143, 201, 181, 0.24);
 }
 
-html:has(dialog.editor[open]) { overflow: hidden; }
+/* While the editor is open the page behind can't scroll, by hand or by
+   CodeMirror keeping the cursor in view (editor.ts sets the class and
+   --ed-lock-top, and puts the page back where it was on close). */
+html.ed-lock, html.ed-lock body { overflow: hidden; overscroll-behavior: none; }
+html.ed-lock body { position: fixed; top: var(--ed-lock-top, 0); left: 0; right: 0; width: 100%; }
 
+/* Exactly the visible viewport: its height follows the on-screen keyboard
+   (--ed-vv-*, from visualViewport in editor.ts). Nothing in it may push it
+   wider or taller; long lines scroll inside CodeMirror's scroller only. */
 .editor {
-  position: fixed; inset: 0; width: 100%; height: 100%; max-width: none; max-height: none;
-  margin: 0; padding: 0; border: 0;
+  position: fixed; top: var(--ed-vv-top, 0); left: 0; right: 0; bottom: auto;
+  width: 100%; height: var(--ed-vv-height, 100%); min-width: 0; max-width: 100%; max-height: none;
+  margin: 0; padding: 0; border: 0; overflow: hidden; box-sizing: border-box;
   background: var(--bg); color: var(--text);
   font-family: var(--sans); font-size: 15px; font-weight: 300; line-height: 1.55;
 }
@@ -39,6 +47,7 @@ html:has(dialog.editor[open]) { overflow: hidden; }
 
 /* ---------------------------------------------------------------- toolbar */
 
+.ed-bar, .ed-status, .ed-host { min-width: 0; max-width: 100%; }
 .ed-bar {
   flex: none; padding: 10px var(--ed-gutter) 10px;
   padding-top: max(10px, env(safe-area-inset-top));
@@ -74,7 +83,7 @@ html:has(dialog.editor[open]) { overflow: hidden; }
 
 /* ---------------------------------------------------------------- text */
 
-.ed-host { display: block; flex: 1 1 auto; min-height: 0; }
+.ed-host { display: block; flex: 1 1 auto; min-height: 0; overflow: hidden; }
 
 /* ---------------------------------------------------------------- status line */
 

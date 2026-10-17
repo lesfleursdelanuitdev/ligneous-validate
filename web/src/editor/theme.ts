@@ -105,8 +105,10 @@ export const editorTheme = EditorView.theme({
   '.cm-searchMatch.cm-searchMatch-selected': { backgroundColor: 'var(--gx-sel)' },
 
   // Touch screens: bigger text and targets.
+  // 16px at least: iOS Safari zooms the whole page in when you tap into
+  // smaller editable text, and the zoomed page then overflows the screen.
   '@media (pointer: coarse)': {
-    '.cm-scroller': { fontSize: '15px' },
+    '.cm-scroller': { fontSize: '16px' },
     '.cm-textfield': { fontSize: '16px', minHeight: '44px' },
     '.cm-button, .cm-diagnosticAction': { minHeight: '44px' },
     '.cm-search label': { minHeight: '44px' },
