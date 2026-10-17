@@ -301,6 +301,7 @@ h1 em { font-style: italic; }
   border: solid var(--on-accent); border-width: 0 1.75px 1.75px 0; transform: rotate(45deg);
 }
 .chip.warning .sev { color: var(--amber); }
+.chip[hidden] { display: none; }
 
 #downloads { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 #downloads .dl-label { flex-basis: 100%; }
@@ -492,6 +493,17 @@ h1 em { font-style: italic; }
 .finding .sev.warning { background: var(--amber-tint); color: var(--amber); }
 .finding .sev.hint { background: var(--hint-tint); color: var(--accent); }
 .meta .at { font-size: 13px; font-weight: 300; color: var(--faint); font-variant-numeric: tabular-nums; }
+
+/* A finding the repaired copy no longer has: it keeps its place, muted, its
+   title struck through, with a badge that says where it is fixed. */
+.fixed-badge {
+  display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border-radius: 100px;
+  font-size: 12px; font-weight: 500; line-height: 1.35; color: var(--accent); background: var(--hint-tint);
+}
+.fixed-badge svg { flex: none; fill: none; stroke: currentColor; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+.findings > li:has(.finding.is-fixed) { background: var(--tint); border-color: var(--border-soft); }
+.finding.is-fixed .title { color: var(--muted); font-weight: 400; }
+.finding.is-fixed .title s { text-decoration-thickness: 1px; text-decoration-color: var(--light); }
 .title { font-size: 14px; font-weight: 500; line-height: 1.45; color: var(--text); overflow-wrap: anywhere; }
 .meaning { margin-top: 6px; font-size: 13px; font-weight: 300; line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
 

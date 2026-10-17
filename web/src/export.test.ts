@@ -164,3 +164,28 @@ Removed spaces before the level number: 7 lines (2, 3, 4, 5, 6, …)
     expect(reportText('t.ged', r)).toContain('How to fix it: Download the repaired file on this page, which says UTF-8 in its header.');
   });
 });
+
+describe('findings fixed in the repaired copy', () => {
+  const fixed = { fixed: new Set([two.findings[1]]), stale: false };
+  it('are marked in the text report, which says the original still has them', () => {
+    const t = reportText('tree.ged', two, new Date('2026-10-16T09:30:00Z'), null, fixed);
+    expect(t).toContain("1 of these is fixed in the repaired copy; your original file still has it.");
+    expect(t).toContain("[Error] Line 1,204: Mary Smith is a child of a family that doesn't exist [fixed in the repaired copy]");
+    expect(t).toContain('[Warning] Line 30: Mary Smith died before they were born\n');
+    const last = reportText('tree.ged', two, new Date(), null, { ...fixed, stale: true });
+    expect(last).toContain('[fixed in the last repaired copy]');
+  });
+  it('get a last column in the CSV, with formula protection kept', () => {
+    const lines = reportCsv(two, fixed).slice(1).split('\r\n');
+    expect(lines[0]).toBe('"severity","code","line","title","people","meaning","fixed in the repaired copy"');
+    expect(lines[1].endsWith(',"yes"')).toBe(true); // the error comes first (Broken links)
+    expect(lines[2].endsWith(',"no"')).toBe(true);
+    const evil = result([finding({ title: '{person}', roles: { person: '@I1@' } })], { names: { '@I1@': '=HYPERLINK("x")' } });
+    expect(reportCsv(evil, { fixed: new Set(evil.findings), stale: true }).split('\r\n')[1])
+      .toBe('"error","X","1","\'=HYPERLINK(""x"")","\'=HYPERLINK(""x"")","","yes"');
+  });
+  it('change nothing without marks', () => {
+    expect(reportCsv(two, { fixed: new Set(), stale: false })).toBe(reportCsv(two));
+    expect(reportText('a.ged', two, new Date(0), null, null)).toBe(reportText('a.ged', two, new Date(0)));
+  });
+});

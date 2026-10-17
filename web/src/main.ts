@@ -1,6 +1,7 @@
 import { progressBar } from './bar';
 import { reportCsv, reportText } from './export';
 import { downloadName } from './names';
+import { fixedFindings } from './fixed';
 import { CHECK_STAGES, REPAIR_STAGES, stagePercent } from './progress';
 import {
   FAILED, REPAIR_FAILED, countBySeverity, doneText, fillDownloads, fillRepairFailed, renderReport, repairPlan, sizeNote, viewKind,
@@ -172,8 +173,8 @@ function onResult(result: Result) {
   showReopen();
   if (kind === 'report') {
     fillDownloads(slots.downloads,
-      () => save(reportText(file.name, result, new Date(), view.repair), 'text/plain;charset=utf-8', downloadName(file.name, 'report-txt')),
-      () => save(reportCsv(result), 'text/csv;charset=utf-8', downloadName(file.name, 'report-csv')));
+      () => save(reportText(file.name, result, new Date(), view.repair, slots.fixed()), 'text/plain;charset=utf-8', downloadName(file.name, 'report-txt')),
+      () => save(reportCsv(result, slots.fixed()), 'text/csv;charset=utf-8', downloadName(file.name, 'report-csv')));
   }
   if (result.error) {
     restart(); // a fresh runtime for the next file
@@ -206,6 +207,8 @@ function showCard(view: Shown, available: FixInfo[], units: PlanOut['units'] | n
     result: view.result, checklist: c, big: view.file.size > AUTO_LIMIT,
     onRun: run => runAsked(view, run),
     onChange: () => schedulePlan(view),
+    // The marks belong to the last run: when the choices change they say so.
+    onStale: stale => { const m = view.slots.fixed(); if (m) view.slots.setFixed({ ...m, stale }); },
     onDownload: () => {
       if (view.data) save(view.data, 'application/octet-stream', downloadName(view.file.name, 'repaired'));
     },
@@ -272,6 +275,7 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   if (info.error) {
     if (view.card && view.pending) {
       view.card.showFailed();
+      view.slots.setFixed(null); // no copy now, so nothing is fixed in one
       say(REPAIR_FAILED, '', 'problem');
       runEnded(view);
       catchUpPlan(view);
@@ -298,6 +302,8 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   const run: Run = view.pending ?? { fixes: selectedFixes(c), name: '', leftOut: [] };
   markRan(c, run, info);
   view.card!.showResult(info);
+  // A run the visitor asked for marks the findings its copy no longer has.
+  if (view.pending) view.slots.setFixed({ fixed: fixedFindings(view.result, info), stale: false });
   if (view.pending) say(announce(info, run.leftOut));
   runEnded(view);
   // A fresh worker for a big file dropped any plan still on its way: ask again.

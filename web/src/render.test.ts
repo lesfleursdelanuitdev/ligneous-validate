@@ -3,7 +3,7 @@ import catalogText from './testdata/catalog.json?raw';
 import {
   FAILED, GROUPS, KEEP_ORIGINAL, OFFER_NOTE, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
   lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, severityWord, sizeNote,
-  summaryRows, viewKind, visibleSlice, editLabel,
+  summaryRows, viewKind, visibleSlice, editLabel, groupCount, fixedChipLabel,
 } from './render';
 import { resultView } from './checklist';
 import type { Finding, Group, Result, Severity } from './types';
@@ -359,5 +359,19 @@ describe('the Edit line button', () => {
   });
   it('is not given to whole-file findings', () => {
     expect(editLabel(0)).toBeNull();
+  });
+});
+
+describe('counts with fixed findings', () => {
+  it('shows the fixed ones next to the total, saying which copy', () => {
+    expect(groupCount(12, 0)).toBe('(12)');
+    expect(groupCount(1204, 9)).toBe('(1,204 · 9 fixed in the repaired copy)');
+    expect(groupCount(12, 9, true)).toBe('(12 · 9 fixed in the last repaired copy)');
+    expect(fixedChipLabel(1200)).toBe('1,200 fixed in the repaired copy');
+  });
+  it('leaves hidden fixed findings out of the groups', () => {
+    const a = { code: 'A', severity: 'error', group: 'links', title: 'a', meaning: '', howToFix: '', line: 1, details: {}, xrefs: [], roles: {} } as Finding;
+    const b = { ...a, code: 'B', line: 2 };
+    expect(buildGroups([a, b], { error: true, warning: true, hint: true }, new Set([a]))[0].findings).toEqual([b]);
   });
 });

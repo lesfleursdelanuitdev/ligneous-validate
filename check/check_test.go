@@ -4,8 +4,11 @@ import (
 	"bytes"
 	"math/rand"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
+
+	"github.com/lesfleursdelanuitdev/ligneous-gedcom-lib/repair"
 )
 
 func read(t *testing.T, p string) []byte {
@@ -184,5 +187,26 @@ func TestCheckBOMAndBareCR(t *testing.T) {
 	}
 	if r := Check(read(t, "testdata/repair/cr-only.ged")); !r.BareCR {
 		t.Error("cr-only.ged: BareCR false")
+	}
+}
+
+// Remaining counts, code by code, what a Check of the repaired copy finds, so
+// the page can mark the findings the copy no longer has.
+func TestRepairRemainingByCode(t *testing.T) {
+	for _, name := range []string{"testdata/repair/leading-space.ged", "../e2e/fixtures/suggested.ged", "../e2e/fixtures/ansel-long.ged"} {
+		raw := read(t, name)
+		for _, opt := range []repair.Options{{}, {Fixes: []repair.Fix{}}, {Fixes: []repair.Fix{repair.FixBlankLines, repair.FixBrokenLinks}}} {
+			out, err := RepairWithOptions(raw, countFindings(Check(raw)), opt)
+			if err != nil {
+				t.Fatal(err)
+			}
+			want := map[string]int{}
+			for _, f := range Check(out.Data).Findings {
+				want[f.Code]++
+			}
+			if !reflect.DeepEqual(out.Remaining, want) {
+				t.Errorf("%s %v: Remaining = %v, Check(out.Data) by code = %v", name, opt.Fixes, out.Remaining, want)
+			}
+		}
 	}
 }

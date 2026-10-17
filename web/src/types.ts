@@ -102,6 +102,8 @@ export interface RepairOut {
   left: string[];
   before: Counts;
   after: Counts;
+  /** How many findings of each code a check of the repaired copy gives (missing from older checkers). */
+  remaining?: Record<string, number>;
   /** Missing only in answers from older checkers (and in some tests' fakes). */
   available?: FixInfo[];
   applied?: FixInfo[];

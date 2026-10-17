@@ -5,6 +5,8 @@
 import { isDataCode } from './codes';
 import { fillParts, genericTitle, pageText } from './fill';
 import { smoothDetails } from './toggle';
+import { FIXED_BADGE, FIXED_BADGE_STALE, fixedPhrase } from './fixed';
+import type { FixedMarks } from './fixed';
 import type { Finding, Group, RepairOut, Result, Severity } from './types';
 
 // ---------------------------------------------------------------- view model
@@ -33,11 +35,14 @@ export const formatNumber = (n: number): string => numbers.format(n);
 
 const rank: Record<Severity, number> = { error: 0, warning: 1, hint: 2 };
 
-/** Non-empty groups in the fixed order; errors, then warnings, then hints, each by line. */
-export function buildGroups(findings: Finding[], show: SeverityFilter): ViewGroup[] {
+/**
+ * Non-empty groups in the fixed order; errors, then warnings, then hints, each
+ * by line. Findings in `hide` (fixed ones the visitor hid) are left out.
+ */
+export function buildGroups(findings: Finding[], show: SeverityFilter, hide?: Set<Finding>): ViewGroup[] {
   const byGroup = new Map<Group, Finding[]>();
   for (const f of findings) {
-    if (!show[f.severity]) continue;
+    if (!show[f.severity] || hide?.has(f)) continue;
     const g: Group = f.group === '' ? 'format' : f.group;
     let list = byGroup.get(g);
     if (!list) byGroup.set(g, (list = []));
@@ -91,6 +96,16 @@ export const severityWord = (s: Severity): string => WORDS[s];
 
 export function countLabel(s: Severity, n: number): string {
   return `${formatNumber(n)} ${WORDS[s].toLowerCase()}${n === 1 ? '' : 's'}`;
+}
+
+/** A section heading's count: "(12)", or "(12 · 9 fixed in the repaired copy)". */
+export function groupCount(total: number, fixed: number, stale = false): string {
+  return fixed > 0 ? `(${formatNumber(total)} · ${formatNumber(fixed)} ${fixedPhrase(stale)})` : `(${formatNumber(total)})`;
+}
+
+/** The filter pill for fixed findings: "9 fixed in the repaired copy". */
+export function fixedChipLabel(fixed: number, stale = false): string {
+  return `${formatNumber(fixed)} ${fixedPhrase(stale)}`;
 }
 
 // Line starts for the last text seen, so opening a finding in a 20 MB file
@@ -367,14 +382,19 @@ export interface EditHooks {
 }
 
 const PENCIL = 'M2 12.5V10l7.25-7.25a1.06 1.06 0 0 1 1.5 0l1 1a1.06 1.06 0 0 1 0 1.5L4.5 12.5Z M8 4l2 2';
+const CHECK = 'M2.5 7.5 5.5 10.5 11.5 3.5';
 
-function findingItem(f: Finding, r: Result, edit?: EditHooks): HTMLElement {
-  const details = el('details', { class: `finding ${f.severity}` });
+/** `fixed`: the badge's text when the repaired copy no longer has this finding. */
+function findingItem(f: Finding, r: Result, edit?: EditHooks, fixed: string | null = null): HTMLElement {
+  const details = el('details', { class: `finding ${f.severity}${fixed ? ' is-fixed' : ''}` });
+  const title = filled(f.title, f, r.names);
   const summary = el('summary', {},
     el('span', { class: 'meta' },
       el('span', { class: `sev ${f.severity}` }, severityWord(f.severity)),
-      el('span', { class: 'at' }, lineLabel(f.line))),
-    el('span', { class: 'title' }, filled(f.title, f, r.names)),
+      el('span', { class: 'at' }, lineLabel(f.line)),
+      // The badge is text, so the struck-through title is never the only sign.
+      fixed ? el('span', { class: 'fixed-badge' }, icon('0 0 14 14', CHECK), fixed) : null),
+    el('span', { class: 'title' }, fixed ? el('s', {}, title) : title),
     f.meaning ? el('span', { class: 'meaning' }, filled(f.meaning, f, r.names)) : null);
   details.append(summary);
   // The lines and the fix are built when the finding is first opened, so
@@ -400,11 +420,13 @@ function findingItem(f: Finding, r: Result, edit?: EditHooks): HTMLElement {
   return el('li', { class: 'has-edit' }, details, el('div', { class: 'edit-row' }, button));
 }
 
-function groupSection(g: ViewGroup, r: Result, edit?: EditHooks): HTMLElement {
+function groupSection(g: ViewGroup, r: Result, edit?: EditHooks, marks: FixedMarks | null = null): HTMLElement {
   const hid = `group-${g.id}`;
   const list = el('ol', { class: 'findings' });
+  const nFixed = marks ? g.findings.filter(f => marks.fixed.has(f)).length : 0;
+  const badge = marks ? (marks.stale ? FIXED_BADGE_STALE : FIXED_BADGE) : null;
   const section = el('section', { class: 'group', 'aria-labelledby': hid },
-    el('h2', { id: hid }, g.heading, ' ', el('span', { class: 'n' }, `(${formatNumber(g.findings.length)})`)),
+    el('h2', { id: hid }, g.heading, ' ', el('span', { class: 'n' }, groupCount(g.findings.length, nFixed, marks?.stale))),
     list);
 
   let shown = 0;
@@ -417,7 +439,7 @@ function groupSection(g: ViewGroup, r: Result, edit?: EditHooks): HTMLElement {
     const frag = document.createDocumentFragment();
     let firstNew: HTMLElement | null = null;
     for (const f of items) {
-      const li = findingItem(f, r, edit);
+      const li = findingItem(f, r, edit, marks?.fixed.has(f) ? badge : null);
       firstNew ??= li;
       frag.append(li);
     }
@@ -459,6 +481,10 @@ export interface ReportSlots {
   repair: HTMLElement;
   /** Filled by fillDownloads(). */
   downloads: HTMLElement;
+  /** Marks the findings a repaired copy no longer has; null clears the marks. */
+  setFixed(marks: FixedMarks | null): void;
+  /** The marks on screen, or null. */
+  fixed(): FixedMarks | null;
 }
 
 /** The repair slot after a repair that failed: one line. */
@@ -509,35 +535,57 @@ export function renderReport(root: HTMLElement, r: Result, fileName: string, edi
   const repair = el('div', { class: 'slot', id: 'repair', hidden: '' });
   const downloads = el('div', { class: 'slot', id: 'downloads', hidden: '' });
   const kind = viewKind(r);
+  const none = { setFixed: () => {}, fixed: () => null };
 
   if (kind === 'not-gedcom' || kind === 'failed') {
     root.replaceChildren();
-    return { repair, downloads };
+    return { repair, downloads, ...none };
   }
 
   const card = summaryCard(r, fileName);
   if (kind === 'clean') {
     root.replaceChildren(card, repair, downloads);
-    return { repair, downloads };
+    return { repair, downloads, ...none };
   }
 
   const counts = countBySeverity(r.findings);
   const show: SeverityFilter = { error: true, warning: true, hint: true };
+  let marks: FixedMarks | null = null;
+  let showFixed = true;
   const groups = el('div', { class: 'groups', id: 'findings' });
   const drawGroups = () => {
-    const vg = buildGroups(r.findings, show);
+    const vg = buildGroups(r.findings, show, marks && !showFixed ? marks.fixed : undefined);
     groups.replaceChildren(...(vg.length
-      ? vg.map(g => groupSection(g, r, edit))
-      : [el('p', { class: 'empty' }, 'Nothing to show. Tick Errors, Warnings or Hints above.')]));
+      ? vg.map(g => groupSection(g, r, edit, marks))
+      : [el('p', { class: 'empty' }, marks && !showFixed
+        ? 'Nothing to show. Tick Errors, Warnings, Hints or the fixed ones above.'
+        : 'Nothing to show. Tick Errors, Warnings or Hints above.')]));
   };
   drawGroups();
+  const filter = filterControls(counts, show, drawGroups);
+  // The pill for fixed findings: there only while a repaired copy's marks are.
+  const fixedBox = el('input', { type: 'checkbox', name: 'fixed', value: 'fixed' });
+  fixedBox.checked = true;
+  fixedBox.addEventListener('change', () => { showFixed = fixedBox.checked; drawGroups(); });
+  const fixedText = el('span', { class: 'sev' });
+  const fixedChip = el('label', { class: 'chip fixed', hidden: '' }, fixedBox, el('span', { class: 'box', 'aria-hidden': 'true' }), fixedText);
+  filter.append(fixedChip);
+  const setFixed = (m: FixedMarks | null) => {
+    const had = marks;
+    marks = m && m.fixed.size ? m : null;
+    fixedChip.hidden = !marks;
+    if (marks) fixedText.textContent = fixedChipLabel(marks.fixed.size, marks.stale);
+    else { showFixed = true; fixedBox.checked = true; }
+    // Redrawn only when something shows differently (not for an unchanged clear).
+    if (had || marks) drawGroups();
+  };
   // The toolbar (filters and the report downloads), then the repair card, then the findings.
-  const toolbar = el('div', { class: 'toolbar' }, filterControls(counts, show, drawGroups), downloads);
+  const toolbar = el('div', { class: 'toolbar' }, filter, downloads);
   if (edit) {
     const open = el('button', { type: 'button', class: 'more open-editor' }, icon('0 0 14 14', PENCIL), 'Open the editor');
     open.addEventListener('click', () => edit.open(0, open));
     toolbar.append(el('div', { class: 'edit-open' }, open));
   }
   root.replaceChildren(card, toolbar, repair, groups);
-  return { repair, downloads };
+  return { repair, downloads, setFixed, fixed: () => marks };
 }

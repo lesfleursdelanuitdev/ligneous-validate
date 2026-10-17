@@ -29,6 +29,10 @@ type RepairOut struct {
 	Left      []string         `json:"left"`
 	Before    Counts           `json:"before"`
 	After     Counts           `json:"after"`
+	// Remaining is how many findings of each code a Check of the repaired copy
+	// gives (the same parse and validation as After). The page compares it
+	// with its own findings to mark the ones the repaired copy no longer has.
+	Remaining map[string]int   `json:"remaining"`
 	Available []repair.FixInfo `json:"available"`
 	Applied   []repair.FixInfo `json:"applied"`
 	Skipped   []repair.FixInfo `json:"skipped"`
@@ -108,7 +112,7 @@ func RepairWithOptionsProgress(raw []byte, before Counts, opt repair.Options, pr
 		out.Left = []string{}
 	}
 	out.Before = before
-	out.After = countsOf(res.Data, step)
+	out.After, out.Remaining = countsOf(res.Data, step)
 	step(StageFinish)
 	return out, nil
 }
@@ -149,10 +153,12 @@ func ParseOptions(s string) (repair.Options, error) {
 }
 
 // countsOf counts what Check would find in data: the parser's findings and
-// the validator's.
-func countsOf(data []byte, step func(string)) Counts {
+// the validator's, by severity and by code.
+func countsOf(data []byte, step func(string)) (Counts, map[string]int) {
 	var c Counts
-	add := func(sev string) {
+	codes := map[string]int{}
+	add := func(code, sev string) {
+		codes[code]++
 		switch sev {
 		case "error":
 			c.Errors++
@@ -167,16 +173,16 @@ func countsOf(data []byte, step func(string)) Counts {
 	popts.Lenient = true
 	doc, perrs, _ := parser.ParseWithOptions(bytes.NewReader(data), popts)
 	for _, pe := range perrs {
-		add(pe.Severity)
+		add(pe.Code, pe.Severity)
 	}
 	step(StageValidate)
 	if doc == nil {
-		return c
+		return c, codes
 	}
 	vopts := validator.DefaultOptions()
 	vopts.DateConsistency = true
 	for _, ve := range validator.ValidateWithOptions(doc, vopts) {
-		add(severityName(int(ve.Severity)))
+		add(ve.Code, severityName(int(ve.Severity)))
 	}
-	return c
+	return c, codes
 }

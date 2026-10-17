@@ -35,6 +35,8 @@ export interface CardOptions {
   /** The ticks or the name changed: plan again. */
   onChange(): void;
   onDownload(): void;
+  /** The run on screen went out of date, or back in date (the choices match it again). */
+  onStale?(stale: boolean): void;
 }
 
 export interface RepairCard {
@@ -272,6 +274,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     resultBox.classList.toggle('is-stale', stale);
     if (stale && !wasStale && dl) live.textContent = STALE_SAY;
     if (!stale) live.textContent = '';
+    if (stale !== wasStale) o.onStale?.(stale);
     wasStale = stale;
   }
 
