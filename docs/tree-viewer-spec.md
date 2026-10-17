@@ -1,6 +1,6 @@
 # tree-viewer.ligneous.org: spec
 
-Status: PROPOSED 2026-10-17, for momolig's review. Branch `tree-viewer` in `ligneous-validate`.
+Status: DECIDED 2026-10-17 (T1–T9). One open question left (card actions). Branch `tree-viewer` in `ligneous-validate`.
 
 ## Goal
 
@@ -25,11 +25,11 @@ The same work fixes and shares the chart code the Gonsalves family site uses tod
 | T2 | Extract a shared renderer, `@ligneous/visualization-react`, from the Gonsalves app's tree viewer. Gonsalves and the new viewer both use it. This brings forward the tree-viewer part of step 7 of the Gonsalves extraction plan. | momolig |
 | T3 | Living people: show everyone on screen. A **Hide living people** switch is off on screen and **on by default when exporting**. | momolig |
 | T4 | v1 includes all four charts, search and choosing the starting person, PNG/SVG/PDF export, and the link with the validator. | momolig |
-| T5 | *Proposed.* The viewer is a second app in the **`ligneous-validate` repo**, deployed to its own site folder `tree-viewer`. It shares the wasm, the worker, file loading, the progress bar and the Layout C styles. The repo may be renamed `ligneous-tools` later, but not now. | proposed |
-| T6 | *Proposed.* The engine and the renderer get a build step (JS + `.d.ts`) and semver tags. The viewer installs them from GitHub tags (`github:lesfleursdelanuitdev/…#vX.Y.Z`). Gonsalves keeps its `file:` links, as decided in extraction plan EX-Q4. | proposed |
-| T7 | *Proposed.* The GEDCOM → chart graph conversion lives in the **Go library**, in a new `chart` package, so it is the same everywhere and tested in Go. The wasm returns a compact graph JSON. It never returns the whole EnrichedDocument. | proposed |
-| T8 | *Proposed.* PDF export uses the browser's print to PDF, with a print stylesheet: no new dependency. PNG export rasterises the pure-SVG chart on a canvas. | proposed |
-| T9 | *Proposed.* The two sites hand a file to each other through `window.open` plus `postMessage`, with origins checked on both sides (see Part 4). | proposed |
+| T5 | The viewer is a second app in the **`ligneous-validate` repo**, deployed to its own site folder `tree-viewer`. It shares the wasm, the worker, file loading, the progress bar and the Layout C styles. The repo may be renamed `ligneous-tools` later, but not now. | momolig, 2026-10-17 |
+| T6 | The engine and the renderer get a build step (JS + `.d.ts`) and semver tags. The viewer installs them from GitHub tags (`github:lesfleursdelanuitdev/…#vX.Y.Z`). Gonsalves keeps its `file:` links, as decided in extraction plan EX-Q4. | momolig, 2026-10-17 |
+| T7 | The GEDCOM → chart graph conversion lives in the **Go library**, in a new `chart` package, so it is the same everywhere and tested in Go. The wasm returns a compact graph JSON. It never returns the whole EnrichedDocument. | momolig, 2026-10-17 |
+| T8 | PDF export uses the browser's print to PDF, with a print stylesheet: no new dependency. PNG export rasterises the pure-SVG chart on a canvas. | momolig, 2026-10-17 |
+| T9 | The two sites hand a file to each other through `window.open` plus `postMessage`, with origins checked on both sides (see Part 4). | momolig, 2026-10-17 |
 
 ## What exists today (from the 2026-10-17 audit)
 
@@ -224,6 +224,5 @@ Each step is its own branch and review. Nothing is merged, pushed, tagged or dep
 
 ## Open questions for momolig
 
-These are the proposed decisions T5–T9, plus one more:
-- **Repo name:** keep `ligneous-validate` for both tools (T5), or create a separate `ligneous-tree-viewer` repo that copies the shared parts?
+T5–T9 were accepted as proposed (momolig, 2026-10-17). Still open:
 - **Card actions:** for the 8 "TBD" card actions, decide case by case during Part 1, or decide now which ones Gonsalves actually needs?
