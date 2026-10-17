@@ -315,3 +315,25 @@ test('e2e: a file over 10 MB shows the real counts from Plan, and waits for a cl
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test("e2e: the editor's Check again refreshes the checklist from Plan", async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await expect(row(page, 'broken-links').locator('.fix-count')).toHaveText('4 lines removed');
+  await page.getByRole('button', { name: 'Edit line 11', exact: true }).first().click();
+  await expect(page.locator('.cm-content')).toBeVisible();
+  // Delete the broken FAMC link and its PEDI line (lines 11-12).
+  await page.locator('.cm-line', { hasText: '1 FAMC @F9@' }).click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Delete');
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.locator('#ed-live')).toHaveText(/^Checked: /);
+  page.once('dialog', d => void d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  // Two links are left (lines 20 and 25 now), one line each.
+  await expect(row(page, 'broken-links').locator('.fix-count')).toHaveText('2 lines removed');
+  await page.locator('#fix-broken-links-show').click();
+  await expect(page.locator('#fix-broken-links-lines .ex-at')).toHaveText(['Line 20', 'Line 25']);
+  await expect(page.locator('#fix-broken-links-lines')).not.toContainText('@F9@');
+});

@@ -123,10 +123,13 @@ export interface PlanOut {
 }
 
 export type ToWorker =
-  | { type: 'check'; bytes: ArrayBuffer }
+  /** `save`: check what Download edited file gives (the editor's Check again). */
+  | { type: 'check'; bytes: ArrayBuffer; save?: boolean }
   | { type: 'repair'; bytes: ArrayBuffer; before?: Counts; options?: RepairOptions }
   /** id: answers to an older request are dropped. */
-  | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number };
+  | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number }
+  /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
+  | { type: 'save'; bytes: ArrayBuffer };
 
 export type FromWorker =
   | { type: 'status'; text: string }
@@ -139,4 +142,5 @@ export type FromWorker =
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
   /** The preview of each kind of fix, from plan(). */
   | { type: 'planned'; info: PlanOut; id: number }
+  | { type: 'saved'; data: ArrayBuffer; error?: string }
   | { type: 'error'; message: string };

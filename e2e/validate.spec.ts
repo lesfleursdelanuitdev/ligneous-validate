@@ -444,6 +444,15 @@ test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
   for (let i = 0; i < 5; i++) await findings.nth(i).locator('summary').click();
   await expect(page.locator('.lines')).toHaveCount(5);
   await page.getByRole('button', { name: 'Show more' }).first().click();
+  // The editor: open it, edit, check again, download the edited file, close.
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.locator('.cm-content').click();
+  await page.keyboard.type('x');
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.locator('#ed-live')).toHaveText(/^Checked: /);
+  await save(page, 'Download edited file');
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.getByRole('dialog')).toBeHidden();
   // And a second file and a non-GEDCOM one.
   await page.locator('#file').setInputFiles(fixture('ansel.ged'));
   await expect(page.locator('#report dd', { hasText: 'ansel.ged' })).toBeVisible();
@@ -455,6 +464,7 @@ test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
   expect(urls.some(r => /\/assets\/ligneous-.*\.wasm$/.test(r.url))).toBe(true);
   expect(urls.some(r => /\/assets\/worker-.*\.js$/.test(r.url))).toBe(true);
   expect(urls.some(r => r.url.endsWith('/wasm_exec.js'))).toBe(true);
+  expect(urls.some(r => /\/assets\/editor-.*\.js$/.test(r.url))).toBe(true);
   expect(strays(urls, origin, allowed)).toEqual([]);
   expect(sockets).toEqual([]);
   expect(await page.evaluate(() => (window as unknown as { __beacons: unknown[] }).__beacons)).toEqual([]);

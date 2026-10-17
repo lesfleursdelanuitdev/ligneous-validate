@@ -3,7 +3,7 @@ import catalogText from './testdata/catalog.json?raw';
 import {
   FAILED, GROUPS, KEEP_ORIGINAL, OFFER_NOTE, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
   lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, severityWord, sizeNote,
-  summaryRows, viewKind, visibleSlice,
+  summaryRows, viewKind, visibleSlice, editLabel,
 } from './render';
 import { resultView } from './checklist';
 import type { Finding, Group, Result, Severity } from './types';
@@ -349,5 +349,15 @@ describe('leftItems: what the repair leaves, without anyone\'s name', () => {
     const info = { changes: [{ line: 1, what: 'a' }], left: [e.Code], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 1, hints: 0 } };
     expect(resultView(info, result({ findings: [hit(e)], names }), []).left)
       .toEqual([{ title: 'Someone died before they were born', count: 1 }]);
+  });
+});
+
+describe('the Edit line button', () => {
+  it('is labelled with the line, formatted', () => {
+    expect(editLabel(1204)).toBe('Edit line 1,204');
+    expect(editLabel(7)).toBe('Edit line 7');
+  });
+  it('is not given to whole-file findings', () => {
+    expect(editLabel(0)).toBeNull();
   });
 });

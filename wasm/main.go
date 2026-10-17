@@ -130,11 +130,35 @@ func planFn(_ js.Value, args []js.Value) (ret any) {
 	return string(b)
 }
 
+// saveFn is the editor's "Download edited file": check.SaveUTF8, returned
+// like repair as {data, json}; json is "{}", or {"error": …} with empty data.
+func saveFn(_ js.Value, args []js.Value) (ret any) {
+	fail := func(msg string) any {
+		return map[string]any{"data": js.Global().Get("Uint8Array").New(0), "json": errJSON(msg)}
+	}
+	defer func() {
+		if r := recover(); r != nil {
+			ret = fail(fmt.Sprint(r))
+		}
+	}()
+	if len(args) < 1 {
+		return fail("save needs a Uint8Array")
+	}
+	out, err := check.SaveUTF8(bytesIn(args[0]))
+	if err != nil {
+		return fail(err.Error())
+	}
+	data := js.Global().Get("Uint8Array").New(len(out))
+	js.CopyBytesToJS(data, out)
+	return map[string]any{"data": data, "json": "{}"}
+}
+
 func main() {
 	api := map[string]any{
 		"check":  js.FuncOf(checkFn),
 		"repair": js.FuncOf(repairFn),
 		"plan":   js.FuncOf(planFn),
+		"save":   js.FuncOf(saveFn),
 	}
 	js.Global().Set("ligneous", js.ValueOf(api))
 	js.Global().Set("ligneousReady", true)

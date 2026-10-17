@@ -5,12 +5,13 @@ import { CHECK_STAGES, REPAIR_STAGES, stagePercent } from './progress';
 import {
   FAILED, REPAIR_FAILED, countBySeverity, doneText, fillDownloads, fillRepairFailed, renderReport, repairPlan, sizeNote, viewKind,
 } from './render';
-import type { ReportSlots } from './render';
+import type { EditHooks, ReportSlots } from './render';
 import { announce, markRan, newChecklist, selectedFixes, setAvailable, setPlan } from './checklist';
 import type { Checklist, Run } from './checklist';
 import { mountRepairCard } from './repaircard';
 import type { RepairCard } from './repaircard';
 import type { FixInfo, FromWorker, PlanOut, RepairOptions, RepairOut, Result } from './types';
+import type { Editor } from './editor/editor';
 
 const NO_WASM = "This browser couldn't start the checker. Try a current version of Firefox, Chrome, Safari or Edge.";
 const LOAD_FAILED = "The checker didn't finish loading. Check your connection and try again.";
@@ -24,7 +25,9 @@ const note = $<HTMLElement>('note');
 const report = $<HTMLElement>('report');
 const stop = $<HTMLButtonElement>('stop');
 const retry = $<HTMLButtonElement>('retry');
-const bar = progressBar($<HTMLElement>('progress'));
+const progressEl = $<HTMLElement>('progress');
+const bar = progressBar(progressEl);
+const reopen = $<HTMLButtonElement>('reopen');
 
 const LOADING = 'Getting the checker ready…';
 const MAKING_REPAIR = 'Making a repaired copy…';
@@ -63,6 +66,21 @@ let shown: Shown | null = null;
 let loadPercent = 0; // how much of the current worker's checker has downloaded
 let barRepair = false; // the bar is showing a repair the visitor asked for
 
+// The editor (src/editor/), loaded the first time it opens.
+let ed: Editor | null = null;
+let edLoading: Promise<Editor | null> | null = null;
+let editorCheck = false; // the running check is the editor's Check again
+let beforeEditorCheck: Shown | null = null; // the report it replaces, kept if it is stopped
+let editName = ''; // the file the editor's session is for
+let saveWait: ((m: { data: ArrayBuffer; error?: string } | null) => void) | null = null;
+const EDITOR_FAILED = "The editor didn't load. Check your connection and try again.";
+const NO_EDITOR = "This browser can't run the editor. Try a current version of Firefox, Chrome, Safari or Edge.";
+// The editor's styles need constructable, adopted style sheets: without them
+// CodeMirror falls back to a <style> element, which the CSP blocks (Safari
+// before 16.4, Firefox before 101). Those browsers get no editor buttons.
+const canEdit = typeof ShadowRoot === 'function' && 'adoptedStyleSheets' in ShadowRoot.prototype &&
+  typeof CSSStyleSheet === 'function' && 'replaceSync' in CSSStyleSheet.prototype;
+
 /** Saves text or bytes under `name` through a temporary link; nothing is sent anywhere. */
 function save(data: BlobPart, type: string, name: string) {
   const url = URL.createObjectURL(new Blob([data], { type }));
@@ -100,6 +118,7 @@ function showNoWasm() {
 
 /** The checker didn't load (network, instantiate, or the start timeout); it can be retried. */
 function showLoadFailed() {
+  editorDone(null, LOAD_FAILED);
   broken = true;
   busy = false;
   repairing = false;
@@ -112,10 +131,12 @@ function showLoadFailed() {
 
 /** The checker crashed or ran out of memory while checking. */
 function showFailed() {
+  editorDone(null, FAILED);
   busy = false;
   shown = null;
   bar.hide();
   report.replaceChildren();
+  showReopen();
   say(FAILED, '', 'problem');
   restart();
   controls();
@@ -127,11 +148,16 @@ function onResult(result: Result) {
   const kind = viewKind(result);
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
-  const slots = renderReport(report, result, file.name);
+  // A Check again report is shown in the editor's line numbers.
+  if (editorCheck && ed) result = ed.prepare(result);
+  const slots = renderReport(report, result, file.name, canEdit ? editHooks : undefined);
+  if (!canEdit) report.querySelector('.toolbar')?.after(Object.assign(document.createElement('p'), { className: 'no-editor', textContent: NO_EDITOR }));
   const view: Shown = {
     file, result, slots, repair: null, data: null, checklist: null, card: null, pending: null, failed: false, planShown: 0,
   };
   shown = view;
+  editorDone(result, doneText(result));
+  showReopen();
   if (kind === 'report') {
     fillDownloads(slots.downloads,
       () => save(reportText(file.name, result, new Date(), view.repair), 'text/plain;charset=utf-8', downloadName(file.name, 'report-txt')),
@@ -284,6 +310,8 @@ function onMessage(e: MessageEvent<FromWorker>) {
     onRepaired(msg.data, msg.info);
   } else if (msg.type === 'planned') {
     onPlanned(msg.info, msg.id);
+  } else if (msg.type === 'saved') {
+    saveWait?.(msg);
   }
   controls();
 }
@@ -316,6 +344,7 @@ function start(): Worker {
 }
 
 function restart() {
+  saveWait?.(null); // a save on the old worker won't come back
   worker?.terminate();
   repairing = false;
   planning = false;
@@ -369,16 +398,22 @@ async function askPlan(view: Shown) {
   worker?.postMessage(options ? { type: 'plan', bytes, options, id } : { type: 'plan', bytes, id }, [bytes]);
 }
 
-async function check(file: File) {
-  if (broken) return;
+async function check(file: File, fromEditor = false) {
+  if (broken) { if (fromEditor) editorDone(null, LOAD_FAILED); return; }
   current = file;
   // A file chosen while another is being checked, or while a repair is still running, gets a
   // fresh runtime: the old one is busy, or may have died.
   if (busy || repairing || planning) restart();
   busy = true;
   barRepair = false;
-  shown = null;
-  report.replaceChildren();
+  editorCheck = fromEditor;
+  // The editor's Check again keeps the report until the new one is there.
+  if (fromEditor) {
+    beforeEditorCheck = shown;
+  } else {
+    shown = null;
+    report.replaceChildren();
+  }
   say('Reading your file…', sizeNote(file.size));
   bar.show('Reading your file…', 0);
   controls();
@@ -389,16 +424,28 @@ async function check(file: File) {
     busy = false;
     bar.hide();
     say("We couldn't read that file. Try choosing it again.");
+    editorDone(null, "We couldn't read that file. Try choosing it again.");
     controls();
     return;
   }
   if (current !== file) return;
-  worker!.postMessage({ type: 'check', bytes }, [bytes]);
+  worker!.postMessage({ type: 'check', bytes, save: fromEditor }, [bytes]);
 }
 
 stop.addEventListener('click', () => {
   bar.hide();
   barRepair = false;
+  if (busy && editorCheck) {
+    // The editor's Check again: the editor and the report it had stay.
+    busy = false;
+    restart();
+    shown = beforeEditorCheck;
+    current = shown?.file ?? null;
+    say('Stopped.');
+    editorDone(null, 'Stopped.');
+    controls();
+    return;
+  }
   if (busy) {
     // Back to the start state.
     busy = false;
@@ -434,8 +481,92 @@ if (typeof WebAssembly !== 'object' || typeof Worker !== 'function') {
 choose.addEventListener('click', () => input.click());
 input.addEventListener('change', () => {
   const file = input.files?.[0];
-  if (file) void check(file);
+  if (file) chooseFile(file);
   input.value = ''; // so choosing the same file again still checks it
+});
+
+/** A new file from the visitor: unsaved edits are lost, so it asks first. */
+function chooseFile(file: File) {
+  if (ed?.isOpen) return; // a file dropped on the open editor
+  if (ed?.dirty && !window.confirm(`Check another file? Your edits to ${editName} will be lost.`)) return;
+  ed?.reset();
+  reopen.hidden = true;
+  void check(file);
+}
+
+// ---------------------------------------------------------------- the editor
+
+/** Tells the editor its Check again has ended (null: failed or stopped). */
+function editorDone(result: Result | null, text: string) {
+  if (!editorCheck) return;
+  editorCheck = false;
+  beforeEditorCheck = null;
+  ed?.checkDone(result, text);
+}
+
+/** "Open the editor" by the status line, when the report has none (no findings left, say). */
+function showReopen() {
+  reopen.hidden = !(ed?.active && !report.querySelector('.open-editor'));
+}
+
+function loadEditor(): Promise<Editor | null> {
+  edLoading ??= import('./editor/editor').then(m => (ed = m.createEditor({
+    checkAgain(text, slot) {
+      // The bar shows in the editor's toolbar while it checks (moved back when the editor closes).
+      slot.append(progressEl);
+      const name = shown?.file.name ?? editName;
+      void check(new File([new TextEncoder().encode(text)], name, { type: 'text/plain' }), true);
+    },
+    download(text) {
+      return new Promise<boolean>(resolve => {
+        if (!worker || broken) { resolve(false); return; }
+        saveWait?.(null);
+        saveWait = m => {
+          saveWait = null;
+          if (!m || m.error) { resolve(false); return; }
+          save(m.data, 'application/octet-stream', downloadName(editName, 'edited'));
+          resolve(true);
+        };
+        const bytes = new TextEncoder().encode(text).buffer as ArrayBuffer;
+        worker.postMessage({ type: 'save', bytes }, [bytes]);
+      });
+    },
+    closed(opener, line, code) {
+      zone.before(progressEl);
+      showReopen();
+      // Back to the card it was opened from, which Check again may have rebuilt.
+      const target = (opener?.isConnected ? opener : null) ??
+        report.querySelector<HTMLElement>(`.edit-line[data-line="${line}"][data-code="${CSS.escape(code ?? '')}"]`) ??
+        report.querySelector<HTMLElement>(`.edit-line[data-line="${line}"]`) ??
+        report.querySelector<HTMLElement>('.open-editor') ?? (reopen.hidden ? choose : reopen);
+      target.scrollIntoView({ block: 'center' });
+      target.focus({ preventScroll: true });
+    },
+  })), () => { edLoading = null; return null; });
+  return edLoading;
+}
+
+async function openEditor(line: number, opener: HTMLElement, code?: string) {
+  const view = shown;
+  // With no report (Check again found no GEDCOM, or failed), only an existing session can open.
+  if (!view && !ed?.active) return;
+  const editor = await loadEditor();
+  if (!editor) { say(EDITOR_FAILED, '', 'problem'); return; }
+  if (!editor.active) {
+    if (!view || shown !== view) return; // another file came meanwhile
+    editName = view.file.name;
+    editor.open(editName, view.result, line, opener, code);
+  } else {
+    editor.open(editName, null, line, opener, code);
+  }
+}
+
+const editHooks: EditHooks = { open: (line, opener, code) => void openEditor(line, opener, code) };
+reopen.addEventListener('click', () => void openEditor(0, reopen));
+
+// Closing or reloading the tab with unsaved edits: the browser asks.
+window.addEventListener('beforeunload', e => {
+  if (ed?.dirty) { e.preventDefault(); e.returnValue = 'unsaved'; }
 });
 
 // Dropping anywhere on the page works; the zone shows where.
@@ -455,5 +586,5 @@ window.addEventListener('drop', e => {
   depth = 0;
   zone.classList.remove('over');
   const file = e.dataTransfer?.files[0];
-  if (file) void check(file);
+  if (file) chooseFile(file);
 });
