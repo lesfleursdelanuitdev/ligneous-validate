@@ -37,7 +37,7 @@ test('e2e: royal92 shows the format list with encoding ticked', async ({ page })
   await expect(format.getByRole('checkbox')).toHaveCount(1);
   await expect(box(page, ENCODING)).toBeChecked();
   await expect(box(page, ENCODING)).toBeEnabled();
-  await expect(row(page, 'encoding').locator('.fix-count')).toHaveText(/^[\d,]+ lines?$/);
+  await expect(row(page, 'encoding').locator('.fix-count')).toHaveText('whole file');
   // Its Show lines opens on what the repair changed.
   await row(page, 'encoding').getByRole('button', { name: 'Show lines' }).click();
   await expect(row(page, 'encoding').locator('.fix-lines-body')).toContainText('1 CHAR');
@@ -148,6 +148,7 @@ test('e2e: changing the ticks after a run marks the result out of date', async (
   await expect(page.locator('#repair .stale')).toBeHidden();
   await box(page, BROKEN).check();
   await expect(page.locator('#repair .stale')).toHaveText('out of date — repair again');
+  await expect(page.locator('#repair-live')).toHaveText('Your choices changed. Repair again to update the copy.');
   await expect(dl).toHaveText('Download the last repaired copy');
   await expect(page.getByRole('button', { name: 'Repair selected (2)' })).toBeVisible();
   // Putting the tick back makes it current again.
@@ -161,6 +162,10 @@ test('e2e: the checklist has 44px targets and its keyboard order follows the pag
   await expect(box(page, BROKEN)).toBeVisible();
   for (const fix of ['blank-lines', 'broken-links', 'empty-families', 'submitter']) {
     const h = await row(page, fix).locator('.fix-label').evaluate(e => e.getBoundingClientRect().height);
+    expect(h).toBeGreaterThanOrEqual(44);
+  }
+  for (const fix of ['blank-lines', 'broken-links', 'empty-families', 'submitter']) {
+    const h = await row(page, fix).locator('.show-lines').evaluate(e => e.getBoundingClientRect().height);
     expect(h).toBeGreaterThanOrEqual(44);
   }
   for (const name of ['Repair everything', /^Repair selected/]) {
@@ -180,4 +185,53 @@ test('e2e: the checklist has 44px targets and its keyboard order follows the pag
   expect(order).toEqual([
     'box:blank-lines', 'show', 'box:broken-links', 'show', 'box:empty-families', 'show', 'box:submitter', 'show', 'Repair everything',
   ]);
+});
+
+test('e2e: a non-ASCII name on an ANSEL file without the conversion is not applied, with the library reason', async ({ page }) => {
+  await upload(page, 'ansel-long.ged');
+  await expect(page.locator('#download-repaired')).toBeVisible();
+  await box(page, ENCODING).uncheck();
+  await box(page, SUBMITTER).check();
+  await page.getByRole('textbox', { name: 'Your name' }).fill('José');
+  await page.getByRole('button', { name: 'Repair selected (2)' }).click();
+  await expect(page.locator('#status')).toHaveText('Repaired: 1 kind of fix applied, 1 not applied.');
+  await expect(page.locator('#repair .not-applied li')).toHaveText([`${SUBMITTER} — This needs “${ENCODING}” too.`]);
+  expect((await save(page, 'Download repaired file')).toString('latin1')).not.toContain('SUBM');
+});
+
+test('e2e: a file with only suggested fixes gets the checklist and no unchanged copy', async ({ page }) => {
+  const text = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Ann /Lee/\n1 SEX F\n0 TRLR\n';
+  await page.locator('#file').setInputFiles({ name: 'nosubm.ged', mimeType: 'text/plain', buffer: Buffer.from(text) });
+  await expect(page.locator('#repair h2')).toHaveText('No format problems to fix');
+  await expect(box(page, SUBMITTER)).not.toBeChecked();
+  await expect(page.locator('#repair-result')).toBeHidden();
+  await expect(page.getByRole('button', { name: /^Download/ }).filter({ hasText: 'repaired' })).toHaveCount(0);
+});
+
+test('e2e: what is left splits into what a fix above can fix and the rest', async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await expect(page.locator('#repair h3', { hasText: 'Tick a fix above to fix these here:' })).toBeVisible();
+  await expect(page.locator('#repair .left.fixable li', { hasText: "A family's child doesn't exist" })).toBeVisible();
+  await expect(page.locator('#repair .left.fixable li', { hasText: "The file doesn't say who made it" })).toBeVisible();
+  await expect(page.locator('#repair .left:not(.fixable) li')).toHaveCount(0); // everything left here has a fix above
+  await box(page, BROKEN).check();
+  await box(page, EMPTY).check();
+  await page.getByRole('textbox', { name: 'Your name' }).waitFor({ state: 'hidden' });
+  await page.getByRole('button', { name: /^Repair selected/ }).click();
+  await expect(page.locator('#status')).toHaveText(/^Repaired: /);
+  await expect(page.locator('#repair .left.fixable li')).toHaveText([/^The file doesn't say who made it/]);
+});
+
+test('e2e: an open Show lines panel and the focus survive a run', async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await row(page, 'broken-links').getByRole('button', { name: 'Show lines' }).click();
+  await box(page, BROKEN).check();
+  await page.getByRole('button', { name: 'Repair selected (2)' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#status')).toHaveText('Repaired: 2 kinds of fix applied.');
+  const show = page.locator('#fix-broken-links-show');
+  await expect(show).toHaveAttribute('aria-expanded', 'true');
+  await expect(page.locator('#fix-broken-links-lines')).toBeVisible();
+  await expect(page.locator('#fix-broken-links-lines .ex-nested code')).toHaveText(['2 PEDI birth']);
+  expect(await page.evaluate(() => document.activeElement?.id)).toBe('repair-selected');
 });

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DATA_LABELS, LABELS, MAX_NAME, announce, checklistHeading, countText, estimateAvailable, everything, examples,
+  DATA_LABELS, LABELS, MAX_NAME, announce, cleanName, selectedLeftOut, checklistHeading, countText, estimateAvailable, everything, examples,
   familiesNeedLinks, isOutOfDate, linkOnlyFamilies, markRan, newChecklist, reasonText, resultView, rowView, rows, selectedFixes,
   setAvailable, setChosen, setName,
 } from './checklist';
+import { isDataCode, kindOfCode } from './codes';
 import type { Finding, FixInfo, RepairOut, Result } from './types';
 
 const fi = (fix: FixInfo['fix'], lines: number, over: Partial<FixInfo> = {}): FixInfo => ({
@@ -63,11 +64,15 @@ describe('labels', () => {
 
 describe('counts', () => {
   it('counts lines, singular and plural, with thousands', () => {
-    expect(countText(fi('encoding', 120_007), 'repair')).toBe('120,007 lines');
+    expect(countText(fi('leading-space', 120_007), 'repair')).toBe('120,007 lines');
     expect(countText(fi('trailer', 1), 'repair')).toBe('1 line');
   });
   it('says whole file for a change with no line of its own', () => {
     expect(countText(fi('line-endings', 0), 'repair')).toBe('whole file');
+  });
+  it('says whole file for the conversion, whatever its line count', () => {
+    expect(countText(fi('encoding', 120_007), 'repair')).toBe('whole file');
+    expect(countText(fi('encoding', 1), 'findings')).toBe('whole file');
   });
   it('says what the data kinds remove or add', () => {
     expect(countText(fi('broken-links', 4), 'repair')).toBe('4 lines removed');
@@ -215,6 +220,23 @@ describe('submitter', () => {
   it('allows at most 120 characters', () => {
     expect(MAX_NAME).toBe(120);
   });
+  it('cleans the name as the library does', () => {
+    expect(cleanName('  Jo\t\tMarch  ')).toBe('Jo March');
+    expect(cleanName('Jo\u200bMa\ufeffrch')).toBe('JoMarch'); // zero-width characters go
+    expect(cleanName('Jo\u0001\u007f\u0090 March')).toBe('Jo March'); // C0, DEL and C1 controls go
+    expect(cleanName('Jo\u00a0\u2028\u2029\u0085March')).toBe('Jo March'); // Go's unicode.IsSpace: one space
+    expect(cleanName('Jo\r\nMarch')).toBe('Jo March');
+  });
+  it('is not applied with a name over 248 bytes in UTF-8, and says so', () => {
+    const c = newChecklist([sub], 'repair', result());
+    setChosen(c, 'submitter', true);
+    setName(c, 'é'.repeat(100)); // 100 characters, 200 bytes
+    expect(selectedFixes(c)).toEqual(['submitter']);
+    setName(c, '日'.repeat(83)); // 83 characters, 249 bytes
+    expect(selectedFixes(c)).toEqual([]);
+    expect(selectedLeftOut(c)).toEqual(['submitter']);
+    expect(rowView(c, sub).note).toBe('The name is too long (at most 120 characters).');
+  });
 });
 
 describe('Repair everything', () => {
@@ -244,25 +266,37 @@ describe('out of date', () => {
   it('is not out of date before a run or right after one', () => {
     const c = newChecklist(SUGGESTED_AVAILABLE, 'repair', suggestedResult());
     expect(isOutOfDate(c)).toBe(false);
-    markRan(c, { fixes: selectedFixes(c), name: '', leftOut: [] }, out());
+    markRan(c, { fixes: selectedFixes(c), name: '', leftOut: [] }, out({ available: SUGGESTED_AVAILABLE }));
     expect(isOutOfDate(c)).toBe(false);
   });
   it('is out of date once the ticks change, and back when they are put back', () => {
     const c = newChecklist(SUGGESTED_AVAILABLE, 'repair', suggestedResult());
-    markRan(c, { fixes: selectedFixes(c), name: '', leftOut: [] }, out());
+    markRan(c, { fixes: selectedFixes(c), name: '', leftOut: [] }, out({ available: SUGGESTED_AVAILABLE }));
     setChosen(c, 'broken-links', true);
     expect(isOutOfDate(c)).toBe(true);
     setChosen(c, 'broken-links', false);
     expect(isOutOfDate(c)).toBe(false);
   });
+  it('is not out of date right after a run whose kinds differ from the estimate (review 2b)', () => {
+    // A big file: the checklist is estimated from the findings, then the run's own list replaces it.
+    const r = result({ encoding: { detected: 'ANSEL', declared: 'ANSEL', reason: '' }, findings: [finding('EMPTY_LINE', 4)] });
+    const c = newChecklist(estimateAvailable(r), 'findings', r);
+    const run = { fixes: selectedFixes(c), name: '', leftOut: [] };
+    expect(run.fixes).toEqual(['encoding', 'blank-lines']);
+    const done = out({ available: [fi('blank-lines', 1)], applied: [fi('blank-lines', 1)] });
+    setAvailable(c, done.available!, 'repair');
+    markRan(c, run, done);
+    expect(c.ran!.fixes).toEqual(['blank-lines']);
+    expect(isOutOfDate(c)).toBe(false);
+  });
   it('is out of date when the name in an applied submitter changes, not for a name that was not used', () => {
     const c = newChecklist([fi('submitter', 3)], 'repair', result());
-    markRan(c, { fixes: [], name: '', leftOut: [] }, out());
+    markRan(c, { fixes: [], name: '', leftOut: [] }, out({ available: [fi('submitter', 3)] }));
     setName(c, 'Jo');
     expect(isOutOfDate(c)).toBe(false); // the submitter isn't ticked
     setChosen(c, 'submitter', true);
     expect(isOutOfDate(c)).toBe(true);
-    markRan(c, { fixes: ['submitter'], name: 'Jo', leftOut: [] }, out());
+    markRan(c, { fixes: ['submitter'], name: 'Jo', leftOut: [] }, out({ available: [fi('submitter', 3)] }));
     setName(c, 'Jo M');
     expect(isOutOfDate(c)).toBe(true);
   });
@@ -399,6 +433,16 @@ describe('after a run', () => {
     expect(v.before).toBe('3 errors, 1 warning, 0 hints');
     expect(v.after).toBe('0 errors, 1 warning, 0 hints');
   });
+  it('splits what is left into what a fix on the checklist can fix and the rest', () => {
+    const orphan = { ...finding('ORPHANED_FAMC', 5, 'error'), group: 'links' as const, title: 'Broken family link' };
+    const subm = { ...finding('HEADER_MISSING_SUBM', 1), group: 'header' as const, title: 'No submitter' };
+    const date = { ...finding('DATE_ORDER', 7), group: 'dates' as const, title: 'Dates in the wrong order' };
+    const v = resultView(out({ left: ['DATE_ORDER', 'HEADER_MISSING_SUBM', 'ORPHANED_FAMC'], available: [fi('broken-links', 1)] }),
+      result({ findings: [orphan, subm, date] }), []);
+    expect(v.leftFixable).toEqual([{ title: 'Broken family link', count: 1 }]);
+    // The submitter isn't on this checklist (not available), so it stays with the rest.
+    expect(v.left).toEqual([{ title: 'Dates in the wrong order', count: 1 }, { title: 'No submitter', count: 1 }]);
+  });
   it('lists what was not applied, with reasons, and a submitter left out for want of a name', () => {
     const v = resultView(info, result(), ['submitter']);
     expect(v.notApplied).toEqual([
@@ -472,5 +516,17 @@ describe('the heading (from repairView)', () => {
   it('has no rows when nothing can be fixed', () => {
     const c = one([]);
     expect(rows(c)).toEqual({ format: [], data: [] });
+  });
+});
+
+describe('the code table', () => {
+  it('maps finding codes to the kind that fixes them', () => {
+    expect(kindOfCode('EMPTY_LINE')).toBe('blank-lines');
+    expect(kindOfCode('ORPHANED_HUSB')).toBe('broken-links');
+    expect(kindOfCode('HEADER_MISSING_SUBM')).toBe('submitter');
+    expect(kindOfCode('ENCODING_NOT_UTF8')).toBe('encoding');
+    expect(kindOfCode('DEATH_BEFORE_BIRTH')).toBeNull();
+    expect(isDataCode('EMPTY_FAMILY')).toBe(true);
+    expect(isDataCode('EMPTY_LINE')).toBe(false);
   });
 });

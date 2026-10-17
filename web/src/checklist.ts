@@ -6,6 +6,7 @@ import {
   NOTE_55, formatNumber, groupChanges, leftItems, lineCount, lineText, countLabel,
 } from './render';
 import type { LeftItem } from './render';
+import { CODES, kindOfCode } from './codes';
 import type { Counts, Fix, FixInfo, RepairOut, Result } from './types';
 
 export const FORMAT_KINDS: Fix[] = ['encoding', 'bom', 'line-endings', 'blank-lines', 'leading-space', 'long-lines', 'trailer'];
@@ -37,26 +38,9 @@ const R_NEEDS_UTF8 = 'needs the conversion to UTF-8';
 const R_FAMILY_DATA = 'this family has its own information (events, notes or sources)';
 const R_NEEDS_NAME = 'needs a name';
 const R_NEEDS_LINKS = 'needs broken-links too';
+const R_NAME_LONG = 'the name is too long (at most 120 characters)';
 
-/** The finding codes each kind fixes: the examples before a run, and the estimate. */
-const CODES: Partial<Record<Fix, string[]>> = {
-  encoding: ['ENCODING_NOT_UTF8', 'ENCODING_MISLABELED', 'ENCODING_UNDECLARED', 'ENCODING_BAD_BYTES', 'ENCODING_STRAY_BYTES'],
-  'blank-lines': ['EMPTY_LINE'],
-  'leading-space': ['LEADING_WHITESPACE'],
-  'long-lines': ['LINE_TOO_LONG', 'LINE_EXCEEDS_MAX_PHYSICAL_LENGTH'],
-  trailer: ['MISSING_TRAILER'],
-  'broken-links': [
-    'ORPHANED_FAMC', 'ORPHANED_FAMS', 'ORPHANED_HUSB', 'ORPHANED_WIFE', 'ORPHANED_CHIL', 'ORPHANED_SOUR',
-    'ORPHANED_NOTE', 'ORPHANED_XREF_OTHER', 'ORPHANED_ASSOCIATE_XREF',
-  ],
-  'empty-families': ['EMPTY_FAMILY'],
-  submitter: ['HEADER_MISSING_SUBM'],
-};
-
-/** Whether a finding code is one a data kind can fix (so a repair is worth offering). */
-export function isDataCode(code: string): boolean {
-  return DATA_KINDS.some(k => CODES[k]!.includes(code));
-}
+export { isDataCode } from './codes';
 
 /** Where the list of kinds came from: a repair, planRepair(), or an estimate from the findings. */
 export type Source = 'repair' | 'plan' | 'findings';
@@ -132,13 +116,33 @@ function checked(c: Checklist, a: FixInfo): boolean {
   return chosenRaw(c, a.fix);
 }
 
-/** The name as the library will write it: control and zero-width characters gone, spaces collapsed. */
+/**
+ * The name as the library writes it (repair/data.go cleanName): zero-width
+ * characters (U+200B-U+200D, U+FEFF) removed, every run of white space (Go's
+ * unicode.IsSpace: tabs, line breaks, U+0085, U+00A0, U+2028, U+2029, ...)
+ * made one space, other C0 and C1 controls removed, no space at either end.
+ */
 export function cleanName(s: string): string {
-  // eslint-disable-next-line no-control-regex
-  return s.replace(/[​-‍﻿]|[\u0000-\u0008\u000e-\u001f\u007f]/g, '').replace(/\s+/g, ' ').trim();
+  return s
+    .replace(/[\u200b-\u200d\ufeff]/g, '')
+    // eslint-disable-next-line no-control-regex
+    .replace(/[\u0000-\u0008\u000e-\u001f\u007f-\u0084\u0086-\u009f]/g, '')
+    .replace(/[\s\u0085]+/g, ' ')
+    .trim();
 }
 
-const hasName = (c: Checklist): boolean => cleanName(c.name) !== '';
+/** The library's limit: "1 NAME " plus the name in at most 255 bytes. */
+const MAX_NAME_BYTES = 248;
+
+/** Why the name can't be used, or null. */
+function nameProblem(name: string): string | null {
+  const n = cleanName(name);
+  if (n === '') return R_NEEDS_NAME;
+  if ([...n].length > MAX_NAME || new TextEncoder().encode(n).length > MAX_NAME_BYTES) return R_NAME_LONG;
+  return null;
+}
+
+const hasName = (c: Checklist): boolean => nameProblem(c.name) === null;
 
 /**
  * Ticks or unticks a kind. Returns the kinds ticked along with it (broken-links,
@@ -187,7 +191,11 @@ export function everything(c: Checklist): { fixes: Fix[]; leftOut: Fix[] } {
 
 /** Records the run now on screen, and what it taught us. */
 export function markRan(c: Checklist, run: Run, out: RepairOut): void {
-  c.ran = { fixes: [...run.fixes], name: run.name, leftOut: [...run.leftOut] };
+  // Only the kinds the run could use: a kind the estimate had but the file
+  // doesn't need would otherwise mark a fresh result out of date.
+  const could = out.available ? new Set(out.available.map(a => a.fix)) : null;
+  const fixes = could ? run.fixes.filter(f => could.has(f)) : [...run.fixes];
+  c.ran = { fixes, name: run.name, leftOut: [...run.leftOut] };
   if (out.skipped?.some(s => s.fix === 'empty-families' && s.reason === R_NEEDS_LINKS)) c.needsLinks = true;
 }
 
@@ -220,7 +228,7 @@ const plural = (n: number, one: string, many: string) => `${formatNumber(n)} ${n
 
 export function countText(a: FixInfo, source: Source): string {
   if (a.fix === 'submitter') return plural(a.lines, 'line added', 'lines added');
-  if (a.lines <= 0) return a.kind === 'data' ? '' : 'whole file';
+  if (a.fix === 'encoding' || a.lines <= 0) return a.kind === 'data' ? '' : 'whole file';
   if (source === 'findings') {
     return a.kind === 'data' ? `${formatNumber(a.lines)} found` : `about ${plural(a.lines, 'line', 'lines')}`;
   }
@@ -251,7 +259,7 @@ export function rowView(c: Checklist, a: FixInfo): RowView {
   else if (a.fix === 'empty-families' && c.needsLinks && info(c, 'broken-links')) reason = linksReason();
   let note: string | null = null;
   const also = [...c.alsoTicked].find(([k, by]) => by === a.fix && chosenRaw(c, k));
-  if (a.fix === 'submitter' && on && !hasName(c)) note = 'Type your name to include this.';
+  if (a.fix === 'submitter' && on && !hasName(c)) note = reasonText('submitter', nameProblem(c.name)!);
   else if (also && on) note = `Also ticked “${LABELS[also[0]]}”, which this needs.`;
   return {
     fix: a.fix, kind: a.kind, label: LABELS[a.fix] ?? a.fix, count: countText(a, c.source),
@@ -417,6 +425,8 @@ export interface ResultGroup {
 export interface ResultView {
   groups: ResultGroup[];
   notApplied: { fix: Fix; label: string; reason: string }[];
+  /** Problems left that a fix on this checklist can fix (tick it and repair again). */
+  leftFixable: LeftItem[];
   before: string;
   after: string;
   note: string | null;
@@ -452,11 +462,16 @@ export function resultView(out: RepairOut, r: Result, leftOut: Fix[]): ResultVie
       notApplied.push({ fix, label: LABELS[fix], reason: reasonText(fix, R_NEEDS_NAME) });
     }
   }
+  // What is left splits by whether a kind offered on the checklist fixes it.
+  const offered = new Set((out.available ?? []).filter(a => !notOffered(a) && (a.lines > 0 || a.required)).map(a => a.fix));
+  const fixable = out.left.filter(code => { const k = kindOfCode(code); return k !== null && offered.has(k); });
+  const rest = out.left.filter(code => !fixable.includes(code));
   return {
     groups, notApplied,
     before: countsText(out.before), after: countsText(out.after),
     note: r.summary.gedcomVersion === '5.5' ? NOTE_55 : null,
-    left: leftItems(out.left, r),
+    leftFixable: leftItems(fixable, r),
+    left: leftItems(rest, r),
   };
 }
 

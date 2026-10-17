@@ -359,12 +359,11 @@ h1 em { font-style: italic; }
   background: var(--card); border: 1px solid var(--dash); border-radius: 6px;
 }
 #repair .fix-name input:focus-visible { outline-offset: 1px; border-color: var(--accent); }
-#repair .fix-lines { margin: 0 0 4px 30px; }
+#repair .fix-lines { margin: -6px 0 0 30px; }
 #repair .show-lines {
-  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: none;
+  display: inline-flex; align-items: center; gap: 6px; min-height: 44px; padding: 0 8px 0 0; border: 0; background: none;
   font-size: 13px; font-weight: 500; color: var(--accent);
 }
-@media (pointer: coarse) { #repair .show-lines { min-height: 44px; } }
 #repair .show-lines::after {
   content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0;
   transform: translateY(-2px) rotate(45deg); transition: transform 200ms ease-out;
@@ -488,6 +487,7 @@ code { font-family: var(--mono); font-size: 0.9em; background: var(--tint); padd
 .empty { font-family: var(--serif); font-style: italic; font-size: 19px; color: var(--muted); margin: 32px 0 0; }
 
 .slot[hidden] { display: none; }
+.sr-only { position: absolute; width: 1px; height: 1px; margin: 0; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
 
 /* ---------------------------------------------------------------- footer */
 

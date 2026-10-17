@@ -2,6 +2,7 @@
 // the page shows (unit-tested); the second half builds the DOM from them
 // (covered by the e2e tests).
 
+import { isDataCode } from './codes';
 import { fillParts, genericTitle, pageText } from './fill';
 import { smoothDetails } from './toggle';
 import type { Finding, Group, RepairOut, Result, Severity } from './types';
@@ -192,9 +193,6 @@ export function sizeNote(bytes: number): string {
   return 'This is a large file, so checking may take a minute or so. You can use other tabs meanwhile.';
 }
 
-/** Findings a suggested fix (a data kind of repair) can fix; see checklist.ts. */
-const DATA_CODE = /^(ORPHANED_(FAMC|FAMS|HUSB|WIFE|CHIL|SOUR|NOTE|XREF_OTHER|ASSOCIATE_XREF)|EMPTY_FAMILY|HEADER_MISSING_SUBM)$/;
-
 /**
  * Whether to make a repaired copy straight away ('auto'), only on request
  * ('offer', above 5 MB, where it is slow and memory-hungry), or not at all
@@ -203,7 +201,7 @@ const DATA_CODE = /^(ORPHANED_(FAMC|FAMS|HUSB|WIFE|CHIL|SOUR|NOTE|XREF_OTHER|ASS
 export function repairPlan(r: Result, size: number): 'skip' | 'auto' | 'offer' {
   const kind = viewKind(r);
   if (kind === 'failed' || kind === 'not-gedcom') return 'skip';
-  const format = r.findings.some(f => f.group === 'format' || f.group === '' || DATA_CODE.test(f.code));
+  const format = r.findings.some(f => f.group === 'format' || f.group === '' || isDataCode(f.code));
   const plain = r.encoding.detected === 'UTF-8' || r.encoding.detected === 'ASCII';
   if (!format && plain && !r.bom && !r.bareCR) return 'skip';
   return size > 5 * MB ? 'offer' : 'auto';

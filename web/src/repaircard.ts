@@ -17,6 +17,9 @@ export const STALE = 'out of date — repair again';
 export const DOWNLOAD = 'Download repaired file';
 export const DOWNLOAD_STALE = 'Download the last repaired copy';
 export const TICK_ONE = 'Tick at least one fix first.';
+export const STALE_SAY = 'Your choices changed. Repair again to update the copy.';
+export const LEFT_FIXABLE = 'Tick a fix above to fix these here:';
+export const LEFT_OTHER = 'These need fixing in your family tree program:';
 const SUBMITTER_LINES = 'Adds 3 lines: a link in the header, and a short record with your name before the end of the file.';
 const WHOLE_FILE = 'This changes the whole file, not single lines.';
 
@@ -46,6 +49,11 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const r = o.result;
   let shownOut: RepairOut | null = null;
   let busy = false;
+  let wasStale = false;
+  /** Show lines panels that are open; kept across a redraw. */
+  const open = new Set<Fix>();
+  // Said politely when the result goes out of date (the stale mark itself is only seen).
+  const live = el('p', { class: 'sr-only', id: 'repair-live', role: 'status', 'aria-live': 'polite' });
 
   const heading = el('h2', { id: 'repair-h' });
   const lists = el('div', { class: 'fix-groups' });
@@ -56,7 +64,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const form = el('form', { class: 'checklist', novalidate: '', 'aria-labelledby': 'repair-h' },
     lists, el('div', { class: 'run-row' }, all, selected, offer), runNote);
   const resultBox = el('div', { class: 'result', id: 'repair-result', hidden: '' });
-  slot.replaceChildren(heading, form, resultBox);
+  slot.replaceChildren(heading, form, resultBox, live);
   slot.setAttribute('aria-labelledby', 'repair-h');
   slot.hidden = false;
 
@@ -116,14 +124,18 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   function showLines(fix: Fix): HTMLElement {
     const bodyId = `${rowId(fix)}-lines`;
     const body = el('div', { class: 'fix-lines-body', id: bodyId, hidden: '' });
-    const toggle = el('button', { type: 'button', class: 'show-lines', 'aria-expanded': 'false', 'aria-controls': bodyId }, 'Show lines');
-    toggle.addEventListener('click', () => {
-      const open = toggle.getAttribute('aria-expanded') !== 'true';
-      toggle.setAttribute('aria-expanded', String(open));
-      toggle.textContent = open ? 'Hide lines' : 'Show lines';
-      body.hidden = !open;
-      if (open) draw();
-    });
+    const toggle = el('button', {
+      type: 'button', class: 'show-lines', id: `${rowId(fix)}-show`, 'aria-expanded': 'false', 'aria-controls': bodyId,
+    }, 'Show lines');
+    const set = (on: boolean) => {
+      toggle.setAttribute('aria-expanded', String(on));
+      toggle.textContent = on ? 'Hide lines' : 'Show lines';
+      body.hidden = !on;
+      if (on) { open.add(fix); draw(); } else open.delete(fix);
+    };
+    toggle.addEventListener('click', () => set(toggle.getAttribute('aria-expanded') !== 'true'));
+    // Reopened after a redraw (new list of kinds, or a run), drawn from the latest run.
+    queueMicrotask(() => { if (open.has(fix)) set(true); });
     const draw = () => {
       body.replaceChildren();
       const ex = examples(fix, r, shownOut);
@@ -210,6 +222,9 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     const dl = resultBox.querySelector<HTMLButtonElement>('#download-repaired');
     if (dl) dl.textContent = stale ? DOWNLOAD_STALE : DOWNLOAD;
     resultBox.classList.toggle('is-stale', stale);
+    if (stale && !wasStale && dl) live.textContent = STALE_SAY;
+    if (!stale) live.textContent = '';
+    wasStale = stale;
   }
 
   function redraw() {
@@ -248,15 +263,17 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
       el('div', { class: 'repair-row' }, dl, el('p', { class: 'keep' }, KEEP_ORIGINAL)),
       v.note ? el('p', { class: 'note55' }, v.note) : null,
     );
-    if (v.left.length) {
-      const left = el('ul', { class: 'left' });
-      for (const l of v.left) {
-        left.append(l.heading
+    const leftList = (items: typeof v.left, cls: string) => {
+      const ul = el('ul', { class: cls });
+      for (const l of items) {
+        ul.append(l.heading
           ? el('li', {}, `${l.title}: ${formatNumber(l.count)}`)
           : el('li', {}, withCode(l.title), ` (${formatNumber(l.count)})`));
       }
-      kids.push(el('h3', {}, 'These need fixing in your family tree program:'), left);
-    }
+      return ul;
+    };
+    if (v.leftFixable.length) kids.push(el('h3', {}, LEFT_FIXABLE), leftList(v.leftFixable, 'left fixable'));
+    if (v.left.length) kids.push(el('h3', {}, LEFT_OTHER), leftList(v.left, 'left'));
     resultBox.replaceChildren();
     for (const k of kids) if (k) resultBox.append(k);
     resultBox.hidden = false;
@@ -271,7 +288,14 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     refresh();
   }
 
+  /** The control that had focus when a run started: disabling the buttons drops it, so it comes back after. */
+  let focusBeforeRun: string | null = null;
+
   function setBusy(b: boolean) {
+    if (b) {
+      const a = document.activeElement;
+      focusBeforeRun = a && slot.contains(a) && a.id ? a.id : null;
+    }
     busy = b;
     for (const btn of [all, selected]) {
       btn.disabled = b;
@@ -279,6 +303,11 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     }
     if (b) runNote.textContent = runNote.textContent || 'Making a repaired copy…';
     else if (runNote.textContent === 'Making a repaired copy…') runNote.textContent = '';
+    if (!b && focusBeforeRun) {
+      const a = document.activeElement;
+      if (!a || a === document.body) document.getElementById(focusBeforeRun)?.focus();
+      focusBeforeRun = null;
+    }
   }
 
   build();

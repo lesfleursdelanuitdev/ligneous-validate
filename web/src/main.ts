@@ -212,9 +212,12 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   // An older checker (or a test's fake) may leave out the list of kinds: estimate it.
   const available = info.available ?? estimateAvailable(view.result);
   if (!view.checklist && available.length === 0 && info.changes.length === 0) return; // nothing to fix
+  showCard(view, available, info.available ? 'repair' : 'findings');
+  // The run made by itself changed nothing (only suggested fixes are on offer):
+  // no copy to download, just the checklist.
+  if (!view.pending && info.changes.length === 0) return;
   view.repair = info;
   view.data = data;
-  showCard(view, available, info.available ? 'repair' : 'findings');
   const c = view.checklist!;
   const run: Run = view.pending ?? { fixes: selectedFixes(c), name: '', leftOut: [] };
   markRan(c, run, info);
