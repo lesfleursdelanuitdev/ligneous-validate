@@ -326,11 +326,76 @@ export function rows(c: Checklist): { format: RowView[]; data: RowView[] } {
   return { format: all.filter(r => r.kind === 'format'), data: all.filter(r => r.kind === 'data') };
 }
 
+/** Only hints (or nothing at all) were found: the fixes are an optional tidy-up. */
+const onlyHints = (r: Result): boolean => r.findings.every(f => f.severity === 'hint');
+
+/** Kinds the checklist offers (a row that can be ticked, or is required). */
+const offeredKinds = (c: Checklist): FixInfo[] => shown(c).filter(a => !notOffered(a));
+
+export const HEADING_SOME = 'What we can fix';
+export const HEADING_NONE = 'Nothing here we can fix for you';
+export const HEADING_HINTS = 'Optional tidy-up';
+
+/**
+ * The card's heading. It never says "none" while it lists fixes: it is
+ * neutral, the summary under it says what each area has.
+ */
 export function checklistHeading(c: Checklist, r: Result): string {
-  if (r.findings.every(f => f.severity === 'hint')) return 'Optional tidy-up';
-  const n = shown(c).filter(a => a.kind === 'format').length;
-  if (n === 0) return 'No format problems to fix';
-  return `We can fix ${formatNumber(n)} ${n === 1 ? 'kind' : 'kinds'} of format problem`;
+  if (onlyHints(r)) return HEADING_HINTS;
+  return offeredKinds(c).length ? HEADING_SOME : HEADING_NONE;
+}
+
+export const SUMMARY_FORMAT = 'Formatting issues';
+export const SUMMARY_DATA = 'Family data with a suggested fix';
+export const SUMMARY_PROGRAM = 'Problems to fix in your family tree program';
+export const NOTE_FORMAT = "Fixing these doesn't change your family data.";
+export const NOTE_DATA = 'These fixes change your family data.';
+
+export interface SummaryLine {
+  area: 'format' | 'data' | 'program';
+  label: string;
+  /** "0 found", "3 kinds (1,204 lines)", "2 kinds (5 places)", "12 found". */
+  count: string;
+  /** What the fixes do to the family data; null for the program line. */
+  note: string | null;
+  /** The in-page section it links to; null when there is nothing there. */
+  href: string | null;
+}
+
+/**
+ * The summary under the heading, one line per area: the format kinds offered
+ * (with the lines they change), the data kinds offered (with the places they
+ * are found), and the findings no kind here fixes.
+ */
+export function checklistSummary(c: Checklist, r: Result): SummaryLine[] {
+  const offered = offeredKinds(c);
+  const format = offered.filter(a => a.kind === 'format');
+  const data = offered.filter(a => a.kind === 'data');
+  const kinds = (n: number) => plural(n, 'kind', 'kinds');
+
+  let formatCount = '0 found';
+  if (format.length) {
+    const lines = format.filter(a => a.fix !== 'encoding').reduce((t, a) => t + Math.max(0, a.lines), 0);
+    const whole = format.some(a => a.fix === 'encoding') || lines === 0;
+    formatCount = `${kinds(format.length)} (${whole ? 'whole file' : plural(lines, 'line', 'lines')})`;
+  }
+
+  const dataFixes = new Set<Fix>(data.map(a => a.fix));
+  const allFixes = new Set<Fix>(offered.map(a => a.fix));
+  let places = 0, program = 0;
+  for (const f of r.findings) {
+    const k = kindOfCode(f.code);
+    if (k !== null && dataFixes.has(k)) places++;
+    if (k === null || !allFixes.has(k)) program++;
+  }
+  let dataCount = '0 found';
+  if (data.length) dataCount = kinds(data.length) + (places ? ` (${plural(places, 'place', 'places')})` : '');
+
+  return [
+    { area: 'format', label: SUMMARY_FORMAT, count: formatCount, note: format.length ? NOTE_FORMAT : null, href: format.length ? '#fixes-format' : null },
+    { area: 'data', label: SUMMARY_DATA, count: dataCount, note: data.length ? NOTE_DATA : null, href: data.length ? '#fixes-data' : null },
+    { area: 'program', label: SUMMARY_PROGRAM, count: `${formatNumber(program)} found`, note: null, href: program ? '#findings' : null },
+  ];
 }
 
 // ---------------------------------------------------------------- Show lines

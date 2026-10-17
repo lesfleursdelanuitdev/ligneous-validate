@@ -3,15 +3,15 @@
 // this file only draws it (covered by the e2e tests).
 
 import {
-  LABELS, MAX_NAME, checklistHeading, everything, examples, isOutOfDate, isPlanPending, rows, resultView, selectedFixes,
+  LABELS, MAX_NAME, checklistHeading, checklistSummary, everything, examples, isOutOfDate, isPlanPending, rows, resultView, selectedFixes,
   selectedLeftOut, setChosen, setName,
 } from './checklist';
 import type { Checklist, Run, RowView } from './checklist';
 import { KEEP_ORIGINAL, OFFER_NOTE, REPAIR_FAILED, el, formatNumber, withCode } from './render';
 import type { Fix, RepairOut, Result } from './types';
 
-export const FORMAT_LEGEND = 'Format fixes';
-export const DATA_LEGEND = 'Suggested fixes — these change your family data';
+export const FORMAT_LEGEND = 'Formatting fixes';
+export const DATA_LEGEND = 'Suggested fixes for your family data';
 export const DATA_WARNING = 'These remove or add records. Look at what they change before you download.';
 export const STALE = 'out of date — repair again';
 export const DOWNLOAD = 'Download repaired file';
@@ -66,6 +66,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const live = el('p', { class: 'sr-only', id: 'repair-live', role: 'status', 'aria-live': 'polite' });
 
   const heading = el('h2', { id: 'repair-h' });
+  const summary = el('ul', { class: 'fix-summary', id: 'repair-summary' });
   const planFailed = el('p', { class: 'plan-failed', hidden: '' }, PLAN_FAILED);
   const edits = el('p', { class: 'edits-note', hidden: '' }, EDITS_NOTE);
   const lists = el('div', { class: 'fix-groups' });
@@ -76,7 +77,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const form = el('form', { class: 'checklist', novalidate: '', 'aria-labelledby': 'repair-h' },
     lists, el('div', { class: 'run-row' }, all, selected, offer), runNote);
   const resultBox = el('div', { class: 'result', id: 'repair-result', hidden: '' });
-  slot.replaceChildren(heading, edits, planFailed, form, resultBox, live);
+  slot.replaceChildren(heading, summary, edits, planFailed, form, resultBox, live);
   slot.setAttribute('aria-labelledby', 'repair-h');
   slot.hidden = false;
 
@@ -194,10 +195,23 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     if (ex.more > 0) body.append(el('p', { class: 'ex-more' }, `and ${formatNumber(ex.more)} more`));
   }
 
+  /** The heading and, under it, one line per area with its count, each linking to its section. */
+  function drawHeading() {
+    heading.textContent = checklistHeading(c, r);
+    summary.replaceChildren();
+    for (const line of checklistSummary(c, r)) {
+      const text: Node[] = [el('strong', {}, `${line.label}:`), document.createTextNode(' '), el('span', { class: 'sum-count' }, line.count)];
+      const li = el('li', { class: `sum-${line.area}` });
+      li.append(line.href ? el('a', { href: line.href }, ...text) : el('span', {}, ...text));
+      if (line.note) li.append(el('span', { class: 'sum-note' }, line.note));
+      summary.append(li);
+    }
+  }
+
   /** Builds both groups from the current list of kinds. */
   function build() {
     const v = rows(c);
-    heading.textContent = checklistHeading(c, r);
+    drawHeading();
     lists.replaceChildren();
     drawers.clear();
     if (v.format.length) {
@@ -266,7 +280,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     const want = [...rows(c).format, ...rows(c).data].map(x => x.fix).join();
     const have = [...lists.querySelectorAll<HTMLElement>('li.fix')].map(li => li.dataset.fix).join();
     if (want !== have) { redraw(); return; }
-    heading.textContent = checklistHeading(c, r);
+    drawHeading();
     refresh();
   }
 

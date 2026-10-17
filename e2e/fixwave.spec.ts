@@ -194,7 +194,7 @@ test('e2e: above 5 MB the repair waits for a click on the checklist and runs in 
   const before = await made(page);
   await make.click();
   await expect(page.locator('#repair .changes li').first()).toBeVisible({ timeout: 240_000 });
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
+  await expect(page.locator('#repair h2')).toHaveText('What we can fix');
   expect(await made(page)).toBe(before + 1);
   await expect(page.locator('#repair .changes li')).toHaveText([/^Removed a blank line: 1 line \(\d[\d,]*\)$/]);
   await expect(page.getByRole('button', { name: 'Download repaired file' })).toBeVisible();

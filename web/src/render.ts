@@ -523,7 +523,7 @@ export function renderReport(root: HTMLElement, r: Result, fileName: string, edi
 
   const counts = countBySeverity(r.findings);
   const show: SeverityFilter = { error: true, warning: true, hint: true };
-  const groups = el('div', { class: 'groups' });
+  const groups = el('div', { class: 'groups', id: 'findings' });
   const drawGroups = () => {
     const vg = buildGroups(r.findings, show);
     groups.replaceChildren(...(vg.length

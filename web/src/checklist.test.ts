@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
-  DATA_LABELS, LABELS, MAX_NAME, announce, cleanName, selectedLeftOut, checklistHeading, countText, everything, examples,
+  DATA_LABELS, LABELS, MAX_NAME, announce, cleanName, selectedLeftOut, checklistHeading, checklistSummary, countText, everything, examples,
   isOutOfDate, markRan, newChecklist, reasonText, resultView, rowView, rows, selectedFixes,
   setAvailable, setChosen, setName, setPlan, isPlanPending, planKey, setPlanFailed,
 } from './checklist';
@@ -320,18 +320,56 @@ describe('a new list of kinds', () => {
 });
 
 describe('heading', () => {
-  it('counts the kinds of format problem', () => {
-    expect(checklistHeading(newChecklist([fi('encoding', 1)]), result())).toBe('We can fix 1 kind of format problem');
-    expect(checklistHeading(newChecklist([fi('encoding', 1), fi('trailer', 1), fi('submitter', 3)]), result()))
-      .toBe('We can fix 2 kinds of format problem');
+  it('is neutral when there is something to fix, whichever area it is in', () => {
+    expect(checklistHeading(newChecklist([fi('encoding', 1)]), result())).toBe('What we can fix');
+    expect(checklistHeading(newChecklist([fi('encoding', 1), fi('trailer', 1), fi('submitter', 3)]), result())).toBe('What we can fix');
+    // The reported case: no format fixes, some data fixes. It never says "none" above a list of fixes.
+    expect(checklistHeading(newChecklist([fi('submitter', 3)]), result())).toBe('What we can fix');
   });
   it('keeps the optional tidy-up for a clean file, or one with only hints', () => {
     const c = newChecklist([fi('bom', 1)]);
     expect(checklistHeading(c, result({ findings: [] }))).toBe('Optional tidy-up');
     expect(checklistHeading(c, result({ findings: [finding('X', 1, 'hint')] }))).toBe('Optional tidy-up');
   });
-  it('says so when only data kinds are offered', () => {
-    expect(checklistHeading(newChecklist([fi('submitter', 3)]), result())).toBe('No format problems to fix');
+  it('says plainly when nothing can be fixed here', () => {
+    expect(checklistHeading(newChecklist([]), result())).toBe('Nothing here we can fix for you');
+    // A family with data of its own is listed, but not offered.
+    const kept = fi('empty-families', 0, { reason: 'this family has its own information (events, notes or sources)' });
+    expect(checklistHeading(newChecklist([kept]), result())).toBe('Nothing here we can fix for you');
+  });
+});
+
+describe('the summary under the heading', () => {
+  const line = (c: ReturnType<typeof newChecklist>, r: Result, area: string) => checklistSummary(c, r).find(l => l.area === area)!;
+  it('has one line per area, in order, with labels, notes and links', () => {
+    const s = checklistSummary(newChecklist(SUGGESTED_AVAILABLE), suggestedResult());
+    expect(s.map(l => [l.label, l.count, l.note, l.href])).toEqual([
+      ['Formatting issues', '1 kind (1 line)', "Fixing these doesn't change your family data.", '#fixes-format'],
+      ['Family data with a suggested fix', '3 kinds (5 places)', 'These fixes change your family data.', '#fixes-data'],
+      ['Problems to fix in your family tree program', '0 found', null, null],
+    ]);
+  });
+  it('says 0 found for format when only data fixes are offered (the reported case)', () => {
+    const r = result({ findings: [finding('HEADER_MISSING_SUBM', 1), finding('DATE_X', 9)] });
+    const c = newChecklist([fi('submitter', 3)]);
+    expect(line(c, r, 'format')).toEqual({ area: 'format', label: 'Formatting issues', count: '0 found', note: null, href: null });
+    expect(line(c, r, 'data').count).toBe('1 kind (1 place)');
+    expect(line(c, r, 'program')).toMatchObject({ count: '1 found', href: '#findings' });
+  });
+  it('counts format lines with thousands, and calls the encoding the whole file', () => {
+    const r = result({ findings: [] });
+    expect(line(newChecklist([fi('blank-lines', 1200), fi('long-lines', 4), fi('trailer', 1)]), r, 'format').count)
+      .toBe('3 kinds (1,205 lines)');
+    expect(line(newChecklist([fi('encoding', 1), fi('blank-lines', 2)]), r, 'format').count).toBe('2 kinds (whole file)');
+  });
+  it('says 0 found everywhere when there is nothing, and counts what only the program can fix', () => {
+    const r = result({ findings: [finding('A', 1), finding('B', 2, 'error'), finding('EMPTY_FAMILY', 3)] });
+    const kept = fi('empty-families', 0, { reason: 'this family has its own information (events, notes or sources)' });
+    expect(checklistSummary(newChecklist([kept]), r).map(l => l.count)).toEqual(['0 found', '0 found', '3 found']);
+  });
+  it('fits the all-hints case', () => {
+    const r = result({ findings: [finding('H', 1, 'hint')] });
+    expect(checklistSummary(newChecklist([fi('line-endings', 15)]), r).map(l => l.count)).toEqual(['1 kind (15 lines)', '0 found', '1 found']);
   });
 });
 
@@ -534,18 +572,18 @@ describe('the result view (from repairView)', () => {
 
 describe('the heading (from repairView)', () => {
   const one = (fixes: FixInfo[]) => newChecklist(fixes);
-  it('uses the singular for one kind and the plural for more, with thousands', () => {
+  it('is the same neutral heading for one kind or more', () => {
     const withWarning = result({ findings: [finding('X', 1, 'warning')] });
-    expect(checklistHeading(one([fi('trailer', 1)]), withWarning)).toBe('We can fix 1 kind of format problem');
-    expect(checklistHeading(one([fi('trailer', 1), fi('bom', 1)]), withWarning)).toBe('We can fix 2 kinds of format problem');
+    expect(checklistHeading(one([fi('trailer', 1)]), withWarning)).toBe('What we can fix');
+    expect(checklistHeading(one([fi('trailer', 1), fi('bom', 1)]), withWarning)).toBe('What we can fix');
   });
   it('calls it an optional tidy-up for a file with no findings, or only hints', () => {
     expect(checklistHeading(one([fi('bom', 1)]), result({ findings: [] }))).toBe('Optional tidy-up');
     expect(checklistHeading(one([fi('bom', 1)]), result({ findings: [finding('A', 1, 'hint'), finding('B', 2, 'hint')] }))).toBe('Optional tidy-up');
   });
-  it('keeps "We can fix" when there is a warning or an error', () => {
+  it('keeps "What we can fix" when there is a warning or an error', () => {
     expect(checklistHeading(one([fi('bom', 1)]), result({ findings: [finding('A', 1, 'hint'), finding('B', 2, 'warning')] })))
-      .toBe('We can fix 1 kind of format problem');
+      .toBe('What we can fix');
   });
   it('has no rows when nothing can be fixed', () => {
     const c = one([]);

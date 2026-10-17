@@ -320,6 +320,24 @@ h1 em { font-style: italic; }
 #repair .keep { margin: 0; font-size: 13px; color: var(--light); }
 #repair .repair-failed { margin: 0; font-size: 15px; font-weight: 400; color: var(--text); }
 #repair h2 + p { margin: 0; }
+
+/* Under the heading: one line per area with its count, each a link to its section. */
+#repair ul.fix-summary {
+  list-style: none; margin: 0 0 20px; padding: 14px 16px; display: flex; flex-direction: column; gap: 10px;
+  background: var(--tint); border-radius: 8px; font-size: 14px; line-height: 1.5;
+}
+#repair .fix-summary li { padding: 0; }
+#repair .fix-summary strong { font-weight: 500; }
+#repair .fix-summary a { color: var(--text); text-decoration-color: var(--dash); }
+#repair .fix-summary a strong { color: var(--accent); }
+@media (hover: hover) { #repair .fix-summary a:hover, #repair .fix-summary a:hover strong { color: var(--amber); } }
+@media (pointer: coarse) { #repair .fix-summary a { display: inline-block; min-height: 24px; } }
+#repair .sum-count { font-variant-numeric: tabular-nums; white-space: nowrap; }
+#repair .fix-summary > li > span:first-child { color: var(--muted); }
+#repair .fix-summary > li > span:first-child strong { color: var(--text); }
+#repair .sum-note { display: block; font-size: 13px; color: var(--muted); }
+#repair .sum-data .sum-note { color: var(--amber); }
+#repair .fixes, #findings { scroll-margin-top: 16px; }
 #repair .note55 { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
 
 /* The checklist: one fieldset per group, a row per kind of fix. */

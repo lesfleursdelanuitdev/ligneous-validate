@@ -33,8 +33,8 @@ test.beforeEach(async ({ page }) => {
 
 test('e2e: royal92 shows the format list with encoding ticked', async ({ page }) => {
   await upload(page, 'royal92.ged');
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
-  const format = page.getByRole('group', { name: 'Format fixes' });
+  await expect(page.locator('#repair h2')).toHaveText('What we can fix');
+  const format = page.getByRole('group', { name: 'Formatting fixes' });
   await expect(format).toBeVisible();
   await expect(format.getByRole('checkbox')).toHaveCount(1);
   await expect(box(page, ENCODING)).toBeChecked();
@@ -49,7 +49,7 @@ test('e2e: royal92 shows the format list with encoding ticked', async ({ page })
 
 test('e2e: the suggested fixes start unticked; broken links alone removes exactly those lines', async ({ page }) => {
   await upload(page, 'suggested.ged');
-  const data = page.getByRole('group', { name: 'Suggested fixes — these change your family data' });
+  const data = page.getByRole('group', { name: 'Suggested fixes for your family data' });
   await expect(data).toBeVisible();
   await expect(data).toContainText('These remove or add records. Look at what they change before you download.');
   for (const label of [BROKEN, EMPTY, SUBMITTER]) await expect(box(page, label)).not.toBeChecked();
@@ -204,10 +204,83 @@ test('e2e: a non-ASCII name on an ANSEL file without the conversion is not appli
 test('e2e: a file with only suggested fixes gets the checklist and no unchanged copy', async ({ page }) => {
   const text = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Ann /Lee/\n1 SEX F\n0 TRLR\n';
   await page.locator('#file').setInputFiles({ name: 'nosubm.ged', mimeType: 'text/plain', buffer: Buffer.from(text) });
-  await expect(page.locator('#repair h2')).toHaveText('No format problems to fix');
+  await expect(page.locator('#repair h2')).toHaveText('What we can fix');
   await expect(box(page, SUBMITTER)).not.toBeChecked();
   await expect(page.locator('#repair-result')).toBeHidden();
   await expect(page.getByRole('button', { name: /^Download/ }).filter({ hasText: 'repaired' })).toHaveCount(0);
+});
+
+// ------------------------------------------------------------------ the heading and its summary
+
+const summary = (page: Page) => page.locator('#repair ul.fix-summary > li');
+
+test('e2e: no format problems but some data fixes: a neutral heading, and the summary says which area has them', async ({ page }) => {
+  const text = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME Ann /Lee/\n1 SEX F\n0 TRLR\n';
+  await page.locator('#file').setInputFiles({ name: 'nosubm.ged', mimeType: 'text/plain', buffer: Buffer.from(text) });
+  await expect(page.locator('#repair h2')).toHaveText('What we can fix');
+  await expect(page.locator('#repair')).not.toContainText('No format problems');
+  await expect(summary(page)).toHaveText([
+    'Formatting issues: 0 found',
+    'Family data with a suggested fix: 1 kind (1 place)These fixes change your family data.',
+    'Problems to fix in your family tree program: 0 found',
+  ]);
+  // Labels are <strong>; only an area with a section below links to it.
+  await expect(summary(page).locator('strong')).toHaveText([
+    'Formatting issues:', 'Family data with a suggested fix:', 'Problems to fix in your family tree program:']);
+  await expect(summary(page).locator('a')).toHaveCount(1);
+  const link = page.getByRole('link', { name: 'Family data with a suggested fix: 1 kind (1 place)' });
+  await expect(link).toHaveAttribute('href', '#fixes-data');
+  await expect(page.getByRole('group', { name: 'Formatting fixes' })).toHaveCount(0);
+  await link.click();
+  await expect(page.getByRole('group', { name: 'Suggested fixes for your family data' })).toBeInViewport();
+  await expect(page.locator('#suggested-warn')).toHaveText('These remove or add records. Look at what they change before you download.');
+});
+
+test('e2e: both kinds: the summary counts each area and links to its section', async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await expect(page.locator('#repair h2')).toHaveText('What we can fix');
+  await expect(summary(page)).toHaveText([
+    "Formatting issues: 1 kind (1 line)Fixing these doesn't change your family data.",
+    'Family data with a suggested fix: 3 kinds (5 places)These fixes change your family data.',
+    'Problems to fix in your family tree program: 0 found',
+  ]);
+  await expect(page.getByRole('link', { name: 'Formatting issues: 1 kind (1 line)' })).toHaveAttribute('href', '#fixes-format');
+  await expect(page.getByRole('link', { name: 'Family data with a suggested fix: 3 kinds (5 places)' })).toHaveAttribute('href', '#fixes-data');
+  await expect(page.locator('#fixes-format legend')).toHaveText('Formatting fixes');
+  await expect(page.locator('#fixes-data legend')).toHaveText('Suggested fixes for your family data');
+  // Spacing is even: the box's padding is the same left and right, and top and bottom.
+  const pad = await page.locator('#repair ul.fix-summary').evaluate(e => {
+    const s = getComputedStyle(e);
+    return [s.paddingLeft === s.paddingRight, s.paddingTop === s.paddingBottom];
+  });
+  expect(pad).toEqual([true, true]);
+});
+
+test('e2e: neither kind: the heading says so plainly, and the rest is for the family tree program', async ({ page }) => {
+  // An empty family with information of its own: listed, but not offered.
+  const text = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n1 SUBM @U1@\n0 @U1@ SUBM\n1 NAME Test\n'
+    + '0 @I1@ INDI\n1 NAME Ann /Lee/\n1 SEX F\n0 @F1@ FAM\n1 MARR\n2 DATE 1 JAN 1900\n1 NOTE A family with no people\n0 TRLR\n';
+  await page.locator('#file').setInputFiles({ name: 'kept.ged', mimeType: 'text/plain', buffer: Buffer.from(text) });
+  await expect(page.locator('#repair h2')).toHaveText('Nothing here we can fix for you');
+  await expect(summary(page)).toHaveText([
+    'Formatting issues: 0 found',
+    'Family data with a suggested fix: 0 found',
+    'Problems to fix in your family tree program: 1 found',
+  ]);
+  const link = page.getByRole('link', { name: 'Problems to fix in your family tree program: 1 found' });
+  await expect(link).toHaveAttribute('href', '#findings');
+  await link.click();
+  await expect(page.locator('#findings')).toBeInViewport();
+});
+
+test('e2e: only hints: an optional tidy-up, in the same pattern', async ({ page }) => {
+  await upload(page, 'clean-cr.ged');
+  await expect(page.locator('#repair h2')).toHaveText('Optional tidy-up');
+  await expect(summary(page)).toHaveText([
+    "Formatting issues: 1 kind (15 lines)Fixing these doesn't change your family data.",
+    'Family data with a suggested fix: 0 found',
+    'Problems to fix in your family tree program: 0 found',
+  ]);
 });
 
 test('e2e: what is left splits into what a fix above can fix and the rest', async ({ page }) => {
