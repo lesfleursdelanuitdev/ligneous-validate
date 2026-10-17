@@ -1,0 +1,14 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>GEDCOM benchmark</title>
+<p>Benchmark page. Driven by bench/browser/run.mjs through Playwright.</p>
+<script>
+  // runOne starts a fresh worker for one library and one file, and resolves
+  // with its result.
+  window.runOne = (lib, file, runs) => new Promise(resolve => {
+    const w = new Worker('/browser/worker.js');
+    w.onmessage = e => { w.terminate(); resolve(e.data); };
+    w.onerror = e => { w.terminate(); resolve({ file, error: 'worker error: ' + (e.message || 'unknown') }); };
+    w.postMessage({ lib, file, runs });
+  });
+</script>
