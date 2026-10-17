@@ -413,6 +413,9 @@ export function createEditor(hostApi: EditorHost): Editor {
         wrapping.of([]), staleAttr.of([]),
         labels.of(EditorView.contentAttributes.of({
           'aria-label': `GEDCOM text of ${fileName}`, translate: 'no', spellcheck: 'false', autocorrect: 'off', autocapitalize: 'off',
+          // Grammarly and similar extensions otherwise lay highlights over long
+          // lines, wider than the screen.
+          'data-gramm': 'false', 'data-gramm_editor': 'false', 'data-enable-grammarly': 'false',
         })),
         editorTheme,
       ],

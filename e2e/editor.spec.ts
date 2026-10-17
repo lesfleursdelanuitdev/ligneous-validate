@@ -534,13 +534,14 @@ test('e2e editor: the dialog fits the viewport at every size, long lines scroll 
       pageWide: de.scrollWidth - de.clientWidth,
       dialog: [r.left, r.top, r.width, r.height],
       viewport: [0, 0, window.innerWidth, window.innerHeight],
-      dialogScrolls: [d.scrollWidth - d.clientWidth, d.scrollHeight - d.clientHeight],
+      // Can the dialog itself be scrolled at all (by hand or by script)?
+      dialogScrolls: (() => { d.scrollLeft = 1e6; d.scrollTop = 1e6; const at = [d.scrollLeft, d.scrollTop]; d.scrollLeft = 0; d.scrollTop = 0; return at; })(),
       bodyOverflow: getComputedStyle(document.body).overflow,
       bodyPosition: getComputedStyle(document.body).position,
       innerWide: sc.scrollWidth > sc.clientWidth,
     };
   });
-  for (const [width, height] of [[1280, 800], [768, 1024], [390, 844]]) {
+  for (const [width, height] of [[2000, 1124], [1280, 800], [768, 1024], [390, 844]]) {
     await page.setViewportSize({ width, height });
     for (const wrap of [false, true]) {
       await page.getByLabel('Wrap lines').setChecked(wrap);
@@ -549,7 +550,22 @@ test('e2e editor: the dialog fits the viewport at every size, long lines scroll 
       await page.keyboard.press('End');
       await page.keyboard.type('!');
       await expect.poll(() => scroller.evaluate(e => e.scrollWidth > e.clientWidth), `${width} wrap ${wrap}`).toBe(!wrap);
+      // A browser extension (Grammarly, say) laying a highlight wider than the
+      // screen over the text must not make the dialog or the page scroll.
+      await page.evaluate(() => {
+        const host = document.querySelector('.ed-host')!;
+        for (const parent of [document.querySelector('dialog.editor')!, host.shadowRoot!.querySelector('.cm-editor')!]) {
+          const wide = document.createElement('div');
+          wide.className = 'fake-extension-layer';
+          wide.style.cssText = 'position:absolute;left:0;top:50%;width:6000px;height:4px';
+          parent.appendChild(wide);
+        }
+      });
       const m = await measure();
+      await page.evaluate(() => {
+        document.querySelectorAll('.fake-extension-layer').forEach(e => e.remove());
+        document.querySelector('.ed-host')!.shadowRoot!.querySelectorAll('.fake-extension-layer').forEach(e => e.remove());
+      });
       const at = `${width}x${height}, wrap ${wrap}`;
       expect(m.pageWide, at).toBe(0);
       expect(m.dialog, at).toEqual(m.viewport);
@@ -570,6 +586,10 @@ test('e2e editor: the dialog fits the viewport at every size, long lines scroll 
     }
   }
   // Phones: the text is at least 16px, or iOS zooms the whole page in when it is tapped.
+  // Grammarly is asked to keep out of the text.
+  for (const [k, v] of [['data-gramm', 'false'], ['data-gramm_editor', 'false'], ['data-enable-grammarly', 'false'], ['spellcheck', 'false']]) {
+    await expect(page.locator('.cm-content')).toHaveAttribute(k, v);
+  }
   if (isMobile) {
     const px = await page.locator('.cm-content').evaluate(e => parseFloat(getComputedStyle(e).fontSize));
     expect(px).toBeGreaterThanOrEqual(16);
