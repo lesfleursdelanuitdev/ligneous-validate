@@ -23,14 +23,15 @@ const runs = Number(opt('--runs') ?? 10);
 const inputs = opt('--inputs');
 const libs = (opt('--libs') ?? 'ours-parse,read-gedcom,ours-check').split(',');
 const files = argv;
-const executablePath = process.env.CHROMIUM ??
-  path.join(os.homedir(), '.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell');
+// CHROMIUM, else the cached headless shell this server has, else whatever
+// Playwright installed (npx playwright install chromium-headless-shell).
+const cached = path.join(os.homedir(), '.cache/ms-playwright/chromium_headless_shell-1243/chrome-headless-shell-linux64/chrome-headless-shell');
+const executablePath = process.env.CHROMIUM ?? (fs.existsSync(cached) ? cached : undefined);
 
 // URL prefix -> directory. Nothing outside these is served.
 const roots = {
   '/browser/': here,
   '/build/': path.join(bench, 'build'),
-  '/site/': path.join(site, 'web/src/wasm'),
   '/inputs/': inputs,
 };
 const types = { '.js': 'text/javascript', '.html': 'text/html', '.wasm': 'application/wasm', '.ged': 'application/octet-stream' };
@@ -38,7 +39,6 @@ const server = http.createServer((req, res) => {
   const url = decodeURIComponent(new URL(req.url, 'http://x').pathname);
   let file = null;
   if (url === '/' || url === '/index.html') file = path.join(here, 'index.html');
-  else if (url === '/wasm_exec.js') file = path.join(site, 'web/public/wasm_exec.js');
   else for (const [prefix, dir] of Object.entries(roots)) {
     if (url.startsWith(prefix)) {
       const p = path.join(dir, url.slice(prefix.length));

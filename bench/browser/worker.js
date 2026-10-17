@@ -3,7 +3,9 @@
 //   lib = ours-parse   bench wasm, ligneousBench.parse(u8)
 //         ours-check   site wasm, ligneous.check(u8), as in the site's worker
 //         read-gedcom  readGedcom(arrayBuffer), bundled by Vite
-// Timing uses performance.now() inside the worker, around the library call only.
+// Timing uses performance.now() inside the worker, around the library call.
+// Parse runners count records inside the timed call; the check's counts are
+// read from its JSON result after the timer, as in Node.
 
 function summarize(times) {
   const s = [...times].sort((a, b) => a - b);
@@ -15,7 +17,7 @@ function summarize(times) {
 }
 
 async function startGo(wasmUrl, name) {
-  importScripts('/wasm_exec.js');
+  importScripts('/build/wasm_exec.js');
   const go = new self.Go();
   const bytes = await (await fetch(wasmUrl)).arrayBuffer();
   const { instance } = await WebAssembly.instantiate(bytes, go.importObject);
@@ -40,7 +42,7 @@ self.onmessage = async e => {
       run = u8 => g.api.parse(u8);
       info = v => v;
     } else if (lib === 'ours-check') {
-      const g = await startGo('/site/ligneous.wasm', 'ligneous');
+      const g = await startGo('/build/site-ligneous.wasm', 'ligneous');
       mem = g.mem;
       run = u8 => g.api.check(u8);
       info = s => {
@@ -50,9 +52,12 @@ self.onmessage = async e => {
       };
     } else if (lib === 'read-gedcom') {
       importScripts('/build/read-gedcom.bundle.js');
-      let ab = null;
-      run = u8 => readGedcomBundle.readGedcom(ab ??= u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
-      info = g => ({ individuals: g.getIndividualRecord().length, families: g.getFamilyRecord().length, error: '' });
+      // The ArrayBuffer copy and the counting are inside the timed call, as in Node.
+      run = u8 => {
+        const g = readGedcomBundle.readGedcom(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
+        return { individuals: g.getIndividualRecord().length, families: g.getFamilyRecord().length, error: '' };
+      };
+      info = v => v;
     } else {
       throw new Error('unknown lib ' + lib);
     }
@@ -76,8 +81,8 @@ self.onmessage = async e => {
     Object.assign(out, summarize(times));
     const pm = self.performance && self.performance.memory;
     out.memory = {
-      wasmLinearMemoryMB: mem ? r2(mem.buffer.byteLength / MB) : undefined,
-      jsHeapUsedMB: pm ? r2(pm.usedJSHeapSize / MB) : undefined,
+      wasmLinearMemoryMiB: mem ? r2(mem.buffer.byteLength / MB) : undefined,
+      jsHeapUsedMiB: pm ? r2(pm.usedJSHeapSize / MB) : undefined,
       note: pm ? 'performance.memory exposed in the worker' : 'performance.memory not exposed in a worker; JS heap n/a',
     };
   } catch (err) {

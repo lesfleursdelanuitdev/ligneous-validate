@@ -67,14 +67,14 @@ const cell = r => {
 };
 const size = f => {
   const b = expected[f]?.bytes ?? 0;
-  return b < 1 << 20 ? `${(b / 1024).toFixed(1)} KB` : `${(b / (1 << 20)).toFixed(1)} MB`;
+  return b < 1 << 20 ? `${(b / 1024).toFixed(1)} KiB` : `${(b / (1 << 20)).toFixed(1)} MiB`;
 };
 const lines = [];
 const p = s => lines.push(s);
 p(`# GEDCOM benchmark results, ${stamp}`);
 p('');
 p(`Host: ${env.nproc} CPUs (${env.cpu}), load average ${env.loadStart} at start and ${env.loadEnd} at end. ` +
-  `Go ${env.go}, Node ${env.node}, Chromium ${env.chromium ?? 'n/a'}. Date ${env.date}. ` +
+  `Library ${env.libraries['ligneous-gedcom-lib']}. Go ${env.go}, Node ${env.node}, Chromium ${env.chromium ?? 'n/a'}. Date ${env.date}. ` +
   `Shared server: the numbers are indicative.`);
 p('');
 p(`Times are milliseconds: median (min–max) of ${env.runs} timed runs after one warm-up. ` +
@@ -138,16 +138,16 @@ p('## Memory');
 p('');
 p('Go: TotalAlloc (all bytes allocated) and peak HeapInuse above the baseline, from one extra untimed run. ' +
   'Node wasm and Chromium wasm: the Go heap\'s linear memory after the runs (it never shrinks, so it is the peak). ' +
-  'Node JS: JS heap still held by the returned tree. Chromium JS: n/a (performance.memory is not exposed in a worker).');
+  'Sizes and memory are in MiB (2^20 bytes). Node JS: JS heap still held after the call. Chromium JS: n/a (performance.memory is not exposed in a worker).');
 p('');
 p('| Task | Library | Runtime | File | Memory |');
 p('|---|---|---|---|---|');
 for (const r of results) {
   const m = r.memory;
   let s = 'n/a';
-  if (m && m.totalAllocMB !== undefined) s = `TotalAlloc ${m.totalAllocMB} MB, peak HeapInuse ${m.peakHeapInuseMB} MB`;
-  else if (m && m.wasmLinearMemoryMB !== undefined) s = `wasm memory ${m.wasmLinearMemoryMB} MB` + (m.rssMB ? `, process RSS ${m.rssMB} MB` : '');
-  else if (m && m.heapUsedDeltaMB !== undefined) s = `JS heap held ${m.heapUsedDeltaMB} MB, process RSS ${m.rssMB} MB`;
+  if (m && m.totalAllocMiB !== undefined) s = `TotalAlloc ${m.totalAllocMiB} MiB, peak HeapInuse ${m.peakHeapInuseMiB} MiB`;
+  else if (m && m.wasmLinearMemoryMiB !== undefined) s = `wasm memory ${m.wasmLinearMemoryMiB} MiB` + (m.rssMiB ? `, process RSS ${m.rssMiB} MiB` : '');
+  else if (m && m.heapUsedDeltaMiB !== undefined) s = `JS heap held ${m.heapUsedDeltaMiB} MiB, process RSS ${m.rssMiB} MiB`;
   if (r.status !== 'valid') continue;
   p(`| ${r.task}${r.variant ? ' (' + r.variant + ')' : ''} | ${r.library} | ${r.runtime} | ${r.file} | ${s} |`);
 }

@@ -6,7 +6,7 @@ toolchain go1.24.4
 
 require (
 	github.com/cacack/gedcom-go v1.2.0
-	github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.2.1
+	github.com/lesfleursdelanuitdev/ligneous-gedcom-lib v0.3.1
 	github.com/lesfleursdelanuitdev/ligneous-validate v0.0.0
 )
 

@@ -131,9 +131,9 @@ func oursCheck(raw []byte) outcome {
 }
 
 type memStats struct {
-	TotalAllocMB    float64 `json:"totalAllocMB"`
-	PeakHeapInuseMB float64 `json:"peakHeapInuseMB"`
-	Note            string  `json:"note"`
+	TotalAllocMiB    float64 `json:"totalAllocMiB"`
+	PeakHeapInuseMiB float64 `json:"peakHeapInuseMiB"`
+	Note             string  `json:"note"`
 }
 
 // measureMemory runs fn once more with a sampler watching HeapInuse.
@@ -173,9 +173,9 @@ func measureMemory(fn func()) memStats {
 	}
 	const mb = 1 << 20
 	return memStats{
-		TotalAllocMB:    round(float64(after.TotalAlloc-before.TotalAlloc) / mb),
-		PeakHeapInuseMB: round(float64(peak-before.HeapInuse) / mb),
-		Note:            "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms",
+		TotalAllocMiB:    round(float64(after.TotalAlloc-before.TotalAlloc) / mb),
+		PeakHeapInuseMiB: round(float64(peak-before.HeapInuse) / mb),
+		Note:             "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms",
 	}
 }
 

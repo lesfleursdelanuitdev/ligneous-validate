@@ -34,9 +34,12 @@ async function startGo(globalName) {
   return globalThis[globalName];
 }
 
-// run(u8) is the timed library call; info(value) turns its return value into
-// {individuals, families, findings?, error} outside the timed region.
-let run, info, library, task, beforeRun = () => gc();
+// run(u8) is the timed call. For the parse runners it returns the counts,
+// so counting is inside the timed region for every library. For the check,
+// it returns the result as a JSON string (as on the site), and info() reads
+// the counts from it after the timer, as the native run reads them from the
+// result struct.
+let run, info, memRun, library, task, beforeRun = () => gc();
 if (lib === 'ours-parse') {
   const api = await startGo('ligneousBench');
   library = 'ligneous-gedcom-lib'; task = 'parse';
@@ -57,14 +60,16 @@ if (lib === 'ours-parse') {
 } else if (lib === 'read-gedcom') {
   const { readGedcom } = require('read-gedcom');
   library = 'read-gedcom'; task = 'parse';
-  // readGedcom takes an ArrayBuffer. Each file's buffer is made once, in the
-  // untimed warm-up call, and reused.
-  let abFor = null, ab = null;
+  // readGedcom takes an ArrayBuffer. The copy out of the file's bytes is
+  // inside the timed call, as our wasm copies its input on every call, and
+  // so is counting the records, as for every parse.
   run = u8 => {
-    if (abFor !== u8) { ab = u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength); abFor = u8; }
-    return readGedcom(ab);
+    const g = readGedcom(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
+    return { individuals: g.getIndividualRecord().length, families: g.getFamilyRecord().length, error: '' };
   };
-  info = g => ({ individuals: g.getIndividualRecord().length, families: g.getFamilyRecord().length, error: '' });
+  info = v => v;
+  // The memory run keeps the tree, so the heap it holds can be measured.
+  memRun = u8 => readGedcom(u8.buffer.slice(u8.byteOffset, u8.byteOffset + u8.byteLength));
 } else {
   console.error('unknown --lib ' + lib);
   process.exit(2);
@@ -77,7 +82,6 @@ for (const file of files) {
   const times = [];
   let last;
   try {
-    // Our parse wasm counts records inside the call (two len()s in Go).
     beforeRun();
     last = info(run(u8)); // warm-up
     if (!last.error) {
@@ -101,12 +105,12 @@ for (const file of files) {
     last = null;
     beforeRun();
     const m0 = process.memoryUsage();
-    const res = run(u8);
+    const res = (memRun ?? run)(u8);
     const m1 = process.memoryUsage();
     out.memory = {
-      rssMB: r2(m1.rss / MB),
-      heapUsedDeltaMB: r2((m1.heapUsed - m0.heapUsed) / MB),
-      wasmLinearMemoryMB: wasmMemory ? r2(wasmMemory.buffer.byteLength / MB) : undefined,
+      rssMiB: r2(m1.rss / MB),
+      heapUsedDeltaMiB: r2((m1.heapUsed - m0.heapUsed) / MB),
+      wasmLinearMemoryMiB: wasmMemory ? r2(wasmMemory.buffer.byteLength / MB) : undefined,
       note: lib === 'read-gedcom'
         ? 'heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total'
         : 'wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total',
