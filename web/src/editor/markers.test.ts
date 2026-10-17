@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ChangeSet, Text } from '@codemirror/state';
-import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, textChange, toDiagnosticSeverity, windowed } from './markers';
+import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, textChange, toDiagnosticSeverity, toEditorLines, windowed } from './markers';
 import type { Finding } from '../types';
 
 const f = (line: number, severity: Finding['severity'] = 'warning', code = 'X'): Finding => ({
@@ -34,6 +34,13 @@ describe('findings to markers', () => {
     // The whole line deleted: no marker.
     const del = ChangeSet.of({ from: checked.line(3).from - 1, to: checked.line(3).to }, checked.length);
     expect(mapLine(checked, del, 3)).toBeNull();
+    // The whole line deleted from its start (Home, Shift+Down, Delete): no marker either.
+    const fromStart = ChangeSet.of({ from: checked.line(3).from, to: checked.line(4).from }, checked.length);
+    expect(mapLine(checked, fromStart, 3)).toBeNull();
+    expect(mapLine(checked, fromStart, 4)).toEqual({ from: checked.line(3).from, to: checked.line(3).from + 8 });
+    // Only its text deleted: still a line (now empty) with its marker.
+    const emptied = ChangeSet.of({ from: checked.line(3).from, to: checked.line(3).to }, checked.length);
+    expect(mapLine(checked, emptied, 3)).toEqual({ from: checked.line(3).from, to: checked.line(3).from });
     // A line that doesn't exist (the text got shorter before the check): no marker.
     expect(mapLine(checked, none, 99)).toBeNull();
     expect(mapLine(checked, none, 0)).toBeNull();
@@ -100,28 +107,59 @@ describe('line breaks', () => {
 
 describe('the change from the checked text to the editor text', () => {
   const apply = (a: string, c: { from: number; to: number; insert: string }) => a.slice(0, c.from) + c.insert + a.slice(c.to);
+  const lineStart = (t: string, i: number) => i === 0 || t[i - 1] === '\n';
+  const lineEnd = (t: string, i: number) => i === t.length || t[i] === '\n';
+  /** Where checked line `n` is in the sent text (line number), or null. */
+  const lineIn = (checked: string, sent: string, n: number) => {
+    const t = Text.of(checked.split('\n'));
+    const c = textChange(checked, sent);
+    const changes = c ? ChangeSet.of(c, t.length) : ChangeSet.empty(t.length);
+    const at = mapLine(t, changes, n);
+    return at ? changes.apply(t).lineAt(at.from).number : null;
+  };
 
   it('is empty when they are the same', () => {
     expect(textChange('0 HEAD\n0 TRLR\n', '0 HEAD\n0 TRLR\n')).toBeNull();
   });
 
-  it('is the one replaced CHAR line', () => {
-    const checked = '0 HEAD\n1 CHAR UTF-8\n0 @I1@ INDI\n';
-    const sent = '0 HEAD\n1 CHAR ANSEL\n0 @I1@ INDI\n';
+  it('replaces the whole CHAR line, which still maps to itself', () => {
+    const checked = '0 HEAD\n1 CHAR UTF-8\n1 SUBM @U1@\n';
+    const sent = '0 HEAD\n1 CHAR ANSEL\n1 SUBM @U1@\n';
     const c = textChange(checked, sent)!;
     expect(apply(checked, c)).toBe(sent);
-    expect(c.to - c.from).toBeLessThanOrEqual('UTF-8'.length);
+    expect(lineStart(checked, c.from) && lineEnd(checked, c.to)).toBe(true);
+    expect(lineIn(checked, sent, 2)).toBe(2);
+    expect(lineIn(checked, sent, 3)).toBe(3);
   });
 
-  it('is the one inserted CHAR line, so later lines map back one up', () => {
-    const checked = '0 HEAD\n1 GEDC\n1 CHAR UTF-8\n0 @I1@ INDI\n1 NAME A\n';
-    const sent = '0 HEAD\n1 GEDC\n0 @I1@ INDI\n1 NAME A\n';
+  it('removes a whole inserted CHAR line, even when the next line starts the same ("1 …")', () => {
+    // The characters "CHAR UTF-8\n1 " differ; the change must still cover whole lines.
+    const checked = '0 HEAD\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n1 NOTE long\n1 SUBM @U1@\n';
+    const sent = '0 HEAD\n2 FORM LINEAGE-LINKED\n1 NOTE long\n1 SUBM @U1@\n';
     const c = textChange(checked, sent)!;
     expect(apply(checked, c)).toBe(sent);
-    const t = Text.of(checked.split('\n'));
-    const changes = ChangeSet.of(c, t.length);
-    // Line 5 of the checked text ("1 NAME A") is line 4 of the editor's.
-    const at = mapLine(t, changes, 5)!;
-    expect(changes.apply(t).lineAt(at.from).number).toBe(4);
+    expect(lineIn(checked, sent, 4)).toBe(3); // 1 NOTE long
+    expect(lineIn(checked, sent, 5)).toBe(4);
+    expect(lineIn(checked, sent, 2)).toBe(2);
+    expect(lineIn(checked, sent, 3)).toBeNull(); // the inserted CHAR line itself
+  });
+
+  it('handles an inserted first line and an extra line in the editor text', () => {
+    expect(apply('1 CHAR UTF-8\n0 HEAD\n', textChange('1 CHAR UTF-8\n0 HEAD\n', '0 HEAD\n')!)).toBe('0 HEAD\n');
+    expect(apply('0 HEAD\n0 TRLR', textChange('0 HEAD\n0 TRLR', '0 HEAD\n1 X\n0 TRLR')!)).toBe('0 HEAD\n1 X\n0 TRLR');
+    expect(lineIn('0 HEAD\n0 TRLR', '0 HEAD\n1 X\n0 TRLR', 2)).toBe(3);
+  });
+});
+
+describe('a Check again report in the editor\'s line numbers', () => {
+  const g = (line: number, code = 'C'): Finding => ({ ...f(line), code });
+  it('moves findings after an inserted CHAR line up one, and a finding on that line to the whole file', () => {
+    const checked = '0 HEAD\n1 GEDC\n1 CHAR UTF-8\n1 NOTE long\n  1 SEX F\n';
+    const sent = '0 HEAD\n1 GEDC\n1 NOTE long\n  1 SEX F\n';
+    const out = toEditorLines([g(4, 'LONG'), g(5, 'SPACE'), g(3, 'ONCHAR'), g(0, 'FILE'), g(1, 'HEAD')], checked, sent);
+    expect(out.map(x => [x.code, x.line])).toEqual([['LONG', 3], ['SPACE', 4], ['ONCHAR', 0], ['FILE', 0], ['HEAD', 1]]);
+  });
+  it('leaves lines alone when the texts are the same', () => {
+    expect(toEditorLines([g(2)], 'a\nb\n', 'a\nb\n')[0].line).toBe(2);
   });
 });

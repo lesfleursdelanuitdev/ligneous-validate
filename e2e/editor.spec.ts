@@ -158,6 +158,7 @@ async function retype(page: Page, text: string) {
   await page.keyboard.press('Home');
   await page.keyboard.press('Home');
   await page.keyboard.press('Shift+End');
+  await page.keyboard.press('Backspace');
   await page.keyboard.type(text);
 }
 
@@ -234,6 +235,108 @@ test('e2e editor: Check again checks what Download gives, so an ANSEL file is no
   expect(await cards()).toEqual(afterCheck);
 });
 
+test('e2e editor: after Check again inserts the CHAR line, the line below keeps its marker, Next and Edit line', async ({ page }) => {
+  // No CHAR line, and a line too long right after 2 FORM: the download inserts
+  // "1 CHAR UTF-8" just above it.
+  await report(page, 'no-char.ged');
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(live(page)).toHaveText(/^Checked: /);
+  await expect(page.locator('.cm-lint-marker')).toHaveCount(3);
+  // The report shows the editor's line numbers: the long line is line 6 here.
+  await expect(page.locator('.finding', { hasText: 'longer than GEDCOM allows' }).locator('.at')).toHaveText('Line 6');
+  await page.getByRole('button', { name: 'Next problem' }).click();
+  await expect(pos(page)).toHaveText(/^Line 6, /);
+  await expect(page.locator('.cm-activeLine')).toHaveText(/^1 NOTE x+$/);
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit line 6', exact: true }).click();
+  await expect(page.locator('.cm-line.gx-flash')).toHaveText(/^1 NOTE x+$/);
+  await expect(pos(page)).toHaveText(/^Line 6, /);
+});
+
+test('e2e editor: Edit line for a line that has been deleted opens the nearest line and says so', async ({ page }) => {
+  await report(page, 'editor.ged');
+  await editLine(page, 12);
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Delete');
+  await expect(page.locator('.cm-activeLine')).toHaveText('1 _UID 1234');
+  page.once('dialog', d => void d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await page.getByRole('button', { name: 'Edit line 12', exact: true }).click();
+  await expect(live(page)).toHaveText('That line no longer exists; showing line 12.');
+  await expect(page.locator('.cm-activeLine')).toHaveText('1 _UID 1234');
+});
+
+test('e2e editor: closing the dialog another way still returns focus and puts the bar back', async ({ page }) => {
+  await report(page, 'editor.ged');
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(live(page)).toHaveText(/^Checked: /);
+  await expect(dialog(page).locator('#progress')).toBeAttached();
+  await page.evaluate(() => (document.querySelector('dialog#editor') as HTMLDialogElement).close());
+  await expect(dialog(page)).toBeHidden();
+  await expect(page.locator('#progress + #drop')).toBeAttached();
+  await expect(page.getByRole('button', { name: 'Open the editor' })).toBeFocused();
+});
+
+test('e2e editor: leaving with unsaved edits sets returnValue and cancels beforeunload', async ({ page }) => {
+  await report(page, 'editor.ged');
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await expect(page.locator('.cm-content')).toBeFocused();
+  await page.keyboard.type('x');
+  await expect(page.locator('#ed-edited')).toBeVisible();
+  const r = await page.evaluate(() => {
+    const e = new Event('beforeunload', { cancelable: true }) as Event & { returnValue: unknown };
+    Object.defineProperty(e, 'returnValue', { value: '', writable: true });
+    window.dispatchEvent(e);
+    return { prevented: e.defaultPrevented, value: e.returnValue };
+  });
+  expect(r.prevented).toBe(true);
+  expect(typeof r.value === 'string' && r.value.length > 0).toBe(true);
+});
+
+test('e2e editor: tapping anywhere in a marker\'s gutter cell shows the tooltip', async ({ page, isMobile }) => {
+  test.skip(!isMobile, 'tap on phones');
+  await report(page, 'editor.ged');
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.waitForTimeout(700); // let the bar's fade finish
+  const marker = (await page.locator('.cm-lint-marker').nth(1).boundingBox())!;
+  const cell = (await page.locator('.cm-gutter-lint .cm-gutterElement:has(.cm-lint-marker-error)').boundingBox())!;
+  // A point in the cell but outside the 10 px marker.
+  const x = cell.x + 2, y = cell.y + cell.height / 2;
+  expect(x < marker.x || x > marker.x + marker.width).toBe(true);
+  // A real tap there already lands on the marker (Chromium snaps taps to it), so
+  // the touch pointerup is sent to the cell itself, as a wider miss would be.
+  await page.locator('.cm-gutter-lint .cm-gutterElement:has(.cm-lint-marker-error)').dispatchEvent('pointerup',
+    { pointerType: 'touch', bubbles: true, composed: true, clientX: x, clientY: y });
+  await expect(page.locator('.cm-tooltip-lint')).toBeVisible();
+});
+
+test('e2e editor: scrolling through a stretch with no findings does not mark again', async ({ page }) => {
+  test.setTimeout(90_000);
+  const path = scratch('stretch.ged');
+  // 6,000 findings at the start, then 40,000 lines with none.
+  const bad = Array.from({ length: 6_000 }, (_, i) => `0 @I${i + 1}@ INDI\n1 NAME A /B/\n  1 SEX M\n`).join('');
+  const good = Array.from({ length: 14_000 }, (_, i) => `0 @J${i + 1}@ INDI\n1 NAME C /D/\n1 SEX F\n`).join('');
+  writeFileSync(path, HEAD + bad + good + '0 TRLR\n');
+  await page.locator('#file').setInputFiles(path);
+  await expect(page.locator('#status')).toHaveText(/^Checked: /, { timeout: 60_000 });
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.locator('.cm-content').focus();
+  await page.keyboard.press('Control+End');
+  await expect(page.locator('.cm-line', { hasText: /^0 TRLR$/ })).toBeInViewport();
+  await page.waitForTimeout(400);
+  const runs = Number(await dialog(page).getAttribute('data-mark-runs'));
+  // Up through the empty stretch.
+  await page.locator('.cm-content').hover();
+  for (let i = 0; i < 8; i++) { await page.mouse.wheel(0, -4000); await page.waitForTimeout(200); }
+  // Still in the stretch with no findings (it starts at line about 18,000).
+  expect(Number((await page.locator('.cm-lineNumbers .cm-gutterElement').nth(5).innerText()).replace(/,/g, ''))).toBeGreaterThan(19_000);
+  expect(Number(await dialog(page).getAttribute('data-mark-runs'))).toBe(runs);
+});
+
 test('e2e editor: Ctrl-click on a pointer jumps to its record', async ({ page }) => {
   await report(page, 'editor.ged');
   await page.getByRole('button', { name: 'Open the editor' }).click();
@@ -255,7 +358,7 @@ test('e2e editor: Download edited file on an ANSEL file gives UTF-8 with CHAR UT
   await expect(page.locator('.cm-content')).toContainText('René /Dupré/');
   // The one line about UTF-8 shows before the first save.
   const note = page.locator('#ed-savenote');
-  await expect(note).toHaveText('Your edited file is saved as UTF-8, and its header says so.');
+  await expect(note).toHaveText('Your edited file is saved as UTF-8, and its header says so. Line endings are made consistent.');
   await expect(note).toBeVisible();
   // An edit: the name gets a middle name.
   await page.locator('.cm-line', { hasText: 'René /Dupré/' }).click();
@@ -431,9 +534,15 @@ test('e2e editor: undo and redo, and search and replace', async ({ page }) => {
 
 test('e2e editor: CodeMirror styles come from adopted style sheets, with no CSP violation', async ({ page }) => {
   await page.addInitScript(() => {
-    const w = window as unknown as { __csp: string[] };
+    const w = window as unknown as { __csp: string[]; __ignored: number };
     w.__csp = [];
-    document.addEventListener('securitypolicyviolation', e => w.__csp.push(`${e.violatedDirective} ${e.blockedURI}`));
+    w.__ignored = 0;
+    document.addEventListener('securitypolicyviolation', e => {
+      // Chromium's own contenteditable, typing over a selection of several lines, sets a
+      // style attribute it blocks itself (no source file); that one is not CodeMirror's.
+      if (e.violatedDirective === 'style-src-attr' && !e.sourceFile) { w.__ignored++; return; }
+      w.__csp.push(`${e.violatedDirective} ${e.blockedURI} ${e.sourceFile}`);
+    });
   });
   const errors: string[] = [];
   page.on('console', m => { if (m.type() === 'error') errors.push(m.text()); });
@@ -443,7 +552,22 @@ test('e2e editor: CodeMirror styles come from adopted style sheets, with no CSP 
   await page.getByRole('button', { name: 'Open the editor' }).click();
   await expect(page.locator('.cm-content')).toBeVisible();
   await page.getByRole('button', { name: 'Next problem' }).click();
+  await page.waitForTimeout(700); // the bar's fade
   await page.locator('.cm-lint-marker').first().hover();
+  await page.getByRole('button', { name: 'Find and replace' }).click();
+  await expect(page.locator('.cm-search')).toBeVisible();
+  await page.keyboard.press('Escape'); // closes the search panel only
+  await expect(dialog(page)).toBeVisible();
+  await page.mouse.move(5, 5); // away from the marker, so its tooltip closes
+  await expect(page.locator('.cm-tooltip-lint')).toHaveCount(0);
+  // Typing over a selection of several lines.
+  await page.locator('.cm-line:visible').nth(2).click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.type('Z');
+  await expect(page.locator('.cm-activeLine')).toHaveText(/^Z/);
   await page.keyboard.press('Control+f');
   await page.waitForTimeout(300);
   const s = await page.evaluate(() => {
@@ -460,7 +584,11 @@ test('e2e editor: CodeMirror styles come from adopted style sheets, with no CSP 
   expect(s.adopted).toBeGreaterThan(0);
   expect(s.flex).toBe('flex'); // CodeMirror's own styles really apply
   expect(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)).toEqual([]);
-  expect(errors).toEqual([]);
+  // Each ignored report also logs one console error; nothing else may.
+  const inline = /^Applying inline style violates the following Content Security Policy directive/;
+  const ignored = await page.evaluate(() => (window as unknown as { __ignored: number }).__ignored);
+  expect(errors.filter(e => inline.test(e))).toHaveLength(ignored);
+  expect(errors.filter(e => !inline.test(e))).toEqual([]);
 });
 
 test('e2e editor: the editor is loaded only when first opened', async ({ page }) => {
@@ -561,4 +689,21 @@ test('e2e editor: many findings get at most 5,000 markers, nearest the view', as
   const last = page.locator('.cm-lint-marker').last();
   await expect(last).toBeInViewport({ timeout: 5000 });
   expect(Number(await dialog(page).getAttribute('data-markers'))).toBe(5000);
+});
+
+test('e2e editor: a browser without adopted style sheets gets no editor buttons, one line, and no CSP violation', async ({ page }) => {
+  await page.addInitScript(() => {
+    delete (ShadowRoot.prototype as unknown as Record<string, unknown>).adoptedStyleSheets;
+    delete (CSSStyleSheet.prototype as unknown as Record<string, unknown>).replaceSync;
+    const w = window as unknown as { __csp: string[] };
+    w.__csp = [];
+    document.addEventListener('securitypolicyviolation', e => w.__csp.push(e.violatedDirective));
+  });
+  await page.goto('/');
+  await report(page, 'editor.ged');
+  await expect(page.locator('.edit-line')).toHaveCount(0);
+  await expect(page.getByRole('button', { name: 'Open the editor' })).toHaveCount(0);
+  await expect(page.locator('.toolbar + .no-editor')).toHaveText(
+    "This browser can't run the editor. Try a current version of Firefox, Chrome, Safari or Edge.");
+  expect(await page.evaluate(() => (window as unknown as { __csp: string[] }).__csp)).toEqual([]);
 });

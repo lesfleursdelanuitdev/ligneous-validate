@@ -2,8 +2,8 @@
 // problem. Pure (unit-tested): the editor keeps the text as it was checked
 // and the edits made since, and maps each finding's line through them.
 
-import { MapMode } from '@codemirror/state';
-import type { ChangeDesc, Text } from '@codemirror/state';
+import { ChangeSet, MapMode, Text } from '@codemirror/state';
+import type { ChangeDesc } from '@codemirror/state';
 import type { Finding, Severity } from '../types';
 
 /** The most markers shown at once: with more findings, those nearest the visible lines. */
@@ -32,6 +32,16 @@ export function mapLine(checked: Text, changes: ChangeDesc, line: number): { fro
   const l = checked.line(line);
   const from = changes.mapPos(l.from, 1, MapMode.TrackDel);
   if (from === null) return null;
+  // Deleted from its start together with its line break (Home, Shift+Down, Delete): gone too.
+  // Only its text deleted, it is still there, empty.
+  if (line < checked.lines) {
+    const end = l.to + 1;
+    let gone = false;
+    changes.iterChangedRanges((fromA, toA, fromB, toB) => {
+      if (fromA <= l.from && toA >= end && fromB === toB) gone = true; // deleted, not replaced
+    });
+    if (gone) return null;
+  }
   const to = Math.max(from, changes.mapPos(l.to, -1));
   return { from, to };
 }
@@ -98,15 +108,49 @@ export function lineBreakOf(text: string): string {
 /**
  * The one change that turns `checked` into `sent`, or null when they are the
  * same. Check again checks what Download gives (SaveUTF8): that can set or
- * insert the header's CHAR line, so the checked text differs from the
- * editor's by at most that. The common start and end are kept.
+ * insert the header's CHAR line, so the two texts differ by a few lines. The
+ * change covers whole lines, so the lines around it map to themselves: a
+ * changed line is replaced without its line break (it still maps), and lines
+ * only in `checked` go with the line break before them (they map to null).
  */
 export function textChange(checked: string, sent: string): { from: number; to: number; insert: string } | null {
   if (checked === sent) return null;
-  const max = Math.min(checked.length, sent.length);
+  const a = checked.split('\n');
+  const b = sent.split('\n');
   let pre = 0;
-  while (pre < max && checked.charCodeAt(pre) === sent.charCodeAt(pre)) pre++;
+  while (pre < a.length && pre < b.length && a[pre] === b[pre]) pre++;
   let post = 0;
-  while (post < max - pre && checked.charCodeAt(checked.length - 1 - post) === sent.charCodeAt(sent.length - 1 - post)) post++;
-  return { from: pre, to: checked.length - post, insert: sent.slice(pre, sent.length - post) };
+  while (post < a.length - pre && post < b.length - pre && a[a.length - 1 - post] === b[b.length - 1 - post]) post++;
+  const midA = a.slice(pre, a.length - post);
+  const midB = b.slice(pre, b.length - post);
+  // Offset of the start of line `i` (0-based) of `a`.
+  let start = 0;
+  for (let i = 0; i < pre; i++) start += a[i].length + 1;
+  const lenA = midA.reduce((n, l) => n + l.length + 1, 0) - 1; // the middle lines and the breaks between them
+  if (midA.length && midB.length) return { from: start, to: start + lenA, insert: midB.join('\n') };
+  if (midA.length) {
+    // Lines only in `checked`: removed with the line break before them (or after, at the very start).
+    return pre > 0 ? { from: start - 1, to: start + lenA, insert: '' } : { from: 0, to: lenA + 1, insert: '' };
+  }
+  // Lines only in `sent`: inserted after the line before them (or before the first line).
+  return pre > 0 ? { from: start - 1, to: start - 1, insert: '\n' + midB.join('\n') } : { from: 0, to: 0, insert: midB.join('\n') + '\n' };
+}
+
+/**
+ * A Check again report in the editor's line numbers: each finding's line of
+ * the checked text (`checked`, as Download gives it) moved to its line in the
+ * text sent from the editor; a line that is only in the checked text (an
+ * inserted CHAR line) becomes 0, the whole file.
+ */
+export function toEditorLines(findings: Finding[], checked: string, sent: string): Finding[] {
+  const c = textChange(checked, sent);
+  if (!c) return findings;
+  const t = Text.of(checked.split('\n'));
+  const changes = ChangeSet.of(c, t.length);
+  const after = changes.apply(t);
+  return findings.map(f => {
+    if (f.line <= 0) return f;
+    const at = mapLine(t, changes, f.line);
+    return { ...f, line: at ? after.lineAt(at.from).number : 0 };
+  });
 }

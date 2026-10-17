@@ -59,7 +59,7 @@ The existing progress bar shows inside the toolbar while **Check again** runs.
 3. Replace the report and the markers.
 4. Keep the editor open, with the cursor where it was.
 
-Check again checks what Download edited file would give: the text first goes through `SaveUTF8`, so its CHAR is set as the download sets it, and the report matches the downloaded file (decided 2026-10-17).
+Check again checks what Download edited file would give: the text first goes through `SaveUTF8`, so its CHAR is set as the download sets it, and the report matches the downloaded file (decided 2026-10-17). The report from Check again shows the editor's line numbers, mapped the same way as the markers, so report and editor agree; a finding on a CHAR line that only the download has shows as "Whole file".
 
 Findings that disappeared are simply gone. The counts in the toolbar update.
 
@@ -68,7 +68,9 @@ Findings that disappeared are simply gone. The counts in the toolbar update.
 1. Encode the text as UTF-8.
 2. Run it through `RepairWithOptions` with only `encoding` selected (library v0.3.0). That sets or inserts `1 CHAR UTF-8` exactly as the repair does. Nothing else changes.
 3. Save as `<name>-edited.ged` with `application/octet-stream`.
-4. Before the first save, show this one line once: `Your edited file is saved as UTF-8, and its header says so.`
+4. Before the first save, show this one line once: `Your edited file is saved as UTF-8, and its header says so. Line endings are made consistent.`
+
+The text is saved exactly as edited, except that the file is UTF-8 without a byte order mark, and uses one line-ending style throughout: the file's first one (decided 2026-10-17).
 
 ## Leaving
 
@@ -82,6 +84,8 @@ Findings that disappeared are simply gone. The counts in the toolbar update.
 - No storage of any kind.
 - The privacy e2e test includes opening the editor, editing, checking again and downloading.
 - **CSP.** CodeMirror injects its styles with constructable stylesheets (`adoptedStyleSheets`), which `style-src 'self'` doesn't block. Verify this in Chromium. If any `<style>` element injection remains, stop and report it rather than loosening the CSP.
+- **Browser CSP reports.** In Chromium, typing over a selection of several lines makes the browser's own contenteditable set a style attribute, which `style-src` blocks: one `style-src-attr` report with no source file. It comes from the browser, not CodeMirror, and changes nothing; the CSP e2e test ignores exactly that kind (empty source file, `style-src-attr`) and no other.
+- **Browsers without adopted style sheets** (Safari before 16.4, Firefox before 101) can't run the editor under this CSP: they get no editor buttons and the line `This browser can't run the editor. Try a current version of Firefox, Chrome, Safari or Edge.`
 
 ## Performance
 

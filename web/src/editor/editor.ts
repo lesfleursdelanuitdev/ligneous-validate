@@ -24,13 +24,13 @@ import { fill } from '../fill';
 import { filled, formatNumber, icon, severityWord } from '../render';
 import type { Finding, Result } from '../types';
 import { gedcomHighlighter, gedcomLanguage, tokenizeLine, valueStart } from './gedcom';
-import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, textChange, toDiagnosticSeverity, windowed } from './markers';
+import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, toDiagnosticSeverity, toEditorLines, windowed } from './markers';
 import { recordLine } from './pointers';
 import { editorTheme } from './theme';
 import './editor.css';
 
 export const CLOSE_PROMPT = 'Close the editor? Your edits stay here until you download them or check another file.';
-export const SAVE_NOTE = 'Your edited file is saved as UTF-8, and its header says so.';
+export const SAVE_NOTE = 'Your edited file is saved as UTF-8, and its header says so. Line endings are made consistent.';
 export const STALE_NOTE = 'Markers may be out of date. Check again to update them.';
 const SAVE_FAILED = "We couldn't save the edited file. Check it again to see what's wrong.";
 const noRecord = (x: string) => `There's no record ${x} in this file.`;
@@ -50,7 +50,9 @@ export interface Editor {
   open(fileName: string, result: Result | null, line: number, opener: HTMLElement, code?: string): void;
   /** Drops the session (another file was chosen). */
   reset(): void;
-  /** A Check again has ended: its result, or null when it failed or was stopped, with the status text. */
+  /** A Check again result in the editor's line numbers (call before showing it; others pass through). */
+  prepare(result: Result): Result;
+  /** A Check again has ended: its (prepared) result, or null when it failed or was stopped, with the status text. */
   checkDone(result: Result | null, text: string): void;
   readonly isOpen: boolean;
   /** There are edits that haven't been downloaded. */
@@ -234,6 +236,8 @@ export function createEditor(hostApi: EditorHost): Editor {
     const picked = windowed(b.findings, b.order, first, last, MARKER_CAP);
     const diags: Diagnostic[] = [];
     let lo = Infinity, hi = 0;
+    let markRuns = Number(dialog.dataset.markRuns ?? 0);
+    dialog.dataset.markRuns = String(++markRuns);
     for (const i of picked) {
       const d = diagnostic(b, view.state.doc, i);
       if (!d) continue;
@@ -241,7 +245,13 @@ export function createEditor(hostApi: EditorHost): Editor {
       lo = Math.min(lo, b.findings[i].line);
       hi = Math.max(hi, b.findings[i].line);
     }
-    s.window = b.order.length > MARKER_CAP ? { first: lo, last: hi } : null;
+    // The range asked for and the range marked, together; past the first or last
+    // finding nothing more can be marked, so that end is open.
+    const firstAll = b.findings[b.order[0]]?.line ?? 1, lastAll = b.findings[b.order[b.order.length - 1]]?.line ?? 1;
+    s.window = b.order.length > MARKER_CAP ? {
+      first: lo <= firstAll ? 1 : Math.min(first, lo),
+      last: hi >= lastAll ? Infinity : Math.max(last, hi),
+    } : null;
     view.dispatch(setDiagnostics(view.state, diags));
     dialog.dataset.markers = String(diags.length);
   };
@@ -374,7 +384,8 @@ export function createEditor(hostApi: EditorHost): Editor {
   /** Taps on a phone: a tap on a marker shows its tooltip, as hovering does. (The gutter is outside the content, so a plain listener.) */
   const tapMarkers = (view: EditorView) => view.dom.addEventListener('pointerup', e => {
     if (e.pointerType === 'mouse') return;
-    const m = (e.target as Element | null)?.closest?.('.cm-lint-marker');
+    const cell = (e.target as Element | null)?.closest?.('.cm-gutter-lint .cm-gutterElement');
+    const m = cell?.querySelector('.cm-lint-marker');
     if (m) m.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
   });
 
@@ -423,9 +434,13 @@ export function createEditor(hostApi: EditorHost): Editor {
     showFlags();
     if (!dialog.open) dialog.showModal();
     s.view.requestMeasure();
+    let gone = 0;
     if (line > 0) {
       const at = mapLine(s.basis.checked, s.basis.since, line);
-      const pos = at ? at.from : 0;
+      const b = s.basis;
+      // A line deleted since: the nearest line that is still there.
+      const pos = at ? at.from : b.since.mapPos(b.checked.line(Math.min(line, b.checked.lines)).from, 1);
+      if (!at) gone = s.view.state.doc.lineAt(pos).number;
       s.openerPos = pos;
       // The finding opened from, so Next and Previous go on from it.
       const k = s.basis.order.findIndex(i => s!.basis.findings[i].line === line && (!code || s!.basis.findings[i].code === code));
@@ -438,6 +453,7 @@ export function createEditor(hostApi: EditorHost): Editor {
     }
     showPos(s.view.state);
     s.view.focus();
+    if (gone) say(`That line no longer exists; showing line ${formatNumber(gone)}.`);
   };
 
   /** The line of the last-checked text for a position now. */
@@ -451,11 +467,15 @@ export function createEditor(hostApi: EditorHost): Editor {
   const close = (ask: boolean): boolean => {
     if (!s || !dialog.open) return false;
     if (ask && s.dirty && !window.confirm(CLOSE_PROMPT)) return false;
-    if (searchPanelOpen(s.view.state)) closeSearchPanel(s.view);
-    dialog.close();
-    hostApi.closed(returnTo, checkedLine(s.openerPos), s.openerCode);
+    dialog.close(); // the close event does the rest
     return true;
   };
+  // However the dialog closes (Close, Esc, or the browser), focus goes back and the bar moves home.
+  dialog.addEventListener('close', () => {
+    if (!s) return;
+    if (searchPanelOpen(s.view.state)) closeSearchPanel(s.view);
+    hostApi.closed(returnTo, checkedLine(s.openerPos), s.openerCode);
+  });
 
   closeBtn.addEventListener('click', () => close(true));
   // Esc closes, after CodeMirror has had it (the search panel closes first).
@@ -528,17 +548,14 @@ export function createEditor(hostApi: EditorHost): Editor {
       checking = saving = false;
       wrapBox.checked = false;
       delete dialog.dataset.markers;
+      delete dialog.dataset.markRuns;
     },
     checkDone(result, statusText) {
       checking = false;
       if (s && s.pending) {
         if (result && result.isGedcom && !result.error) {
-          // What was checked is the text sent, as Download gives it (its CHAR line may
-          // differ): that change, then the edits made while it ran, are "since".
-          const checked = s.view.state.toText(result.text);
-          const c = textChange(checked.toString(), s.pending.doc.toString());
-          const toSent = c ? ChangeSet.of(c, checked.length) : ChangeSet.empty(checked.length);
-          s.basis = newBasis(result, checked, toSent.compose(s.pending.since));
+          // prepare() put the findings in the lines of the text sent; the edits made while it ran are "since".
+          s.basis = newBasis(result, s.pending.doc, s.pending.since);
           s.stale = !s.pending.since.empty;
           s.current = -1;
           s.positions = null;
@@ -558,6 +575,17 @@ export function createEditor(hostApi: EditorHost): Editor {
       showFlags();
       say(statusText);
       if (!result && dialog.open) checkBtn.focus();
+    },
+    prepare(result) {
+      if (!s || !s.pending || !result.isGedcom || result.error) return result;
+      // Checked was the text as Download gives it (its CHAR line set or inserted):
+      // the report shows the editor's lines, as the markers do.
+      const sent = s.pending.doc;
+      return {
+        ...result,
+        findings: toEditorLines(result.findings, s.view.state.toText(result.text).toString(), sent.toString()),
+        text: sent.sliceString(0, sent.length, s.lineBreak),
+      };
     },
     get isOpen() { return dialog.open; },
     get dirty() { return !!s?.dirty; },

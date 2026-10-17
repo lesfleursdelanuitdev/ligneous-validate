@@ -380,6 +380,7 @@ h1 em { font-style: italic; }
 .edit-row { padding: 0 22px 18px; margin-top: -6px; }
 .has-edit .finding.is-open + .edit-row { margin-top: 0; }
 .open-editor { align-self: flex-end; }
+.no-editor { margin: 12px 0 0; font-size: 13px; color: var(--muted); }
 .finding .body h3 { font-size: 14px; font-weight: 500; color: var(--text); margin: 18px 0 4px; }
 .finding .body > :first-child { margin-top: 0; }
 .finding .body p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; max-width: 72ch; }

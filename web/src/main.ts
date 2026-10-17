@@ -48,6 +48,12 @@ let beforeEditorCheck: Shown | null = null; // the report it replaces, kept if i
 let editName = ''; // the file the editor's session is for
 let saveWait: ((m: { data: ArrayBuffer; error?: string } | null) => void) | null = null;
 const EDITOR_FAILED = "The editor didn't load. Check your connection and try again.";
+const NO_EDITOR = "This browser can't run the editor. Try a current version of Firefox, Chrome, Safari or Edge.";
+// The editor's styles need constructable, adopted style sheets: without them
+// CodeMirror falls back to a <style> element, which the CSP blocks (Safari
+// before 16.4, Firefox before 101). Those browsers get no editor buttons.
+const canEdit = typeof ShadowRoot === 'function' && 'adoptedStyleSheets' in ShadowRoot.prototype &&
+  typeof CSSStyleSheet === 'function' && 'replaceSync' in CSSStyleSheet.prototype;
 
 /** Saves text or bytes under `name` through a temporary link; nothing is sent anywhere. */
 function save(data: BlobPart, type: string, name: string) {
@@ -116,7 +122,10 @@ function onResult(result: Result) {
   const kind = viewKind(result);
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
-  const slots = renderReport(report, result, file.name, editHooks);
+  // A Check again report is shown in the editor's line numbers.
+  if (editorCheck && ed) result = ed.prepare(result);
+  const slots = renderReport(report, result, file.name, canEdit ? editHooks : undefined);
+  if (!canEdit) report.querySelector('.toolbar')?.after(Object.assign(document.createElement('p'), { className: 'no-editor', textContent: NO_EDITOR }));
   const view = { file, result, slots, repair: null as RepairOut | null };
   shown = view;
   editorDone(result, doneText(result));
@@ -419,7 +428,7 @@ reopen.addEventListener('click', () => void openEditor(0, reopen));
 
 // Closing or reloading the tab with unsaved edits: the browser asks.
 window.addEventListener('beforeunload', e => {
-  if (ed?.dirty) { e.preventDefault(); e.returnValue = ''; }
+  if (ed?.dirty) { e.preventDefault(); e.returnValue = 'unsaved'; }
 });
 
 // Dropping anywhere on the page works; the zone shows where.
