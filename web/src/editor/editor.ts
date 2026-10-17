@@ -24,7 +24,7 @@ import { fill } from '../fill';
 import { filled, formatNumber, icon, severityWord } from '../render';
 import type { Finding, Result } from '../types';
 import { gedcomHighlighter, gedcomLanguage, tokenizeLine, valueStart } from './gedcom';
-import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, toDiagnosticSeverity, toEditorLines, windowed } from './markers';
+import { MARKER_CAP, lineBreakOf, mapLine, navOrder, stepTo, toDiagnosticSeverity, toEditorLines, windowed, editorLineMap } from './markers';
 import { recordLine } from './pointers';
 import { editorTheme } from './theme';
 import './editor.css';
@@ -43,6 +43,8 @@ export interface EditorHost {
   download(text: string): Promise<boolean>;
   /** The editor closed. `line` and `code` say which card to go back to (line in the last check). */
   closed(opener: HTMLElement | null, line: number, code: string | undefined): void;
+  /** Whether there are edits since the last check (Check again, or the file as chosen); called when it changes. */
+  edits?(since: boolean): void;
 }
 
 export interface Editor {
@@ -52,6 +54,8 @@ export interface Editor {
   reset(): void;
   /** A Check again result in the editor's line numbers (call before showing it; others pass through). */
   prepare(result: Result): Result;
+  /** prepare()'s move from a line of the checked text to the editor's, for anything else in those lines (call before prepare). */
+  lineMapper(result: Result): (line: number) => number;
   /** A Check again has ended: its (prepared) result, or null when it failed or was stopped, with the status text. */
   checkDone(result: Result | null, text: string): void;
   readonly isOpen: boolean;
@@ -277,7 +281,16 @@ export function createEditor(hostApi: EditorHost): Editor {
     prev.disabled = next.disabled = n === 0;
   };
 
+  let editsSent = false;
+  /** Tells the page whether there are edits since the last check, when that changes. */
+  const reportEdits = (since: boolean) => {
+    if (since === editsSent) return;
+    editsSent = since;
+    hostApi.edits?.(since);
+  };
+
   const showFlags = () => {
+    reportEdits(!!s?.stale);
     if (!s) return;
     edited.hidden = !s.dirty;
     stale.hidden = !s.stale;
@@ -549,6 +562,7 @@ export function createEditor(hostApi: EditorHost): Editor {
       wrapBox.checked = false;
       delete dialog.dataset.markers;
       delete dialog.dataset.markRuns;
+      reportEdits(false);
     },
     checkDone(result, statusText) {
       checking = false;
@@ -575,6 +589,10 @@ export function createEditor(hostApi: EditorHost): Editor {
       showFlags();
       say(statusText);
       if (!result && dialog.open) checkBtn.focus();
+    },
+    lineMapper(result) {
+      if (!s || !s.pending || !result.isGedcom || result.error) return line => line;
+      return editorLineMap(s.view.state.toText(result.text).toString(), s.pending.doc.toString()) ?? (line => line);
     },
     prepare(result) {
       if (!s || !s.pending || !result.isGedcom || result.error) return result;

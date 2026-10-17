@@ -228,6 +228,8 @@ test('e2e: an open Show lines panel and the focus survive a run', async ({ page 
   await upload(page, 'suggested.ged');
   await row(page, 'broken-links').getByRole('button', { name: 'Show lines' }).click();
   await box(page, BROKEN).check();
+  // The runs wait for the plan of the new ticks.
+  await expect(page.getByRole('button', { name: 'Repair selected (2)' })).toBeEnabled();
   await page.getByRole('button', { name: 'Repair selected (2)' }).focus();
   await page.keyboard.press('Enter');
   await expect(page.locator('#status')).toHaveText('Repaired: 2 kinds of fix applied.');
@@ -336,4 +338,183 @@ test("e2e: the editor's Check again refreshes the checklist from Plan", async ({
   await page.locator('#fix-broken-links-show').click();
   await expect(page.locator('#fix-broken-links-lines .ex-at')).toHaveText(['Line 20', 'Line 25']);
   await expect(page.locator('#fix-broken-links-lines')).not.toContainText('@F9@');
+});
+
+// ------------------------------------------------------------------ the last round
+
+/**
+ * Test hooks around the page's workers: counts them, records the message
+ * types sent, can swallow (__hold) or delay (__delay, ms) messages of a type,
+ * and can turn Plan answers into errors (__planError).
+ */
+async function instrument(page: Page) {
+  await page.addInitScript(() => {
+    const Real = window.Worker;
+    const w = window as unknown as {
+      __made: number; __sent: string[]; __hold: string[]; __delay: Record<string, number>; __planError: boolean;
+    };
+    w.__made = 0; w.__sent = []; w.__hold = []; w.__delay = {}; w.__planError = false;
+    window.Worker = class extends Real {
+      constructor(...a: ConstructorParameters<typeof Worker>) { super(...a); w.__made++; }
+      addEventListener(type: string, fn: (e: unknown) => void, ...rest: never[]) {
+        if (type !== 'message') return super.addEventListener(type, fn as never, ...rest);
+        const wrapped = (e: MessageEvent) => {
+          const d = e.data as { type: string; id?: number };
+          fn(w.__planError && d.type === 'planned' ? { data: { ...d, info: { available: [], error: 'forced' } } } : e);
+        };
+        super.addEventListener(type, wrapped as never, ...rest);
+      }
+      postMessage(msg: { type: string }, transfer?: never) {
+        w.__sent.push(msg.type);
+        if (w.__hold.includes(msg.type)) return;
+        const ms = w.__delay[msg.type];
+        if (ms) { setTimeout(() => super.postMessage(msg, transfer as never), ms); return; }
+        super.postMessage(msg, transfer as never);
+      }
+    } as typeof Worker;
+  });
+}
+const hook = (page: Page, f: (w: { __hold: string[]; __delay: Record<string, number>; __planError: boolean }) => void) =>
+  page.evaluate(`(${f.toString()})(window)`);
+
+/** A GEDCOM file of a little over `mb` MB, with a broken FAMC and a family whose only member doesn't exist. */
+function bigWithLinks(dir: string, mb: number): string {
+  const head = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n1 SUBM @U1@\n0 @U1@ SUBM\n1 NAME Test\n';
+  const parts = [head];
+  let size = head.length;
+  for (let i = 1; size < mb * 1024 * 1024; i++) {
+    const r = `0 @I${i}@ INDI\n1 NAME Person${i} /Family${i % 500}/\n1 SEX ${i % 2 ? 'M' : 'F'}\n1 NOTE A note to give the file some weight, number ${i}.\n`;
+    parts.push(r);
+    size += r.length;
+    if (i === 10) parts.push('1 FAMC @F404@\n');
+  }
+  parts.push('0 @F1@ FAM\n1 HUSB @I999999@\n0 TRLR\n');
+  const path = join(dir, 'big-links.ged');
+  writeFileSync(path, parts.join(''));
+  return path;
+}
+
+test('e2e: after Stop, the preview catches up with ticks changed during the repair', async ({ page }) => {
+  test.setTimeout(300_000);
+  await instrument(page);
+  await page.goto('/');
+  const dir = mkdtempSync(join(tmpdir(), 'validate-e2e-'));
+  try {
+    await page.locator('#file').setInputFiles(bigWithLinks(dir, 5.2));
+    await expect(page.locator('#status')).toHaveText(/^Checked: /, { timeout: 240_000 });
+    const famCount = row(page, 'empty-families').locator('.fix-count');
+    await expect(famCount).toHaveText('2 lines, once broken links are removed', { timeout: 60_000 });
+    await box(page, BROKEN).check();
+    await expect(famCount).toHaveText('2 lines removed'); // planned with broken-links: F1 goes
+    await expect(page.locator('#repair .fix-groups')).not.toHaveClass(/is-pending/);
+    // The repair is held, so it is still running; a tick then sends a plan, which is swallowed too.
+    await hook(page, w => { w.__hold = ['repair', 'plan']; });
+    await page.getByRole('button', { name: 'Repair selected (1)' }).click();
+    const plans = () => page.evaluate(() => (window as unknown as { __sent: string[] }).__sent.filter(t => t === 'plan').length);
+    const before = await plans();
+    await box(page, EMPTY).check();
+    await expect(page.locator('#repair .fix-groups')).toHaveClass(/is-pending/);
+    await expect.poll(plans).toBeGreaterThan(before); // sent, and swallowed with the repair
+    await hook(page, w => { w.__hold = []; });
+    await page.getByRole('button', { name: 'Stop' }).click();
+    await expect(page.locator('#status')).toHaveText('Stopped.');
+    // Planned again for the ticks on screen (the plan sent during the repair died with its worker).
+    await expect(page.locator('#repair .fix-groups')).not.toHaveClass(/is-pending/, { timeout: 60_000 });
+    await expect(famCount).toHaveText('2 lines removed');
+    await page.locator('#fix-empty-families-show').click();
+    await expect(page.locator('#fix-empty-families-lines')).toContainText('0 @F1@ FAM');
+    await expect(page.getByRole('button', { name: 'Repair selected (2)' })).toBeEnabled();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('e2e: while a plan for the ticks on screen is on its way, the preview says so and the runs wait', async ({ page }) => {
+  await instrument(page);
+  await page.goto('/');
+  await upload(page, 'suggested.ged');
+  await expect(row(page, 'broken-links').locator('.fix-count')).toHaveText('4 lines removed');
+  await page.locator('#fix-empty-families-show').click();
+  await expect(page.locator('#fix-empty-families-lines .ex-at')).toHaveText(['Line 17', 'Line 23']);
+  await hook(page, w => { w.__delay = { plan: 1500 }; });
+  await box(page, BROKEN).check();
+  await expect(page.locator('#fix-empty-families-lines')).toHaveText('Working out the lines…');
+  await expect(page.locator('#repair .fix-groups')).toHaveClass(/is-pending/);
+  await expect(page.getByRole('button', { name: 'Repair everything' })).toBeDisabled();
+  await expect(page.getByRole('button', { name: /^Repair selected/ })).toBeDisabled();
+  // The plan lands: the lines for these ticks, and the runs are back.
+  await expect(page.locator('#fix-empty-families-lines .ex-at')).toHaveText(['Line 17', 'Line 23', 'Line 26'], { timeout: 10_000 });
+  await expect(page.locator('#repair .fix-groups')).not.toHaveClass(/is-pending/);
+  await expect(page.getByRole('button', { name: 'Repair selected (2)' })).toBeEnabled();
+});
+
+test("e2e: edits since the last Check again aren't in the repaired copy, and the card says so", async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await expect(page.locator('#download-repaired')).toHaveText('Download repaired file');
+  await page.getByRole('button', { name: 'Edit line 11', exact: true }).first().click();
+  await page.locator('.cm-line', { hasText: '1 NAME Ann /Lee/' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Jr');
+  page.once('dialog', d => void d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  const NOTE = "Your edits since the last Check again aren't in this copy. Open the editor and choose Check again first.";
+  await expect(page.locator('#repair .edits-note')).toHaveText(NOTE);
+  await expect(page.locator('#download-repaired')).toHaveText('Download the last repaired copy');
+  await box(page, BROKEN).check();
+  await page.getByRole('button', { name: 'Repair selected (2)' }).click();
+  await expect(page.locator('#status')).toHaveText('Repaired: 2 kinds of fix applied.');
+  await expect(page.locator('#repair .edits-note')).toBeVisible();
+  const bytes = await save(page, 'Download the last repaired copy');
+  expect(bytes.toString('utf8')).toContain('1 NAME Ann /Lee/\n');
+  expect(bytes.toString('utf8')).not.toContain('Jr');
+});
+
+test("e2e: a plan error doesn't stop the checker; the card says it can't preview, and repairs still run", async ({ page }) => {
+  await instrument(page);
+  await page.goto('/');
+  await hook(page, w => { w.__planError = true; });
+  await upload(page, 'suggested.ged');
+  await expect(page.locator('#repair .plan-failed')).toHaveText("We couldn't preview these fixes.");
+  await box(page, BROKEN).check();
+  await page.getByRole('button', { name: 'Repair selected (2)' }).click();
+  await expect(page.locator('#status')).toHaveText('Repaired: 2 kinds of fix applied.');
+  await expect(page.locator('#repair h4', { hasText: BROKEN })).toBeVisible();
+  expect(await page.evaluate(() => (window as unknown as { __made: number }).__made)).toBe(1); // never restarted
+});
+
+test('e2e: after Check again of an edited ANSEL file, the checklist plans the text Download gives', async ({ page }) => {
+  await upload(page, 'ansel.ged');
+  await expect(box(page, ENCODING)).toBeVisible();
+  await page.getByRole('button', { name: 'Open the editor' }).click();
+  await page.locator('.cm-line', { hasText: 'René /Dupré/' }).click();
+  await page.keyboard.press('End');
+  await page.keyboard.type(' Jr');
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(page.locator('#ed-live')).toHaveText(/^Checked: /);
+  page.once('dialog', d => void d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  await expect(page.locator('#report')).not.toContainText('older character encoding');
+  // The report has no encoding finding, and neither does the checklist.
+  await expect(box(page, SUBMITTER)).toBeVisible();
+  await expect(box(page, ENCODING)).toHaveCount(0);
+  await expect(page.locator('#repair-result')).toBeHidden();
+  await box(page, SUBMITTER).check();
+  await page.getByRole('textbox', { name: 'Your name' }).fill('Jo');
+  await page.locator('#fix-submitter-show').click();
+  await expect(page.locator('#fix-submitter-lines .ex-at')).toHaveText(['Added in the header', 'Added at the end']);
+  await page.getByRole('button', { name: 'Repair selected (1)' }).click();
+  await expect(page.locator('#status')).toHaveText('Repaired: 1 kind of fix applied.');
+  const text = (await save(page, 'Download repaired file')).toString('utf8');
+  expect(text).toContain('1 CHAR UTF-8');
+  expect(text).toContain('René /Dupré/ Jr');
+  expect(text).toContain('1 NAME Jo');
+});
+
+test('e2e: the lines in Show lines are a named, focusable region', async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await page.locator('#fix-broken-links-show').click();
+  const region = page.getByRole('region', { name: `Lines for ${BROKEN}, line 11` });
+  await expect(region).toHaveAttribute('tabindex', '0');
+  await region.focus();
+  await expect(region).toBeFocused();
 });

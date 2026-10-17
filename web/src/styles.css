@@ -385,6 +385,16 @@ h1 em { font-style: italic; }
 #repair .ex-line.nested { padding-left: 26px; }
 #repair .ex-line.added { background: var(--hint-tint); }
 #repair .ex-mark { flex: none; width: 10px; color: var(--accent); font-weight: 600; text-align: center; }
+#repair .ex-line.removed { background: var(--error-tint); }
+#repair .ex-line.removed code { text-decoration: line-through; text-decoration-thickness: 1px; text-decoration-color: color-mix(in srgb, var(--error) 60%, transparent); }
+#repair .ex-line.removed .ex-mark { color: var(--error); }
+#repair .ex-rows:focus-visible { outline-offset: 2px; }
+#repair .fix-groups.is-pending .fix-count { opacity: 0.55; }
+#repair .plan-failed, #repair .edits-note {
+  margin: 0 0 14px; padding: 10px 14px; font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--text);
+  border-radius: 6px; border-left: 3px solid var(--amber); background: var(--amber-tint);
+}
+#repair .plan-failed { border-left-color: var(--error); background: var(--error-tint); }
 #repair .ex-line code { background: none; padding: 0; white-space: pre; font-size: 13px; }
 #repair .ex-more { margin: 6px 0 0; font-size: 13px; color: var(--light); }
 #repair .run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }

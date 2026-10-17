@@ -453,6 +453,20 @@ test('e2e: privacy, nothing leaves the page', async ({ browser, baseURL }) => {
   await save(page, 'Download edited file');
   await page.getByRole('button', { name: 'Close', exact: true }).click();
   await expect(page.getByRole('dialog')).toBeHidden();
+  // The checklist: tick every suggested fix, type a name, repair, let it plan again, download.
+  page.once('dialog', d => void d.accept()); // in case the editor still has edits
+  await page.locator('#file').setInputFiles(fixture('suggested.ged'));
+  await expect(page.locator('#report dd', { hasText: 'suggested.ged' })).toBeVisible();
+  for (const label of ["Remove links to records that don't exist", 'Remove families with nobody in them', 'Add you as the person who made this file']) {
+    await page.getByRole('checkbox', { name: label, exact: true }).check();
+  }
+  await page.getByRole('textbox', { name: 'Your name' }).fill('Jo March');
+  await page.getByRole('button', { name: /^Repair selected/ }).click();
+  await expect(page.locator('#status')).toHaveText(/^Repaired: /);
+  await page.getByRole('checkbox', { name: 'Remove blank lines', exact: true }).uncheck();
+  await expect(page.locator('#repair .fix-groups')).toHaveClass(/is-pending/);
+  await expect(page.locator('#repair .fix-groups')).not.toHaveClass(/is-pending/);
+  await save(page, 'Download the last repaired copy');
   // And a second file and a non-GEDCOM one.
   await page.locator('#file').setInputFiles(fixture('ansel.ged'));
   await expect(page.locator('#report dd', { hasText: 'ansel.ged' })).toBeVisible();

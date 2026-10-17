@@ -143,14 +143,25 @@ export function textChange(checked: string, sent: string): { from: number; to: n
  * inserted CHAR line) becomes 0, the whole file.
  */
 export function toEditorLines(findings: Finding[], checked: string, sent: string): Finding[] {
+  const map = editorLineMap(checked, sent);
+  if (!map) return findings;
+  return findings.map(f => (f.line <= 0 ? f : { ...f, line: map(f.line) }));
+}
+
+/**
+ * The same move as toEditorLines for any line of the checked text (the
+ * checklist's plan and repair work on that text too): its line in the text
+ * sent, or 0 when it is only in the checked text. Null when the two are the same.
+ */
+export function editorLineMap(checked: string, sent: string): ((line: number) => number) | null {
   const c = textChange(checked, sent);
-  if (!c) return findings;
+  if (!c) return null;
   const t = Text.of(checked.split('\n'));
   const changes = ChangeSet.of(c, t.length);
   const after = changes.apply(t);
-  return findings.map(f => {
-    if (f.line <= 0) return f;
-    const at = mapLine(t, changes, f.line);
-    return { ...f, line: at ? after.lineAt(at.from).number : 0 };
-  });
+  return line => {
+    if (line <= 0) return line;
+    const at = mapLine(t, changes, line);
+    return at ? after.lineAt(at.from).number : 0;
+  };
 }

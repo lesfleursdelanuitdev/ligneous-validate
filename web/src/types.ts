@@ -125,9 +125,10 @@ export interface PlanOut {
 export type ToWorker =
   /** `save`: check what Download edited file gives (the editor's Check again). */
   | { type: 'check'; bytes: ArrayBuffer; save?: boolean }
-  | { type: 'repair'; bytes: ArrayBuffer; before?: Counts; options?: RepairOptions }
+  /** `save`: work on what Download edited file gives, as the editor's Check again did. */
+  | { type: 'repair'; bytes: ArrayBuffer; before?: Counts; options?: RepairOptions; save?: boolean }
   /** id: answers to an older request are dropped. */
-  | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number }
+  | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number; save?: boolean }
   /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
   | { type: 'save'; bytes: ArrayBuffer };
 

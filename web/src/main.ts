@@ -6,11 +6,11 @@ import {
   FAILED, REPAIR_FAILED, countBySeverity, doneText, fillDownloads, fillRepairFailed, renderReport, repairPlan, sizeNote, viewKind,
 } from './render';
 import type { EditHooks, ReportSlots } from './render';
-import { announce, markRan, newChecklist, selectedFixes, setAvailable, setPlan } from './checklist';
+import { announce, markRan, newChecklist, planKey, selectedFixes, setAvailable, setPlan, setPlanFailed } from './checklist';
 import type { Checklist, Run } from './checklist';
-import { mountRepairCard } from './repaircard';
+import { PLAN_FAILED, mountRepairCard } from './repaircard';
 import type { RepairCard } from './repaircard';
-import type { FixInfo, FromWorker, PlanOut, RepairOptions, RepairOut, Result } from './types';
+import type { Fix, FixInfo, FromWorker, PlanOut, RepairOptions, RepairOut, Result } from './types';
 import type { Editor } from './editor/editor';
 
 const NO_WASM = "This browser couldn't start the checker. Try a current version of Firefox, Chrome, Safari or Edge.";
@@ -61,6 +61,14 @@ interface Shown {
   failed: boolean;
   /** The id of the plan whose answer is on screen. */
   planShown: number;
+  /** The ticks the latest plan was asked for (planKey); null: the default ticks (no checklist yet). */
+  planAsked: string | null;
+  /** The last plan failed (a recovered error: the checker is still fine). */
+  planError: boolean;
+  /** An editor Check again: the plan and the repair work on what Download gives, as the check did. */
+  saved: boolean;
+  /** From a line of what was checked to the editor's line (identity for a chosen file). */
+  mapLine: (line: number) => number;
 }
 let shown: Shown | null = null;
 let loadPercent = 0; // how much of the current worker's checker has downloaded
@@ -72,6 +80,7 @@ let edLoading: Promise<Editor | null> | null = null;
 let editorCheck = false; // the running check is the editor's Check again
 let beforeEditorCheck: Shown | null = null; // the report it replaces, kept if it is stopped
 let editName = ''; // the file the editor's session is for
+let editsSinceCheck = false; // the editor has edits since the last check (the copy doesn't have them)
 let saveWait: ((m: { data: ArrayBuffer; error?: string } | null) => void) | null = null;
 const EDITOR_FAILED = "The editor didn't load. Check your connection and try again.";
 const NO_EDITOR = "This browser can't run the editor. Try a current version of Firefox, Chrome, Safari or Edge.";
@@ -148,12 +157,15 @@ function onResult(result: Result) {
   const kind = viewKind(result);
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
-  // A Check again report is shown in the editor's line numbers.
-  if (editorCheck && ed) result = ed.prepare(result);
+  // A Check again report is shown in the editor's line numbers; the checklist's lines are moved the same way.
+  const fromEditor = editorCheck && !!ed;
+  const mapLine = fromEditor ? ed!.lineMapper(result) : (line: number) => line;
+  if (fromEditor) result = ed!.prepare(result);
   const slots = renderReport(report, result, file.name, canEdit ? editHooks : undefined);
   if (!canEdit) report.querySelector('.toolbar')?.after(Object.assign(document.createElement('p'), { className: 'no-editor', textContent: NO_EDITOR }));
   const view: Shown = {
     file, result, slots, repair: null, data: null, checklist: null, card: null, pending: null, failed: false, planShown: 0,
+    planAsked: null, planError: false, saved: fromEditor, mapLine,
   };
   shown = view;
   editorDone(result, doneText(result));
@@ -175,15 +187,20 @@ function onResult(result: Result) {
   if (plan === 'auto') void askRepair(file, false);
 }
 
-/** Puts up the checklist for the file on screen (once), or gives it a new list of kinds. */
-function showCard(view: Shown, available: FixInfo[], units: PlanOut['units'] | null) {
+/**
+ * Puts up the checklist for the file on screen (once), or gives it a new list
+ * of kinds: from a plan (with its units, made for the ticks `key`), or from a
+ * run (units null: the preview stays).
+ */
+function showCard(view: Shown, available: FixInfo[], units: PlanOut['units'] | null, key: string | null = null) {
   if (view.checklist) {
-    if (units !== null) setPlan(view.checklist, { available, units });
+    if (units !== null) setPlan(view.checklist, { available, units }, key ?? undefined);
     else setAvailable(view.checklist, available);
     view.card?.update();
     return;
   }
   const c = newChecklist(available, units ?? null);
+  if (units === null && view.planError) setPlanFailed(c);
   view.checklist = c;
   view.card = mountRepairCard(view.slots.repair, {
     result: view.result, checklist: c, big: view.file.size > AUTO_LIMIT,
@@ -193,6 +210,22 @@ function showCard(view: Shown, available: FixInfo[], units: PlanOut['units'] | n
       if (view.data) save(view.data, 'application/octet-stream', downloadName(view.file.name, 'repaired'));
     },
   });
+  view.card.setEditsNote(editsSinceCheck);
+}
+
+/** Plans again when the preview on screen isn't the answer to the latest plan (lost to a restart, say). */
+function catchUpPlan(view: Shown | null) {
+  if (view && view === shown && view.checklist && view.planShown !== planSeq) schedulePlan(view);
+}
+
+/** Lines of what was checked, in the editor's numbers (an editor Check again). */
+function mapUnits(units: PlanOut['units'], map: (line: number) => number): PlanOut['units'] {
+  if (!units) return units;
+  const out: NonNullable<PlanOut['units']> = {};
+  for (const [fix, list] of Object.entries(units) as [Fix, NonNullable<PlanOut['units']>[Fix]][]) {
+    out[fix] = list?.map(u => (u.line > 0 ? { ...u, line: map(u.line) } : u));
+  }
+  return out;
 }
 
 /** Plans again for the current ticks, once they have stopped changing for a moment. */
@@ -241,6 +274,7 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
       view.card.showFailed();
       say(REPAIR_FAILED, '', 'problem');
       runEnded(view);
+      catchUpPlan(view);
     } else {
       // The repair made by itself failed: one line, in place of the checklist.
       view.failed = true;
@@ -250,6 +284,7 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
     }
     return;
   }
+  if (view.saved) info = { ...info, changes: info.changes.map(ch => (ch.line > 0 ? { ...ch, line: view.mapLine(ch.line) } : ch)) };
   // An older checker (or a test's fake) may leave out the list of kinds.
   const available = info.available ?? view.checklist?.available ?? [];
   if (!view.checklist && available.length === 0 && info.changes.length === 0) return; // nothing to fix
@@ -275,15 +310,24 @@ function onPlanned(info: PlanOut, id: number) {
   if (!shown || shown.file !== current || shown.failed) return;
   const view = shown;
   if (info.error) {
-    // A failed plan (out of memory, say) can leave the runtime dead. Without a
-    // checklist yet and no repair coming by itself, say the copy can't be made.
-    restart();
-    if (!view.checklist && view.file.size > AUTO_LIMIT) fillRepairFailed(view.slots.repair);
+    // A recovered error (errJSON): the checker is fine, and a repair it is
+    // running goes on. Only a real worker error restarts it. The card says
+    // the preview failed; its buttons stay.
+    view.planError = true;
+    if (view.checklist) {
+      setPlanFailed(view.checklist);
+      view.card?.update();
+    } else if (view.file.size > AUTO_LIMIT) {
+      // No repair comes by itself to give the list of kinds.
+      fillRepairFailed(view.slots.repair, PLAN_FAILED);
+    }
     return;
   }
   view.planShown = id;
+  view.planError = false;
   if (!view.checklist && info.available.length === 0) return; // nothing to fix
-  showCard(view, info.available, info.units ?? {});
+  const units = view.saved ? mapUnits(info.units ?? {}, view.mapLine) : info.units ?? {};
+  showCard(view, info.available, units, view.planAsked);
 }
 
 function onMessage(e: MessageEvent<FromWorker>) {
@@ -328,10 +372,12 @@ function onWorkerError() {
     restart();
     if (shown && shown.file === current) {
       if (shown.card) { shown.card.showFailed(); runEnded(shown); } else fillRepairFailed(shown.slots.repair);
+      catchUpPlan(shown);
     }
     controls();
   } else {
     restart();
+    catchUpPlan(shown);
   }
 }
 
@@ -345,6 +391,12 @@ function start(): Worker {
 
 function restart() {
   saveWait?.(null); // a save on the old worker won't come back
+  // A repair the visitor asked for dies with the worker: say so (Stop clears `repairing` first).
+  if (repairing && shown?.pending && shown.card) {
+    shown.card.showFailed();
+    repairBarEnd(false);
+    runEnded(shown);
+  }
   worker?.terminate();
   repairing = false;
   planning = false;
@@ -374,7 +426,8 @@ async function askRepair(file: File, fresh: boolean, options?: RepairOptions) {
   const c = countBySeverity(shown.result.findings);
   repairing = true;
   const before = { errors: c.error, warnings: c.warning, hints: c.hint };
-  worker?.postMessage(options ? { type: 'repair', bytes, before, options } : { type: 'repair', bytes, before }, [bytes]);
+  const save = shown.saved;
+  worker?.postMessage(options ? { type: 'repair', bytes, before, options, save } : { type: 'repair', bytes, before, save }, [bytes]);
   controls();
 }
 
@@ -394,8 +447,10 @@ async function askPlan(view: Shown) {
   if (id !== planSeq || shown !== view || current !== view.file || busy) return;
   const c = view.checklist;
   const options: RepairOptions | undefined = c ? { fixes: selectedFixes(c), submitterName: c.name } : undefined;
+  view.planAsked = c ? planKey(c) : null;
   planning = true;
-  worker?.postMessage(options ? { type: 'plan', bytes, options, id } : { type: 'plan', bytes, id }, [bytes]);
+  const save = view.saved;
+  worker?.postMessage(options ? { type: 'plan', bytes, options, id, save } : { type: 'plan', bytes, id, save }, [bytes]);
 }
 
 async function check(file: File, fromEditor = false) {
@@ -456,9 +511,12 @@ stop.addEventListener('click', () => {
     say('Stopped.');
   } else if (repairing) {
     // The report and the checklist stay; the repaired copy can be asked for again.
+    repairing = false;
     restart();
     say('Stopped.');
     if (shown) runEnded(shown);
+    // A plan sent while it ran died with the worker: plan the ticks on screen again.
+    catchUpPlan(shown);
   }
   controls();
   choose.focus();
@@ -490,6 +548,7 @@ function chooseFile(file: File) {
   if (ed?.isOpen) return; // a file dropped on the open editor
   if (ed?.dirty && !window.confirm(`Check another file? Your edits to ${editName} will be lost.`)) return;
   ed?.reset();
+  editsSinceCheck = false;
   reopen.hidden = true;
   void check(file);
 }
@@ -530,6 +589,11 @@ function loadEditor(): Promise<Editor | null> {
         const bytes = new TextEncoder().encode(text).buffer as ArrayBuffer;
         worker.postMessage({ type: 'save', bytes }, [bytes]);
       });
+    },
+    edits(since) {
+      // The repaired copy is made from the last checked text: say so while there are edits since.
+      editsSinceCheck = since;
+      shown?.card?.setEditsNote(since);
     },
     closed(opener, line, code) {
       zone.before(progressEl);

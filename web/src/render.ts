@@ -462,9 +462,9 @@ export interface ReportSlots {
 }
 
 /** The repair slot after a repair that failed: one line. */
-export function fillRepairFailed(slot: HTMLElement): void {
+export function fillRepairFailed(slot: HTMLElement, text = REPAIR_FAILED): void {
   slot.removeAttribute('aria-labelledby');
-  slot.replaceChildren(el('p', { class: 'repair-failed' }, REPAIR_FAILED));
+  slot.replaceChildren(el('p', { class: 'repair-failed' }, text));
   slot.hidden = false;
 }
 

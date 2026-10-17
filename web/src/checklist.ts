@@ -51,8 +51,12 @@ export interface Run {
 
 export interface Checklist {
   available: FixInfo[];
-  /** Plan's preview for the current ticks; null until Plan has answered. */
+  /** Plan's preview; null until Plan has answered. */
   units: Units | null;
+  /** The ticks (planKey) the preview on screen was made for. */
+  planFor: string | null;
+  /** The last plan failed: the preview can't be shown, but the run buttons stay. */
+  planFailed: boolean;
   /** The visitor's own ticks; a kind that isn't here has its default (format on, data off). */
   user: Map<Fix, boolean>;
   name: string;
@@ -63,13 +67,37 @@ export interface Checklist {
 }
 
 export function newChecklist(available: FixInfo[], units: Units | null = null): Checklist {
-  return { available: sortInfos(available), units, user: new Map(), name: '', alsoTicked: new Map(), ran: null };
+  const c: Checklist = {
+    available: sortInfos(available), units, planFor: null, planFailed: false,
+    user: new Map(), name: '', alsoTicked: new Map(), ran: null,
+  };
+  if (units) c.planFor = planKey(c); // made for the default ticks
+  return c;
 }
 
-/** Plan's answer for the current ticks; the visitor's ticks are kept. */
-export function setPlan(c: Checklist, plan: PlanOut): void {
+/** What a plan depends on: the fixes it is asked with, and the name (the submitter's preview). */
+export function planKey(c: Checklist): string {
+  return `${selectedFixes(c).join(',')}|${cleanName(c.name)}`;
+}
+
+/** A plan for other ticks than those on screen, or none yet; a failed plan isn't waited for. */
+export function isPlanPending(c: Checklist): boolean {
+  return !c.planFailed && (c.units === null || c.planFor !== planKey(c));
+}
+
+export function setPlanFailed(c: Checklist): void {
+  c.planFailed = true;
+}
+
+/**
+ * Plan's answer, made for the ticks `key` (planKey when it was asked; the
+ * default ticks when left out). The visitor's ticks are kept.
+ */
+export function setPlan(c: Checklist, plan: PlanOut, key?: string): void {
   c.available = sortInfos(plan.available);
   c.units = plan.units ?? null;
+  c.planFailed = false;
+  c.planFor = key ?? planKey(c);
 }
 
 /** A run's own list of kinds (the same as Plan's); the visitor's ticks and the preview are kept. */
@@ -236,8 +264,12 @@ function unitLines(fix: Fix, u: { lines?: string[]; removed?: string[]; what: st
 const ADDS = (fix: Fix) => fix === 'submitter';
 
 /** A row's count: Plan's units for a data kind when there are some, else Available's lines. */
-export function countText(a: FixInfo, units: Unit[] | null | undefined): string {
+export function countText(a: FixInfo, units: Unit[] | null | undefined, needsMissing = false): string {
   if (a.kind === 'data') {
+    // Plan lists nothing for it with these ticks: it only does something with what it needs.
+    if (units && units.length === 0 && a.fix !== 'submitter') {
+      return needsMissing && a.lines > 0 ? `${plural(a.lines, 'line', 'lines')}, once broken links are removed` : '';
+    }
     const n = units && units.length ? units.reduce((t, u) => t + unitLines(a.fix, u), 0) : a.lines;
     if (n <= 0) return '';
     return ADDS(a.fix) ? plural(n, 'line added', 'lines added') : plural(n, 'line removed', 'lines removed');
@@ -277,16 +309,14 @@ export function rowView(c: Checklist, a: FixInfo): RowView {
   let reason: string | null = null;
   if (a.required && a.reason) reason = reasonText(a.fix, a.reason);
   else if (notOffered(a) || blocked(c, a)) reason = reasonText(a.fix, a.reason!);
-  else {
-    const missing = (a.needs ?? []).find(n => info(c, n) && !checked(c, info(c, n)!));
-    if (missing) reason = needsText(a, missing);
-  }
+  const missing = (a.needs ?? []).find(n => info(c, n) && !checked(c, info(c, n)!));
+  if (reason === null && missing) reason = needsText(a, missing);
   let note: string | null = null;
   const also = [...c.alsoTicked].find(([k, by]) => by === a.fix && chosenRaw(c, k));
   if (a.fix === 'submitter' && on && !hasName(c)) note = reasonText('submitter', nameProblem(c.name)!);
   else if (also && on) note = `Also ticked “${LABELS[also[0]]}”, which this needs.`;
   return {
-    fix: a.fix, kind: a.kind, label: LABELS[a.fix] ?? a.fix, count: countText(a, c.units?.[a.fix]),
+    fix: a.fix, kind: a.kind, label: LABELS[a.fix] ?? a.fix, count: countText(a, c.units?.[a.fix], !!missing),
     checked: on, disabled: !enabled(c, a), reason, note, nameField: a.fix === 'submitter' && on,
   };
 }
@@ -307,6 +337,8 @@ export function checklistHeading(c: Checklist, r: Result): string {
 
 export interface ExampleRow {
   text: string;
+  /** The original line a replacement takes out (a long line, the old CHAR line). */
+  removed: boolean;
   /** A line the fix adds (the submitter, the trailer, CHAR, the pieces of a split). */
   added: boolean;
   /** Nested under the unit's first line (a removed link's or family's own lines). */
@@ -334,9 +366,12 @@ function whereOf(fix: Fix, u: Unit, own: string | null): string {
   if (u.line <= 0) return 'Whole file';
   if (fix === 'submitter') return u.what.startsWith('added a submitter record') ? 'Added at the end' : 'Added in the header';
   if (fix === 'trailer') return 'Added at the end';
-  if (fix === 'encoding' && (u.lines ?? []).length && !/^\s*1\s+CHAR\b/i.test(own ?? '')) return 'Added in the header';
+  if (fix === 'encoding' && (u.lines ?? []).length && !isCharLine(own)) return 'Added in the header';
   return `Line ${formatNumber(u.line)}`;
 }
+
+const row = (text: string): ExampleRow => ({ text, added: false, removed: false, nested: false });
+const isCharLine = (s: string | null) => /^\s*1\s+CHAR\b/i.test(s ?? '');
 
 const REMOVES: Fix[] = ['broken-links', 'empty-families'];
 
@@ -356,15 +391,20 @@ export function examples(fix: Fix, c: Checklist, r: Result): { items: Example[];
     let rows: ExampleRow[];
     if (REMOVES.includes(fix)) {
       rows = [
-        ...(own !== null ? [{ text: own, added: false, nested: false }] : []),
-        ...lines.map(text => ({ text, added: false, nested: true })),
+        ...(own !== null ? [row(own)] : []),
+        ...lines.map(text => ({ ...row(text), nested: true })),
       ];
     } else if (fix === 'blank-lines') {
-      rows = [{ text: '', added: false, nested: false }];
+      rows = [row('')];
     } else if (lines.length) {
-      rows = lines.map(text => ({ text, added: true, nested: false }));
+      // A replacement (a split long line, a CHAR line that is there): the original goes, then the new lines.
+      const replaced = own !== null && (fix === 'long-lines' || (fix === 'encoding' && isCharLine(own)));
+      rows = [
+        ...(replaced ? [{ ...row(own), removed: true }] : []),
+        ...lines.map(text => ({ ...row(text), added: true })),
+      ];
     } else {
-      rows = own !== null ? [{ text: own, added: false, nested: false }] : [];
+      rows = own !== null ? [row(own)] : [];
     }
     return { line: u.line, at: whereOf(fix, u, own), what: capital(u.what), rows };
   });

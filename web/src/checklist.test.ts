@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   DATA_LABELS, LABELS, MAX_NAME, announce, cleanName, selectedLeftOut, checklistHeading, countText, everything, examples,
   isOutOfDate, markRan, newChecklist, reasonText, resultView, rowView, rows, selectedFixes,
-  setAvailable, setChosen, setName, setPlan,
+  setAvailable, setChosen, setName, setPlan, isPlanPending, planKey, setPlanFailed,
 } from './checklist';
 import { isDataCode, kindOfCode } from './codes';
 import planSuggested from './testdata/plan-suggested.json';
@@ -11,6 +11,7 @@ import planNamed from './testdata/plan-suggested-named.json';
 import planBlankInFam from './testdata/plan-blank-in-fam-links.json';
 import planAnsel from './testdata/plan-ansel-long.json';
 import planUtf16 from './testdata/plan-utf16.json';
+import ANSEL_LONG from '../../e2e/fixtures/ansel-long.ged?raw';
 import type { Finding, FixInfo, PlanOut, RepairOut, Result } from './types';
 
 const PLAN = planSuggested as unknown as Required<PlanOut>;
@@ -98,6 +99,15 @@ describe('counts', () => {
     // Alone, only F2 and its link go: 1 + 3.
     expect(countText(fi('empty-families', 6), PLAN.units['empty-families'])).toBe('4 lines removed');
     expect(countText(fi('submitter', 3), PLAN_NAMED.units.submitter)).toBe('3 lines added');
+  });
+  it('says empty families go once broken links are removed when Plan has no unit without them', () => {
+    const fam = fi('empty-families', 2, { needs: ['broken-links'] });
+    expect(countText(fam, [], true)).toBe('2 lines, once broken links are removed');
+    expect(countText(fam, [], false)).toBe('');
+    const c = newChecklist([fi('broken-links', 1), fam], { 'broken-links': [{ line: 5, what: 'x' }], 'empty-families': [] });
+    expect(rowView(c, fam).count).toBe('2 lines, once broken links are removed');
+    setChosen(c, 'broken-links', true);
+    expect(rowView(c, fam).count).toBe(''); // the plan for these ticks hasn't come yet: nothing to say
   });
 });
 
@@ -346,13 +356,13 @@ describe('Show lines', () => {
     expect(examples('broken-links', c, r)).toEqual({
       items: [
         { line: 11, at: 'Line 11', what: "Removed a link to family @F9@, which doesn't exist (and 1 line under it)",
-          rows: [{ text: '1 FAMC @F9@', added: false, nested: false }, { text: '2 PEDI birth', added: false, nested: true }] },
-        { line: 22, at: 'Line 22', what: "Removed a link to person @I7@, which doesn't exist", rows: [{ text: '1 CHIL @I7@', added: false, nested: false }] },
-        { line: 27, at: 'Line 27', what: "Removed a link to person @I99@, which doesn't exist", rows: [{ text: '1 HUSB @I99@', added: false, nested: false }] },
+          rows: [{ text: '1 FAMC @F9@', added: false, removed: false, nested: false }, { text: '2 PEDI birth', added: false, removed: false, nested: true }] },
+        { line: 22, at: 'Line 22', what: "Removed a link to person @I7@, which doesn't exist", rows: [{ text: '1 CHIL @I7@', added: false, removed: false, nested: false }] },
+        { line: 27, at: 'Line 27', what: "Removed a link to person @I99@, which doesn't exist", rows: [{ text: '1 HUSB @I99@', added: false, removed: false, nested: false }] },
       ],
       more: 0,
     });
-    expect(examples('blank-lines', c, r)!.items).toEqual([{ line: 18, at: 'Line 18', what: 'Removed a blank line', rows: [{ text: '', added: false, nested: false }] }]);
+    expect(examples('blank-lines', c, r)!.items).toEqual([{ line: 18, at: 'Line 18', what: 'Removed a blank line', rows: [{ text: '', added: false, removed: false, nested: false }] }]);
   });
   it('follows the combination: with broken-links chosen, empty-families also lists F3', () => {
     const c = newChecklist(PLAN_LINKS.available, PLAN_LINKS.units);
@@ -386,9 +396,9 @@ describe('Show lines', () => {
     const c = newChecklist(PLAN_NAMED.available, PLAN_NAMED.units);
     const rowsOf = examples('submitter', c, suggestedResult())!.items.flatMap(i => i.rows);
     expect(rowsOf).toEqual([
-      { text: '1 SUBM @SUBM1@', added: true, nested: false },
-      { text: '0 @SUBM1@ SUBM', added: true, nested: false },
-      { text: '1 NAME Jo March', added: true, nested: false },
+      { text: '1 SUBM @SUBM1@', added: true, removed: false, nested: false },
+      { text: '0 @SUBM1@ SUBM', added: true, removed: false, nested: false },
+      { text: '1 NAME Jo March', added: true, removed: false, nested: false },
     ]);
   });
   it('gives at most five format examples and says how many more', () => {
@@ -569,10 +579,54 @@ describe('from real Plan answers', () => {
     expect(rowView(c, long)).toMatchObject({ checked: true, disabled: false });
     setChosen(c, 'encoding', false);
     expect(rowView(c, long)).toMatchObject({ checked: false, disabled: true, reason: 'This needs “Convert to UTF-8 (and say so in the header)” too.' });
-    const ex = examples('long-lines', c, result())!;
+    const ex = examples('long-lines', c, result({ text: ANSEL_LONG }))!;
     expect(ex.items).toHaveLength(1);
-    expect(ex.items[0].rows.length).toBeGreaterThan(1);
-    expect(ex.items[0].rows.every(r => r.added)).toBe(true);
-    expect(ex.items[0].rows[1].text).toMatch(/^2 CONC /);
+    // A replacement: the long line from the file goes, its pieces come.
+    const [orig, ...pieces] = ex.items[0].rows;
+    expect(orig).toMatchObject({ removed: true, added: false });
+    expect(orig.text).toMatch(/^1 NOTE This note is long\./);
+    expect(orig.text.length).toBeGreaterThan(255);
+    expect(pieces.length).toBeGreaterThan(1);
+    expect(pieces.every(r => r.added && !r.removed)).toBe(true);
+    expect(pieces[1].text).toMatch(/^2 CONC /);
+  });
+  it('ANSEL: the CHAR line is a replacement too, 1 CHAR ANSEL going and 1 CHAR UTF-8 coming', () => {
+    const c = newChecklist(PLAN_ANSEL.available, PLAN_ANSEL.units);
+    const item = examples('encoding', c, result({ text: ANSEL_LONG }))!.items.find(i => i.what === 'Set the character set to UTF-8')!;
+    expect(item.at).toBe('Line 4');
+    expect(item.rows).toEqual([
+      { text: '1 CHAR ANSEL', added: false, removed: true, nested: false },
+      { text: '1 CHAR UTF-8', added: true, removed: false, nested: false },
+    ]);
+  });
+});
+
+describe('a plan on its way', () => {
+  it('is pending until Plan answers for the ticks on screen', () => {
+    const c = newChecklist(PLAN.available);
+    expect(isPlanPending(c)).toBe(true); // no plan yet
+    setPlan(c, PLAN);
+    expect(isPlanPending(c)).toBe(false);
+    setChosen(c, 'broken-links', true);
+    expect(isPlanPending(c)).toBe(true); // the shown plan is for other ticks
+    setPlan(c, PLAN_LINKS, planKey(c));
+    expect(isPlanPending(c)).toBe(false);
+    setName(c, 'Jo');
+    expect(isPlanPending(c)).toBe(true); // the name shapes the submitter's preview
+  });
+  it('keys a plan by the ticks it was asked for, not those on screen when it lands', () => {
+    const c = newChecklist(PLAN.available, PLAN.units);
+    const asked = planKey(c);
+    setChosen(c, 'broken-links', true);
+    setPlan(c, PLAN, asked); // the answer for the old ticks lands late
+    expect(isPlanPending(c)).toBe(true);
+  });
+  it('is not pending once a plan failed; a later plan clears the failure', () => {
+    const c = newChecklist(PLAN.available);
+    setPlanFailed(c);
+    expect(isPlanPending(c)).toBe(false);
+    expect(c.planFailed).toBe(true);
+    setPlan(c, PLAN);
+    expect(c.planFailed).toBe(false);
   });
 });

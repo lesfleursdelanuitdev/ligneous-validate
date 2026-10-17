@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { ChangeSet, Text } from '@codemirror/state';
-import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, textChange, toDiagnosticSeverity, toEditorLines, windowed } from './markers';
+import { lineBreakOf, mapLine, navOrder, problemCount, stepTo, textChange, toDiagnosticSeverity, toEditorLines, windowed, editorLineMap } from './markers';
 import type { Finding } from '../types';
 
 const f = (line: number, severity: Finding['severity'] = 'warning', code = 'X'): Finding => ({
@@ -161,5 +161,10 @@ describe('a Check again report in the editor\'s line numbers', () => {
   });
   it('leaves lines alone when the texts are the same', () => {
     expect(toEditorLines([g(2)], 'a\nb\n', 'a\nb\n')[0].line).toBe(2);
+  });
+  it('maps any checked line the same way, for the checklist\'s plan and repair', () => {
+    const map = editorLineMap('0 HEAD\n1 GEDC\n1 CHAR UTF-8\n1 NOTE long\n0 TRLR\n', '0 HEAD\n1 GEDC\n1 NOTE long\n0 TRLR\n')!;
+    expect([1, 2, 3, 4, 5, 0].map(map)).toEqual([1, 2, 0, 3, 4, 0]);
+    expect(editorLineMap('a\nb\n', 'a\nb\n')).toBeNull();
   });
 });

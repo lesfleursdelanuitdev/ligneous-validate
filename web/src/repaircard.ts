@@ -3,7 +3,7 @@
 // this file only draws it (covered by the e2e tests).
 
 import {
-  LABELS, MAX_NAME, checklistHeading, everything, examples, isOutOfDate, rows, resultView, selectedFixes,
+  LABELS, MAX_NAME, checklistHeading, everything, examples, isOutOfDate, isPlanPending, rows, resultView, selectedFixes,
   selectedLeftOut, setChosen, setName,
 } from './checklist';
 import type { Checklist, Run, RowView } from './checklist';
@@ -23,6 +23,8 @@ export const LEFT_OTHER = 'These need fixing in your family tree program:';
 const SUBMITTER_LINES = 'Type your name to see the 3 lines this adds: a link in the header, and a short record with your name.';
 const NOTHING_NOW = 'Nothing would change with the fixes ticked now.';
 const WORKING = 'Working out the lines…';
+export const PLAN_FAILED = "We couldn't preview these fixes.";
+export const EDITS_NOTE = "Your edits since the last Check again aren't in this copy. Open the editor and choose Check again first.";
 
 export interface CardOptions {
   result: Result;
@@ -43,6 +45,8 @@ export interface RepairCard {
   /** A run that failed: one line where the result goes; the checklist stays. */
   showFailed(): void;
   setBusy(busy: boolean): void;
+  /** There are editor edits since the last Check again: the copy doesn't have them. */
+  setEditsNote(on: boolean): void;
 }
 
 const rowId = (fix: Fix) => `fix-${fix}`;
@@ -53,6 +57,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   let shownOut: RepairOut | null = null;
   let busy = false;
   let wasStale = false;
+  let editsNote = false;
   /** Show lines panels that are open; kept across a redraw. */
   const open = new Set<Fix>();
   /** Redraws an open panel in place (a new plan). */
@@ -61,6 +66,8 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const live = el('p', { class: 'sr-only', id: 'repair-live', role: 'status', 'aria-live': 'polite' });
 
   const heading = el('h2', { id: 'repair-h' });
+  const planFailed = el('p', { class: 'plan-failed', hidden: '' }, PLAN_FAILED);
+  const edits = el('p', { class: 'edits-note', hidden: '' }, EDITS_NOTE);
   const lists = el('div', { class: 'fix-groups' });
   const all = el('button', { type: 'button', class: 'more run', id: 'repair-all' }, 'Repair everything');
   const selected = el('button', { type: 'submit', class: 'more run', id: 'repair-selected' });
@@ -69,7 +76,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   const form = el('form', { class: 'checklist', novalidate: '', 'aria-labelledby': 'repair-h' },
     lists, el('div', { class: 'run-row' }, all, selected, offer), runNote);
   const resultBox = el('div', { class: 'result', id: 'repair-result', hidden: '' });
-  slot.replaceChildren(heading, form, resultBox, live);
+  slot.replaceChildren(heading, edits, planFailed, form, resultBox, live);
   slot.setAttribute('aria-labelledby', 'repair-h');
   slot.hidden = false;
 
@@ -87,6 +94,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   all.addEventListener('click', () => {
     const e = everything(c);
     refresh();
+    o.onChange();
     run(e.fixes, e.leftOut);
   });
   form.addEventListener('submit', e => {
@@ -150,7 +158,12 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   /** Show lines: Plan's units for the current ticks, each under its line number with its lines. */
   function drawLines(fix: Fix, body: HTMLElement) {
     body.replaceChildren();
-    const ex = examples(fix, c, r);
+    if (c.planFailed) {
+      body.append(el('p', {}, PLAN_FAILED));
+      return;
+    }
+    // Until the plan for the ticks on screen comes, the lines shown would be another combination's.
+    const ex = isPlanPending(c) ? null : examples(fix, c, r);
     if (ex === null) {
       body.append(el('p', {}, WORKING));
       return;
@@ -161,11 +174,15 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     }
     const list = el('ol', { class: 'ex', translate: 'no' });
     for (const item of ex.items) {
-      const rowsEl = el('div', { class: 'ex-rows' });
+      // It scrolls sideways, so it can be reached and scrolled from the keyboard.
+      const rowsEl = el('div', {
+        class: 'ex-rows', tabindex: '0', role: 'region',
+        'aria-label': `Lines for ${LABELS[fix]}, ${item.at.charAt(0).toLowerCase()}${item.at.slice(1)}`,
+      });
       for (const row of item.rows) {
-        rowsEl.append(el('span', { class: `ex-line${row.nested ? ' nested' : ''}${row.added ? ' added' : ''}` },
-          el('span', { class: 'ex-mark', 'aria-hidden': 'true' }, row.added ? '+' : ''),
-          row.added ? el('span', { class: 'sr-only' }, 'Added: ') : null,
+        rowsEl.append(el('span', { class: `ex-line${row.nested ? ' nested' : ''}${row.added ? ' added' : ''}${row.removed ? ' removed' : ''}` },
+          el('span', { class: 'ex-mark', 'aria-hidden': 'true' }, row.added ? '+' : row.removed ? '−' : ''),
+          row.added ? el('span', { class: 'sr-only' }, 'Added: ') : row.removed ? el('span', { class: 'sr-only' }, 'Removed: ') : null,
           el('code', {}, row.text === '' ? '(blank)' : row.text)));
       }
       list.append(el('li', {},
@@ -222,6 +239,14 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     }
     const n = selectedFixes(c).length;
     selected.textContent = `Repair selected (${formatNumber(n)})`;
+    // A plan on its way: counts dimmed, open panels say so, and the runs wait for it.
+    const pending = isPlanPending(c);
+    lists.classList.toggle('is-pending', pending);
+    lists.setAttribute('aria-busy', String(pending));
+    for (const btn of [all, selected]) btn.disabled = busy || pending;
+    planFailed.hidden = !c.planFailed;
+    edits.hidden = !editsNote;
+    for (const d of drawers.values()) d();
     // The main action is the run until there is a copy to download.
     selected.classList.toggle('primary', !shownOut);
     selected.classList.toggle('more', !!shownOut);
@@ -229,7 +254,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     const mark = resultBox.querySelector<HTMLElement>('.stale');
     if (mark) mark.hidden = !stale;
     const dl = resultBox.querySelector<HTMLButtonElement>('#download-repaired');
-    if (dl) dl.textContent = stale ? DOWNLOAD_STALE : DOWNLOAD;
+    if (dl) dl.textContent = stale || editsNote ? DOWNLOAD_STALE : DOWNLOAD;
     resultBox.classList.toggle('is-stale', stale);
     if (stale && !wasStale && dl) live.textContent = STALE_SAY;
     if (!stale) live.textContent = '';
@@ -243,7 +268,6 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     if (want !== have) { redraw(); return; }
     heading.textContent = checklistHeading(c, r);
     refresh();
-    for (const d of drawers.values()) d();
   }
 
   function redraw() {
@@ -317,9 +341,9 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     }
     busy = b;
     for (const btn of [all, selected]) {
-      btn.disabled = b;
       if (b) btn.setAttribute('aria-busy', 'true'); else btn.removeAttribute('aria-busy');
     }
+    refresh();
     if (b) runNote.textContent = runNote.textContent || 'Making a repaired copy…';
     else if (runNote.textContent === 'Making a repaired copy…') runNote.textContent = '';
     if (!b && focusBeforeRun) {
@@ -330,5 +354,10 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   }
 
   build();
-  return { update, showResult, showFailed, setBusy };
+  function setEditsNote(on: boolean) {
+    editsNote = on;
+    refresh();
+  }
+
+  return { update, showResult, showFailed, setBusy, setEditsNote };
 }
