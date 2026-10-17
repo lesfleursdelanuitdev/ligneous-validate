@@ -16,6 +16,7 @@ interface GoRuntime {
 interface Api {
   check(bytes: Uint8Array, progress?: (stage: string) => void): string;
   repair(bytes: Uint8Array, before?: Counts, progress?: (stage: string) => void): { data: Uint8Array; json: string };
+  save(bytes: Uint8Array): { data: Uint8Array; json: string };
 }
 
 interface WorkerScope {
@@ -109,6 +110,15 @@ scope.addEventListener('message', async e => {
       post({ type: 'repaired', data, info }, [data]);
     } catch (err) {
       post({ type: 'repaired', data: new ArrayBuffer(0), info: { changes: [], left: [], before: { errors: 0, warnings: 0, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 }, error: String(err) } });
+    }
+  } else if (msg.type === 'save') {
+    try {
+      const out = api.save(bytes);
+      const info = JSON.parse(out.json) as { error?: string };
+      const data = out.data.slice().buffer;
+      post(info.error ? { type: 'saved', data, error: info.error } : { type: 'saved', data }, [data]);
+    } catch (err) {
+      post({ type: 'saved', data: new ArrayBuffer(0), error: String(err) });
     }
   }
 });

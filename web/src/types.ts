@@ -69,7 +69,9 @@ export interface RepairOut {
 
 export type ToWorker =
   | { type: 'check'; bytes: ArrayBuffer }
-  | { type: 'repair'; bytes: ArrayBuffer; before?: Counts };
+  | { type: 'repair'; bytes: ArrayBuffer; before?: Counts }
+  /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
+  | { type: 'save'; bytes: ArrayBuffer };
 
 export type FromWorker =
   | { type: 'status'; text: string }
@@ -80,4 +82,5 @@ export type FromWorker =
   | { type: 'stage'; job: 'check' | 'repair'; stage: string }
   | { type: 'result'; result: Result }
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
+  | { type: 'saved'; data: ArrayBuffer; error?: string }
   | { type: 'error'; message: string };

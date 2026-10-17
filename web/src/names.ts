@@ -1,7 +1,8 @@
-export type DownloadKind = 'repaired' | 'report-txt' | 'report-csv';
+export type DownloadKind = 'repaired' | 'edited' | 'report-txt' | 'report-csv';
 
 const SUFFIX: Record<DownloadKind, string> = {
   repaired: '-repaired.ged',
+  edited: '-edited.ged',
   'report-txt': '-report.txt',
   'report-csv': '-report.csv',
 };

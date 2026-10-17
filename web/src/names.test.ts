@@ -54,3 +54,11 @@ describe('downloadName', () => {
     expect(downloadName('.ged', 'repaired')).toBe('family-tree-repaired.ged');
   });
 });
+
+describe('the edited file name', () => {
+  it('is <name>-edited.ged', () => {
+    expect(downloadName('royal92.ged', 'edited')).toBe('royal92-edited.ged');
+    expect(downloadName('Family Tree.GED', 'edited')).toBe('Family Tree-edited.ged');
+    expect(downloadName('tree', 'edited')).toBe('tree-edited.ged');
+  });
+});

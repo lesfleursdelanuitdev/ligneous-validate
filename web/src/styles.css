@@ -345,8 +345,10 @@ h1 em { font-style: italic; }
   .file .name::after { display: none; }
 }
 
-.finding { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
-@media (hover: hover) { .finding:not([open]):hover { border-color: var(--dash); } }
+/* The card is the list item: the finding, then its Edit line button. */
+.findings > li { background: var(--card); border: 1px solid var(--border); border-radius: 10px; }
+@media (hover: hover) { .findings > li:not(:has(.finding[open])):hover { border-color: var(--dash); } }
+.finding { border-radius: 10px; }
 .finding summary {
   list-style: none; cursor: pointer; display: flex; flex-direction: column;
   padding: 20px 22px; border-radius: 10px;
@@ -374,6 +376,10 @@ h1 em { font-style: italic; }
 .meaning { margin-top: 6px; font-size: 13px; font-weight: 300; line-height: 1.55; color: var(--muted); overflow-wrap: anywhere; }
 
 .finding .body { padding: 0 22px 22px; min-width: 0; }
+.has-edit .finding .body { padding-bottom: 14px; }
+.edit-row { padding: 0 22px 18px; margin-top: -6px; }
+.has-edit .finding.is-open + .edit-row { margin-top: 0; }
+.open-editor { align-self: flex-end; }
 .finding .body h3 { font-size: 14px; font-weight: 500; color: var(--text); margin: 18px 0 4px; }
 .finding .body > :first-child { margin-top: 0; }
 .finding .body p { margin: 0; font-size: 14px; line-height: 1.6; color: var(--text); overflow-wrap: anywhere; max-width: 72ch; }

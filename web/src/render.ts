@@ -76,6 +76,11 @@ export function viewKind(r: Result): ViewKind {
   return r.findings.length === 0 ? 'clean' : 'report';
 }
 
+/** The finding card's editor button, "Edit line 1,204"; null for a whole-file finding. */
+export function editLabel(line: number): string | null {
+  return line > 0 ? 'Edit line ' + formatNumber(line) : null;
+}
+
 export function lineLabel(line: number): string {
   return line > 0 ? 'Line ' + formatNumber(line) : 'Whole file';
 }
@@ -318,7 +323,7 @@ function withCode(text: string): Node {
  * translate="no" spans, so a browser's translation doesn't send them off or
  * change them; the rest gets its `code` spans.
  */
-function filled(template: string, f: Finding, names: Record<string, string>): Node {
+export function filled(template: string, f: Finding, names: Record<string, string>): Node {
   const frag = document.createDocumentFragment();
   for (const p of fillParts(pageText(template), f, names)) {
     frag.append(p.name ? el('span', { translate: 'no' }, p.text) : withCode(p.text));
@@ -371,7 +376,15 @@ function lineViewer(r: Result, line: number): HTMLElement | null {
   return pre;
 }
 
-function findingItem(f: Finding, r: Result): HTMLElement {
+/** What the report does with the editor buttons (main.ts opens the editor). */
+export interface EditHooks {
+  /** "Edit line N" on a card; `line` is 0 for "Open the editor". */
+  open(line: number, opener: HTMLElement, code?: string): void;
+}
+
+const PENCIL = 'M2 12.5V10l7.25-7.25a1.06 1.06 0 0 1 1.5 0l1 1a1.06 1.06 0 0 1 0 1.5L4.5 12.5Z M8 4l2 2';
+
+function findingItem(f: Finding, r: Result, edit?: EditHooks): HTMLElement {
   const details = el('details', { class: `finding ${f.severity}` });
   const summary = el('summary', {},
     el('span', { class: 'meta' },
@@ -393,10 +406,17 @@ function findingItem(f: Finding, r: Result): HTMLElement {
     }
     return body;
   });
-  return el('li', {}, details);
+  const label = editLabel(f.line);
+  if (!edit || !label) return el('li', {}, details);
+  // Outside the summary (a button can't sit inside one), at the foot of the
+  // card: under the description, or under the lines and the fix when open.
+  const button = el('button', { type: 'button', class: 'more edit-line', 'data-line': String(f.line), 'data-code': f.code },
+    icon('0 0 14 14', PENCIL), label);
+  button.addEventListener('click', () => edit.open(f.line, button, f.code));
+  return el('li', { class: 'has-edit' }, details, el('div', { class: 'edit-row' }, button));
 }
 
-function groupSection(g: ViewGroup, r: Result): HTMLElement {
+function groupSection(g: ViewGroup, r: Result, edit?: EditHooks): HTMLElement {
   const hid = `group-${g.id}`;
   const list = el('ol', { class: 'findings' });
   const section = el('section', { class: 'group', 'aria-labelledby': hid },
@@ -413,7 +433,7 @@ function groupSection(g: ViewGroup, r: Result): HTMLElement {
     const frag = document.createDocumentFragment();
     let firstNew: HTMLElement | null = null;
     for (const f of items) {
-      const li = findingItem(f, r);
+      const li = findingItem(f, r, edit);
       firstNew ??= li;
       frag.append(li);
     }
@@ -520,17 +540,20 @@ export function fillRepairBusy(slot: HTMLElement): void {
 
 const SVG = 'http://www.w3.org/2000/svg';
 
-/** The 14×14 download arrow on the report buttons; decoration only. */
-function downloadIcon(): SVGSVGElement {
+/** A 14×14 stroked icon for a button; decoration only. */
+export function icon(viewBox: string, d: string): SVGSVGElement {
   const svg = document.createElementNS(SVG, 'svg');
-  for (const [k, v] of Object.entries({ viewBox: '0 0 14 14', width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
+  for (const [k, v] of Object.entries({ viewBox, width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
     svg.setAttribute(k, v);
   }
   const path = document.createElementNS(SVG, 'path');
-  path.setAttribute('d', 'M7 1.5v7.5M3.75 5.75 7 9l3.25-3.25M2 12.25h10');
+  path.setAttribute('d', d);
   svg.append(path);
   return svg;
 }
+
+/** The 14×14 download arrow on the report buttons. */
+const downloadIcon = () => icon('0 0 14 14', 'M7 1.5v7.5M3.75 5.75 7 9l3.25-3.25M2 12.25h10');
 
 /** Fills the downloads slot with the two report buttons. */
 export function fillDownloads(slot: HTMLElement, onText: () => void, onCsv: () => void): void {
@@ -552,7 +575,7 @@ export function fillDownloads(slot: HTMLElement, onText: () => void, onCsv: () =
  * no report at all. Returns the empty (hidden) slots for the repair and
  * download parts.
  */
-export function renderReport(root: HTMLElement, r: Result, fileName: string): ReportSlots {
+export function renderReport(root: HTMLElement, r: Result, fileName: string, edit?: EditHooks): ReportSlots {
   const repair = el('div', { class: 'slot', id: 'repair', hidden: '' });
   const downloads = el('div', { class: 'slot', id: 'downloads', hidden: '' });
   const kind = viewKind(r);
@@ -574,12 +597,17 @@ export function renderReport(root: HTMLElement, r: Result, fileName: string): Re
   const drawGroups = () => {
     const vg = buildGroups(r.findings, show);
     groups.replaceChildren(...(vg.length
-      ? vg.map(g => groupSection(g, r))
+      ? vg.map(g => groupSection(g, r, edit))
       : [el('p', { class: 'empty' }, 'Nothing to show. Tick Errors, Warnings or Hints above.')]));
   };
   drawGroups();
   // The toolbar (filters and the report downloads), then the repair card, then the findings.
   const toolbar = el('div', { class: 'toolbar' }, filterControls(counts, show, drawGroups), downloads);
+  if (edit) {
+    const open = el('button', { type: 'button', class: 'more open-editor' }, icon('0 0 14 14', PENCIL), 'Open the editor');
+    open.addEventListener('click', () => edit.open(0, open));
+    toolbar.append(el('div', { class: 'edit-open' }, open));
+  }
   root.replaceChildren(card, toolbar, repair, groups);
   return { repair, downloads };
 }
