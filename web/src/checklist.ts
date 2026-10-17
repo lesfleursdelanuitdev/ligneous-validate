@@ -316,11 +316,28 @@ export interface ExampleRow {
 export interface Example {
   /** 0: the whole file. */
   line: number;
+  /** Where it is: "Line N", "Whole file", or where added lines go. */
+  at: string;
   what: string;
   rows: ExampleRow[];
 }
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * Where a unit is. Added lines have no line of their own (their Line is the
+ * line they go next to), so they say where they go: the submitter's link in
+ * the header; its record and the trailer at the end. A CHAR line that is
+ * there is changed in place; a missing one is added in the header.
+ */
+function whereOf(fix: Fix, u: Unit, own: string | null): string {
+  if (u.line <= 0) return 'Whole file';
+  if (fix === 'submitter') return u.what.startsWith('added a submitter record') ? 'Added at the end' : 'Added in the header';
+  if (fix === 'trailer') return 'Added at the end';
+  if (fix === 'encoding' && (u.lines ?? []).length && !/^\s*1\s+CHAR\b/i.test(own ?? '')) return 'Added in the header';
+  return `Line ${formatNumber(u.line)}`;
+}
+
 const REMOVES: Fix[] = ['broken-links', 'empty-families'];
 
 /**
@@ -349,7 +366,7 @@ export function examples(fix: Fix, c: Checklist, r: Result): { items: Example[];
     } else {
       rows = own !== null ? [{ text: own, added: false, nested: false }] : [];
     }
-    return { line: u.line, what: capital(u.what), rows };
+    return { line: u.line, at: whereOf(fix, u, own), what: capital(u.what), rows };
   });
   return { items, more: units.length - items.length };
 }

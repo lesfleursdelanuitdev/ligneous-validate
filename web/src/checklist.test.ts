@@ -345,14 +345,14 @@ describe('Show lines', () => {
     const r = suggestedResult();
     expect(examples('broken-links', c, r)).toEqual({
       items: [
-        { line: 11, what: "Removed a link to family @F9@, which doesn't exist (and 1 line under it)",
+        { line: 11, at: 'Line 11', what: "Removed a link to family @F9@, which doesn't exist (and 1 line under it)",
           rows: [{ text: '1 FAMC @F9@', added: false, nested: false }, { text: '2 PEDI birth', added: false, nested: true }] },
-        { line: 22, what: "Removed a link to person @I7@, which doesn't exist", rows: [{ text: '1 CHIL @I7@', added: false, nested: false }] },
-        { line: 27, what: "Removed a link to person @I99@, which doesn't exist", rows: [{ text: '1 HUSB @I99@', added: false, nested: false }] },
+        { line: 22, at: 'Line 22', what: "Removed a link to person @I7@, which doesn't exist", rows: [{ text: '1 CHIL @I7@', added: false, nested: false }] },
+        { line: 27, at: 'Line 27', what: "Removed a link to person @I99@, which doesn't exist", rows: [{ text: '1 HUSB @I99@', added: false, nested: false }] },
       ],
       more: 0,
     });
-    expect(examples('blank-lines', c, r)!.items).toEqual([{ line: 18, what: 'Removed a blank line', rows: [{ text: '', added: false, nested: false }] }]);
+    expect(examples('blank-lines', c, r)!.items).toEqual([{ line: 18, at: 'Line 18', what: 'Removed a blank line', rows: [{ text: '', added: false, nested: false }] }]);
   });
   it('follows the combination: with broken-links chosen, empty-families also lists F3', () => {
     const c = newChecklist(PLAN_LINKS.available, PLAN_LINKS.units);
@@ -362,6 +362,25 @@ describe('Show lines', () => {
     const c = newChecklist(PLAN_BLANK_IN_FAM.available, PLAN_BLANK_IN_FAM.units);
     expect(examples('empty-families', c, result())!.items.map(i => i.what))
       .toEqual(['Removed a link to the removed family @F2@', 'Removed an empty family @F2@', 'Removed an empty family @F3@']);
+  });
+  it('labels added lines by where they go, not "Line 1"', () => {
+    const c = newChecklist(PLAN_NAMED.available, PLAN_NAMED.units);
+    expect(examples('submitter', c, suggestedResult())!.items.map(i => i.at))
+      .toEqual(['Added in the header', 'Added at the end']);
+    // The trailer goes at the end; a missing CHAR line is added in the header; a CHAR line that is there is changed in place.
+    const text = '0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR ANSEL\n0 TRLR\n';
+    const t = newChecklist([fi('trailer', 1), fi('encoding', 1)], {
+      trailer: [{ line: 6, what: 'added the end-of-file marker (0 TRLR)', lines: ['0 TRLR'] }],
+      encoding: [{ line: 4, what: 'set the character set to UTF-8', lines: ['1 CHAR UTF-8'] }],
+    });
+    expect(examples('trailer', t, result({ text }))!.items[0].at).toBe('Added at the end');
+    expect(examples('encoding', t, result({ text }))!.items[0].at).toBe('Line 4');
+    const noChar = newChecklist([fi('encoding', 1)], { encoding: [{ line: 1, what: 'set the character set to UTF-8', lines: ['1 CHAR UTF-8'] }] });
+    expect(examples('encoding', noChar, result({ text: '0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 TRLR\n' }))!.items[0].at).toBe('Added in the header');
+    // Removed lines keep their line number; a whole-file change says so.
+    expect(examples('broken-links', newChecklist(PLAN.available, PLAN.units), suggestedResult())!.items[0].at).toBe('Line 11');
+    const whole = newChecklist([fi('line-endings', 3)], { 'line-endings': [{ line: 0, what: 'changed line endings to CRLF' }] });
+    expect(examples('line-endings', whole, result())!.items[0].at).toBe('Whole file');
   });
   it('shows added lines as added', () => {
     const c = newChecklist(PLAN_NAMED.available, PLAN_NAMED.units);

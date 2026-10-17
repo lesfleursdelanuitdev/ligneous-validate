@@ -7,7 +7,7 @@ import {
   selectedLeftOut, setChosen, setName,
 } from './checklist';
 import type { Checklist, Run, RowView } from './checklist';
-import { KEEP_ORIGINAL, OFFER_NOTE, REPAIR_FAILED, el, formatNumber, lineLabel, withCode } from './render';
+import { KEEP_ORIGINAL, OFFER_NOTE, REPAIR_FAILED, el, formatNumber, withCode } from './render';
 import type { Fix, RepairOut, Result } from './types';
 
 export const FORMAT_LEGEND = 'Format fixes';
@@ -169,7 +169,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
           el('code', {}, row.text === '' ? '(blank)' : row.text)));
       }
       list.append(el('li', {},
-        el('p', { class: 'ex-head' }, el('span', { class: 'ex-at' }, item.line > 0 ? lineLabel(item.line) : 'Whole file'),
+        el('p', { class: 'ex-head' }, el('span', { class: 'ex-at' }, item.at),
           ' ', el('span', { class: 'ex-what', translate: 'yes' }, withCode(item.what))),
         item.rows.length ? rowsEl : null));
     }
