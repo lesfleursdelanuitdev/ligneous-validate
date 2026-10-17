@@ -96,13 +96,13 @@ test('e2e: utf16 and cr-only reports and repair', async ({ page }) => {
   await expect(page.locator('#report dd', { hasText: 'UTF-16LE (we can convert this)' })).toBeVisible();
   await expect(page.locator('.finding').first()).toBeVisible();
   await expect(page.locator('#repair')).toBeVisible();
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 3 format problems automatically');
+  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
   await expect(page.locator('#repair')).toContainText('Converted from UTF-16LE to UTF-8');
   await expect(page.locator('#downloads')).toBeVisible();
 
   await upload(page, 'cr-only.ged');
   await expect(page.locator('#report dd', { hasText: 'cr-only.ged' })).toBeVisible();
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 format problem automatically');
+  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
   await expect(page.locator('#repair')).toContainText('Changed line endings to CRLF');
   const { bytes } = await save(page, 'Download repaired file');
   const original = (await readFile(fixture('cr-only.ged'))).toString('latin1');

@@ -2,9 +2,10 @@ import { describe, expect, it } from 'vitest';
 import catalogText from './testdata/catalog.json?raw';
 import {
   FAILED, GROUPS, KEEP_ORIGINAL, OFFER_NOTE, PAGE_SIZE, REPAIR_FAILED, buildGroups, countBySeverity, doneText, groupChanges, leftItems,
-  lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, repairView, severityWord, sizeNote,
+  lineLabel, lineViewerAttrs, lineWindow, noProblemsText, codeParts, repairPlan, severityWord, sizeNote,
   summaryRows, viewKind, visibleSlice,
 } from './render';
+import { resultView } from './checklist';
 import type { Finding, Group, Result, Severity } from './types';
 
 let n = 0;
@@ -203,55 +204,6 @@ describe('lineViewerAttrs', () => {
   });
 });
 
-describe('repairView', () => {
-  const info = (changes: { line: number; what: string }[], left: string[] = []) => ({
-    changes, left, before: { errors: 3, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 1, hints: 0 },
-  });
-
-  it('is null when nothing can be fixed', () => {
-    expect(repairView(info([]), result())).toBeNull();
-  });
-
-  it('uses the singular heading for one change and the plural for more', () => {
-    // A file with a warning: with no findings at all it is an "Optional tidy-up" (tested below).
-    const withWarning = result({ findings: [f('format', 'warning')] });
-    expect(repairView(info([{ line: 0, what: 'a' }]), withWarning)!.heading).toBe('We can fix 1 format problem automatically');
-    expect(repairView(info([{ line: 0, what: 'a' }, { line: 4, what: 'b' }]), withWarning)!.heading)
-      .toBe('We can fix 2 format problems automatically');
-    expect(repairView(info(Array.from({ length: 1500 }, () => ({ line: 1, what: 'x' }))), withWarning)!.heading)
-      .toBe('We can fix 1,500 format problems automatically');
-  });
-
-  it('lists the changes grouped by what was done, with line counts', () => {
-    const v = repairView(info([{ line: 0, what: 'added a trailer' }, { line: 1204, what: 'fixed a thing' }]), result())!;
-    expect(v.changes).toEqual(['Added a trailer', 'Fixed a thing: 1 line (1,204)']);
-  });
-
-  it('gives the counts before and after', () => {
-    const v = repairView(info([{ line: 0, what: 'a' }]), result())!;
-    expect(v.before).toBe('3 errors, 1 warning, 0 hints');
-    expect(v.after).toBe('0 errors, 1 warning, 0 hints');
-  });
-
-  it('shows the GEDCOM 5.5 note only for exactly 5.5', () => {
-    const one = info([{ line: 0, what: 'a' }]);
-    const r55 = result({ summary: { ...result().summary, gedcomVersion: '5.5' } });
-    expect(repairView(one, r55)!.note).toBe("Your file is GEDCOM 5.5, which doesn't officially list UTF-8. Almost every program reads it anyway.");
-    expect(repairView(one, result())!.note).toBeNull();
-  });
-
-  it('maps the codes left to titles with their counts in the current result', () => {
-    const a = { ...f('links', 'error', 5), code: 'ORPHANED_FAMC', title: 'Broken family link' };
-    const b = { ...f('links', 'error', 9), code: 'ORPHANED_FAMC', title: 'Broken family link' };
-    const c = { ...f('dates', 'warning', 7), code: 'DATE_ORDER', title: 'Dates in the wrong order' };
-    const v = repairView(info([{ line: 0, what: 'a' }], ['DATE_ORDER', 'ORPHANED_FAMC', 'GONE']), result({ findings: [a, b, c] }))!;
-    expect(v.left).toEqual([
-      { title: 'Dates in the wrong order', count: 1 },
-      { title: 'Broken family link', count: 2 },
-    ]);
-  });
-});
-
 describe('codeParts', () => {
   it('splits catalog text on backticks into plain and code parts', () => {
     expect(codeParts('End with `0 TRLR`, always.')).toEqual([
@@ -261,16 +213,6 @@ describe('codeParts', () => {
   it('gives one plain part when there are no backticks', () => {
     expect(codeParts('plain')).toEqual([{ text: 'plain', code: false }]);
     expect(codeParts('')).toEqual([]);
-  });
-});
-
-describe('catalog backticks in the repair view', () => {
-  it('keeps them in the view model so the page can draw <code>', () => {
-    const info = { changes: [{ line: 3, what: 'added `0 TRLR`' }], left: ['X'], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 } };
-    const x = { ...f('format', 'warning', 2), code: 'X', title: 'Missing `0 TRLR`' };
-    const v = repairView(info, result({ findings: [x] }))!;
-    expect(v.changes).toEqual(['Added `0 TRLR`: 1 line (3)']);
-    expect(v.left[0].title).toBe('Missing `0 TRLR`');
   });
 });
 
@@ -300,18 +242,7 @@ describe('groupChanges', () => {
   });
 });
 
-describe('repairView headings and notes', () => {
-  const one = { changes: [{ line: 0, what: 'removed the byte order mark' }], left: [], before: { errors: 0, warnings: 0, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 } };
-  it('calls it an optional tidy-up for a file with no findings', () => {
-    expect(repairView(one, result())!.heading).toBe('Optional tidy-up');
-  });
-  it('calls it an optional tidy-up when there are only hints', () => {
-    expect(repairView(one, result({ findings: [f('names', 'hint'), f('dates', 'hint')] }))!.heading).toBe('Optional tidy-up');
-  });
-  it('keeps "We can fix" when there is a warning or an error', () => {
-    expect(repairView(one, result({ findings: [f('names', 'hint'), f('format', 'warning')] }))!.heading)
-      .toBe('We can fix 1 format problem automatically');
-  });
+describe('repair strings', () => {
   it('has the strings the slot shows', () => {
     expect(REPAIR_FAILED).toBe("We couldn't make a repaired copy of this file.");
     expect(KEEP_ORIGINAL).toBe('Keep your original file. This is a new copy.');
@@ -349,6 +280,12 @@ describe('repairPlan', () => {
     expect(repairPlan(clean({ bareCR: true }), 1000)).toBe('auto');
     expect(repairPlan(clean({ encoding: { detected: 'ANSEL', declared: 'ANSEL', reason: '' } }), 1000)).toBe('auto');
     expect(repairPlan(clean({ findings: [f('format', 'warning')] }), 5 * MB)).toBe('auto');
+  });
+  it('repairs a small file whose findings a suggested fix can fix', () => {
+    expect(repairPlan(clean({ findings: [{ ...f('header', 'warning'), code: 'HEADER_MISSING_SUBM' }] }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ findings: [{ ...f('links', 'error'), code: 'ORPHANED_FAMC' }] }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ findings: [{ ...f('links', 'warning'), code: 'EMPTY_FAMILY' }] }), 1000)).toBe('auto');
+    expect(repairPlan(clean({ findings: [{ ...f('links', 'error'), code: 'ORPHANED_FAMC' }] }), 6 * MB)).toBe('offer');
   });
   it('only offers the repair above 5 MB', () => {
     expect(repairPlan(clean({ findings: [f('format', 'warning')] }), 5 * MB + 1)).toBe('offer');
@@ -407,10 +344,10 @@ describe('leftItems: what the repair leaves, without anyone\'s name', () => {
       .toEqual([{ title: 'A line is longer than GEDCOM allows', count: 2 }]);
   });
 
-  it('is what repairView lists', () => {
+  it('is what the result view lists', () => {
     const e = catalog.find(x => x.Code === 'DEATH_BEFORE_BIRTH')!;
     const info = { changes: [{ line: 1, what: 'a' }], left: [e.Code], before: { errors: 0, warnings: 1, hints: 0 }, after: { errors: 0, warnings: 1, hints: 0 } };
-    expect(repairView(info, result({ findings: [hit(e)], names }))!.left)
+    expect(resultView(info, result({ findings: [hit(e)], names }), []).left)
       .toEqual([{ title: 'Someone died before they were born', count: 1 }]);
   });
 });

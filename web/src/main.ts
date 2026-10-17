@@ -3,11 +3,14 @@ import { reportCsv, reportText } from './export';
 import { downloadName } from './names';
 import { CHECK_STAGES, REPAIR_STAGES, stagePercent } from './progress';
 import {
-  FAILED, countBySeverity, doneText, fillDownloads, fillRepair, fillRepairBusy, fillRepairFailed, fillRepairOffer, renderReport,
-  repairPlan, sizeNote, viewKind,
+  FAILED, REPAIR_FAILED, countBySeverity, doneText, fillDownloads, fillRepairFailed, renderReport, repairPlan, sizeNote, viewKind,
 } from './render';
 import type { ReportSlots } from './render';
-import type { FromWorker, RepairOut, Result } from './types';
+import { announce, estimateAvailable, markRan, newChecklist, selectedFixes, setAvailable } from './checklist';
+import type { Checklist, Run } from './checklist';
+import { mountRepairCard } from './repaircard';
+import type { RepairCard } from './repaircard';
+import type { FixInfo, FromWorker, PlanOut, RepairOptions, RepairOut, Result } from './types';
 
 const NO_WASM = "This browser couldn't start the checker. Try a current version of Firefox, Chrome, Safari or Edge.";
 const LOAD_FAILED = "The checker didn't finish loading. Check your connection and try again.";
@@ -25,14 +28,36 @@ const bar = progressBar($<HTMLElement>('progress'));
 
 const LOADING = 'Getting the checker ready…';
 const MAKING_REPAIR = 'Making a repaired copy…';
+const MB = 1024 * 1024;
+/** Above this, nothing runs by itself: the checklist comes from planRepair or the findings. */
+const AUTO_LIMIT = 5 * MB;
+/**
+ * planRepair costs about as much as a check (the library writes and checks
+ * the unchanged copy), so above this the checklist is estimated from the
+ * findings instead.
+ */
+const PLAN_LIMIT = 10 * MB;
 
 let worker: Worker | null = null;
 let ready = false; // the current worker has loaded the checker
 let busy = false; // a check is running
 let repairing = false; // a repair has been asked for and not answered yet
+let planning = false; // planRepair has been asked for and not answered yet
 let broken = false;
 let current: File | null = null;
-let shown: { file: File; result: Result; slots: ReportSlots; repair: RepairOut | null } | null = null;
+interface Shown {
+  file: File;
+  result: Result;
+  slots: ReportSlots;
+  /** The run on screen and its bytes. */
+  repair: RepairOut | null;
+  data: ArrayBuffer | null;
+  checklist: Checklist | null;
+  card: RepairCard | null;
+  /** The run the visitor asked for, while it runs. */
+  pending: Run | null;
+}
+let shown: Shown | null = null;
 let loadPercent = 0; // how much of the current worker's checker has downloaded
 let barRepair = false; // the bar is showing a repair the visitor asked for
 
@@ -101,7 +126,7 @@ function onResult(result: Result) {
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
   const slots = renderReport(report, result, file.name);
-  const view = { file, result, slots, repair: null as RepairOut | null };
+  const view: Shown = { file, result, slots, repair: null, data: null, checklist: null, card: null, pending: null };
   shown = view;
   if (kind === 'report') {
     fillDownloads(slots.downloads,
@@ -114,18 +139,48 @@ function onResult(result: Result) {
   }
   const plan = repairPlan(result, file.size);
   if (plan === 'auto') void askRepair(file, false);
-  else if (plan === 'offer') offerRepair();
+  else if (plan === 'offer') {
+    // Nothing runs by itself: the checklist from the findings, then from planRepair when that is cheap.
+    showCard(view, estimateAvailable(result), 'findings');
+    if (file.size <= PLAN_LIMIT) void askPlan(file);
+  }
 }
 
-function offerRepair() {
-  if (!shown) return;
-  const { file, slots } = shown;
-  fillRepairOffer(slots.repair, () => {
-    fillRepairBusy(slots.repair);
-    barRepair = true;
-    bar.show(MAKING_REPAIR, 0);
-    void askRepair(file, true);
+/** Puts up the checklist for the file on screen (once), or gives it a new list of kinds. */
+function showCard(view: Shown, available: FixInfo[], source: 'repair' | 'plan' | 'findings') {
+  if (view.checklist) {
+    setAvailable(view.checklist, available, source);
+    view.card?.redraw();
+    return;
+  }
+  const c = newChecklist(available, source, view.result);
+  view.checklist = c;
+  view.card = mountRepairCard(view.slots.repair, {
+    result: view.result, checklist: c, big: view.file.size > AUTO_LIMIT,
+    onRun: run => runAsked(view, run),
+    onDownload: () => {
+      if (view.data) save(view.data, 'application/octet-stream', downloadName(view.file.name, 'repaired'));
+    },
   });
+}
+
+/** "Repair everything" or "Repair selected": a run with the bar and Stop; big files get a fresh worker. */
+function runAsked(view: Shown, run: Run) {
+  if (shown !== view || busy || repairing) return;
+  view.pending = run;
+  view.card?.setBusy(true);
+  barRepair = true;
+  bar.show(MAKING_REPAIR, 0);
+  const options: RepairOptions = { fixes: run.fixes };
+  if (run.fixes.includes('submitter')) options.submitterName = run.name;
+  void askRepair(view.file, view.file.size > AUTO_LIMIT, options);
+  controls();
+}
+
+/** A run asked for has ended without a result: the checklist stays and can be run again. */
+function runEnded(view: Shown) {
+  view.pending = null;
+  view.card?.setBusy(false);
 }
 
 /** The asked-for repair has ended: the bar fills and fades, or goes at once on a failure. */
@@ -145,12 +200,35 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   if (!shown || shown.file !== current) return;
   const view = shown;
   if (info.error) {
-    fillRepairFailed(view.slots.repair);
+    if (view.card) {
+      view.card.showFailed();
+      if (view.pending) say(REPAIR_FAILED, '', 'problem');
+      runEnded(view);
+    } else {
+      fillRepairFailed(view.slots.repair);
+    }
     return;
   }
+  // An older checker (or a test's fake) may leave out the list of kinds: estimate it.
+  const available = info.available ?? estimateAvailable(view.result);
+  if (!view.checklist && available.length === 0 && info.changes.length === 0) return; // nothing to fix
   view.repair = info;
-  fillRepair(view.slots.repair, info, view.result, () =>
-    save(data, 'application/octet-stream', downloadName(view.file.name, 'repaired')));
+  view.data = data;
+  showCard(view, available, info.available ? 'repair' : 'findings');
+  const c = view.checklist!;
+  const run: Run = view.pending ?? { fixes: selectedFixes(c), name: '', leftOut: [] };
+  markRan(c, run, info);
+  view.card!.showResult(info);
+  if (view.pending) say(announce(info, run.leftOut));
+  runEnded(view);
+}
+
+function onPlanned(info: PlanOut) {
+  planning = false;
+  // A failed plan (out of memory, say) can leave the runtime dead; the estimate stays.
+  if (info.error) { restart(); return; }
+  if (!shown || shown.file !== current || !shown.checklist || shown.checklist.source !== 'findings') return;
+  showCard(shown, info.available, 'plan');
 }
 
 function onMessage(e: MessageEvent<FromWorker>) {
@@ -175,6 +253,8 @@ function onMessage(e: MessageEvent<FromWorker>) {
     onResult(msg.result);
   } else if (msg.type === 'repaired') {
     onRepaired(msg.data, msg.info);
+  } else if (msg.type === 'planned') {
+    onPlanned(msg.info);
   }
   controls();
 }
@@ -189,7 +269,9 @@ function onWorkerError() {
     repairing = false;
     repairBarEnd(false);
     restart();
-    if (shown && shown.file === current) fillRepairFailed(shown.slots.repair);
+    if (shown && shown.file === current) {
+      if (shown.card) { shown.card.showFailed(); runEnded(shown); } else fillRepairFailed(shown.slots.repair);
+    }
     controls();
   } else {
     restart();
@@ -207,27 +289,48 @@ function start(): Worker {
 function restart() {
   worker?.terminate();
   repairing = false;
+  planning = false;
   ready = false;
   loadPercent = 0;
   worker = start();
 }
 
-/** Asks for a repaired copy, giving the counts the page already has. `fresh` starts a new worker first. */
-async function askRepair(file: File, fresh: boolean) {
+/**
+ * Asks for a repaired copy, giving the counts the page already has, with the
+ * fixes chosen (none given: every format kind). `fresh` starts a new worker first.
+ */
+async function askRepair(file: File, fresh: boolean, options?: RepairOptions) {
   let bytes: ArrayBuffer;
   try {
     bytes = await file.arrayBuffer();
   } catch {
-    if (shown && shown.file === file) fillRepairFailed(shown.slots.repair);
+    if (shown && shown.file === file) {
+      if (shown.card) { shown.card.showFailed(); runEnded(shown); } else fillRepairFailed(shown.slots.repair);
+    }
     repairBarEnd(false);
+    controls();
     return;
   }
   if (current !== file || !shown) { repairBarEnd(false); return; }
-  if (fresh) restart();
+  if (fresh || planning) restart();
   const c = countBySeverity(shown.result.findings);
   repairing = true;
-  worker?.postMessage({ type: 'repair', bytes, before: { errors: c.error, warnings: c.warning, hints: c.hint } }, [bytes]);
+  const before = { errors: c.error, warnings: c.warning, hints: c.hint };
+  worker?.postMessage(options ? { type: 'repair', bytes, before, options } : { type: 'repair', bytes, before }, [bytes]);
   controls();
+}
+
+/** Asks for the list of kinds of fix only (planRepair), for the checklist of a big file. */
+async function askPlan(file: File) {
+  let bytes: ArrayBuffer;
+  try {
+    bytes = await file.arrayBuffer();
+  } catch {
+    return; // the estimate stays
+  }
+  if (current !== file || !shown || busy || repairing) return;
+  planning = true;
+  worker?.postMessage({ type: 'plan', bytes }, [bytes]);
 }
 
 async function check(file: File) {
@@ -235,7 +338,7 @@ async function check(file: File) {
   current = file;
   // A file chosen while another is being checked, or while a repair is still running, gets a
   // fresh runtime: the old one is busy, or may have died.
-  if (busy || repairing) restart();
+  if (busy || repairing || planning) restart();
   busy = true;
   barRepair = false;
   shown = null;
@@ -269,10 +372,10 @@ stop.addEventListener('click', () => {
     report.replaceChildren();
     say('Stopped.');
   } else if (repairing) {
-    // The report stays; the repaired copy can be asked for again.
+    // The report and the checklist stay; the repaired copy can be asked for again.
     restart();
     say('Stopped.');
-    offerRepair();
+    if (shown) runEnded(shown);
   }
   controls();
   choose.focus();

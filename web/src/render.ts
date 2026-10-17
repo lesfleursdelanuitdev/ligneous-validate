@@ -4,7 +4,7 @@
 
 import { fillParts, genericTitle, pageText } from './fill';
 import { smoothDetails } from './toggle';
-import type { Counts, Finding, Group, RepairOut, Result, Severity } from './types';
+import type { Finding, Group, RepairOut, Result, Severity } from './types';
 
 // ---------------------------------------------------------------- view model
 
@@ -109,6 +109,20 @@ function lineStarts(text: string): number[] {
   return s;
 }
 
+/** The number of lines in text (a trailing line end doesn't start another). */
+export function lineCount(text: string): number {
+  const s = lineStarts(text);
+  return s[s.length - 1] === text.length && text.length > 0 ? s.length - 1 : s.length;
+}
+
+/** Line n (1-based) of text without its line end, or null when there is no such line. */
+export function lineText(text: string, n: number): string | null {
+  const s = lineStarts(text);
+  if (n < 1 || n > lineCount(text)) return null;
+  const end = n < s.length ? s[n] : text.length;
+  return text.slice(s[n - 1], end).replace(/\r?\n$|\r$/, '');
+}
+
 export interface WindowLine {
   n: number;
   text: string;
@@ -178,15 +192,18 @@ export function sizeNote(bytes: number): string {
   return 'This is a large file, so checking may take a minute or so. You can use other tabs meanwhile.';
 }
 
+/** Findings a suggested fix (a data kind of repair) can fix; see checklist.ts. */
+const DATA_CODE = /^(ORPHANED_(FAMC|FAMS|HUSB|WIFE|CHIL|SOUR|NOTE|XREF_OTHER|ASSOCIATE_XREF)|EMPTY_FAMILY|HEADER_MISSING_SUBM)$/;
+
 /**
  * Whether to make a repaired copy straight away ('auto'), only on request
  * ('offer', above 5 MB, where it is slow and memory-hungry), or not at all
- * ('skip': nothing the repair could fix).
+ * ('skip': nothing the repair could fix, format or suggested).
  */
 export function repairPlan(r: Result, size: number): 'skip' | 'auto' | 'offer' {
   const kind = viewKind(r);
   if (kind === 'failed' || kind === 'not-gedcom') return 'skip';
-  const format = r.findings.some(f => f.group === 'format' || f.group === '');
+  const format = r.findings.some(f => f.group === 'format' || f.group === '' || DATA_CODE.test(f.code));
   const plain = r.encoding.detected === 'UTF-8' || r.encoding.detected === 'ASCII';
   if (!format && plain && !r.bom && !r.bareCR) return 'skip';
   return size > 5 * MB ? 'offer' : 'auto';
@@ -198,20 +215,6 @@ export interface LeftItem {
   /** The title is a group heading, standing in for titles that need details. */
   heading?: true;
 }
-
-export interface RepairView {
-  heading: string;
-  changes: string[];
-  before: string;
-  after: string;
-  /** Shown under the button; null when it doesn't apply. */
-  note: string | null;
-  /** Problems the repair can't fix, with how many there are in the file. */
-  left: LeftItem[];
-}
-
-const countsText = (c: Counts): string =>
-  `${countLabel('error', c.errors)}, ${countLabel('warning', c.warnings)}, ${countLabel('hint', c.hints)}`;
 
 const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
 
@@ -264,28 +267,11 @@ export function leftItems(codes: string[], r: Result): LeftItem[] {
   return [...byText.values()].sort((x, y) => x.at - y.at).map(e => e.item);
 }
 
-/** What the repair section shows; null (section hidden) when nothing can be fixed. */
-export function repairView(info: RepairOut, r: Result): RepairView | null {
-  const n = info.changes.length;
-  if (n === 0) return null;
-  const onlyHints = r.findings.every(f => f.severity === 'hint');
-  return {
-    heading: onlyHints
-      ? 'Optional tidy-up'
-      : `We can fix ${formatNumber(n)} format ${n === 1 ? 'problem' : 'problems'} automatically`,
-    changes: groupChanges(info.changes),
-    before: countsText(info.before),
-    after: countsText(info.after),
-    note: r.summary.gedcomVersion === '5.5' ? NOTE_55 : null,
-    left: leftItems(info.left, r),
-  };
-}
-
 // ---------------------------------------------------------------- DOM
 
-type Kids = (Node | string | null | undefined | false)[];
+export type Kids = (Node | string | null | undefined | false)[];
 
-function el<K extends keyof HTMLElementTagNameMap>(
+export function el<K extends keyof HTMLElementTagNameMap>(
   tag: K, attrs: Record<string, string> = {}, ...kids: Kids
 ): HTMLElementTagNameMap[K] {
   const e = document.createElement(tag);
@@ -307,7 +293,7 @@ export function codeParts(text: string): { text: string; code: boolean }[] {
 }
 
 /** Text with `code` spans, as the catalog writes GEDCOM examples. */
-function withCode(text: string): Node {
+export function withCode(text: string): Node {
   const frag = document.createDocumentFragment();
   for (const p of codeParts(text)) frag.append(p.code ? el('code', { translate: 'no' }, p.text) : p.text);
   return frag;
@@ -451,46 +437,10 @@ function filterControls(counts: Record<Severity, number>, show: SeverityFilter, 
 }
 
 export interface ReportSlots {
-  /** Filled by fillRepair() once the repair has run. */
+  /** Filled by the repair card (repaircard.ts). */
   repair: HTMLElement;
   /** Filled by fillDownloads(). */
   downloads: HTMLElement;
-}
-
-/** Fills the repair slot; leaves it hidden when there is nothing to fix. */
-export function fillRepair(slot: HTMLElement, info: RepairOut, r: Result, onDownload: () => void): void {
-  const v = repairView(info, r);
-  if (!v) {
-    slot.replaceChildren();
-    slot.hidden = true;
-    return;
-  }
-  const button = el('button', { type: 'button', class: 'primary' }, 'Download repaired file');
-  button.addEventListener('click', onDownload);
-  // Appended one by one: a list can be long, and spreading it into a call
-  // overflows the stack.
-  const changes = el('ul', { class: 'changes' });
-  for (const c of v.changes) changes.append(el('li', {}, withCode(c)));
-  const parts: Kids = [
-    el('h2', { id: 'repair-h' }, v.heading),
-    changes,
-    el('p', { class: 'counts' }, `Before: ${v.before}. After: ${v.after}.`),
-    el('div', { class: 'repair-row' }, button, el('p', { class: 'keep' }, KEEP_ORIGINAL)),
-    v.note ? el('p', { class: 'note55' }, v.note) : null,
-  ];
-  if (v.left.length) {
-    const left = el('ul', { class: 'left' });
-    for (const l of v.left) {
-      left.append(l.heading
-        ? el('li', {}, `${l.title}: ${formatNumber(l.count)}`)
-        : el('li', {}, withCode(l.title), ` (${formatNumber(l.count)})`));
-    }
-    parts.push(el('h3', {}, 'These need fixing in your family tree program:'), left);
-  }
-  slot.replaceChildren();
-  for (const p of parts) if (p) slot.append(p);
-  slot.setAttribute('aria-labelledby', 'repair-h');
-  slot.hidden = false;
 }
 
 /** The repair slot after a repair that failed: one line. */
@@ -500,28 +450,10 @@ export function fillRepairFailed(slot: HTMLElement): void {
   slot.hidden = false;
 }
 
-/** The repair slot for a big file: a button that makes the repaired copy on request. */
-export function fillRepairOffer(slot: HTMLElement, onMake: () => void): void {
-  const button = el('button', { type: 'button', class: 'primary' }, 'Make a repaired copy');
-  button.addEventListener('click', onMake);
-  slot.setAttribute('aria-labelledby', 'repair-h');
-  slot.replaceChildren(
-    el('h2', { id: 'repair-h' }, 'Repaired copy'),
-    el('div', { class: 'repair-row' }, button, el('p', { class: 'keep' }, OFFER_NOTE)));
-  slot.hidden = false;
-}
-
-/** The repair slot while a requested repair runs. */
-export function fillRepairBusy(slot: HTMLElement): void {
-  slot.setAttribute('aria-labelledby', 'repair-h');
-  slot.replaceChildren(el('h2', { id: 'repair-h' }, 'Repaired copy'), el('p', {}, 'Making a repaired copy…'));
-  slot.hidden = false;
-}
-
 const SVG = 'http://www.w3.org/2000/svg';
 
 /** The 14×14 download arrow on the report buttons; decoration only. */
-function downloadIcon(): SVGSVGElement {
+export function downloadIcon(): SVGSVGElement {
   const svg = document.createElementNS(SVG, 'svg');
   for (const [k, v] of Object.entries({ viewBox: '0 0 14 14', width: '14', height: '14', 'aria-hidden': 'true', focusable: 'false' })) {
     svg.setAttribute(k, v);

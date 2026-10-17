@@ -3,7 +3,7 @@
 // created.
 
 import { downloadPercent, readWithProgress } from './progress';
-import type { Counts, FromWorker, RepairOut, Result, ToWorker } from './types';
+import type { Counts, FromWorker, PlanOut, RepairOptions, RepairOut, Result, ToWorker } from './types';
 
 /** The size of ligneous.wasm, baked in at build time (web/vite.config.ts). */
 declare const __WASM_SIZE__: number;
@@ -15,7 +15,8 @@ interface GoRuntime {
 
 interface Api {
   check(bytes: Uint8Array, progress?: (stage: string) => void): string;
-  repair(bytes: Uint8Array, before?: Counts, progress?: (stage: string) => void): { data: Uint8Array; json: string };
+  repair(bytes: Uint8Array, before?: Counts, options?: RepairOptions, progress?: (stage: string) => void): { data: Uint8Array; json: string };
+  planRepair(bytes: Uint8Array): string;
 }
 
 interface WorkerScope {
@@ -103,12 +104,21 @@ scope.addEventListener('message', async e => {
     post({ type: 'result', result });
   } else if (msg.type === 'repair') {
     try {
-      const out = api.repair(bytes, msg.before, stage => post({ type: 'stage', job: 'repair', stage }));
+      const out = api.repair(bytes, msg.before, msg.options, stage => post({ type: 'stage', job: 'repair', stage }));
       const info = JSON.parse(out.json) as RepairOut;
       const data = out.data.slice().buffer; // its own buffer, sized exactly
       post({ type: 'repaired', data, info }, [data]);
     } catch (err) {
       post({ type: 'repaired', data: new ArrayBuffer(0), info: { changes: [], left: [], before: { errors: 0, warnings: 0, hints: 0 }, after: { errors: 0, warnings: 0, hints: 0 }, error: String(err) } });
     }
+  } else if (msg.type === 'plan') {
+    let info: PlanOut;
+    try {
+      const parsed = JSON.parse(api.planRepair(bytes)) as PlanOut | { error: string };
+      info = 'available' in parsed ? parsed : { available: [], error: parsed.error };
+    } catch (err) {
+      info = { available: [], error: String(err) };
+    }
+    post({ type: 'planned', info });
   }
 });

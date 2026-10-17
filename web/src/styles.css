@@ -322,6 +322,95 @@ h1 em { font-style: italic; }
 #repair h2 + p { margin: 0; }
 #repair .note55 { font-size: 13px; color: var(--muted); margin: 14px 0 0; }
 
+/* The checklist: one fieldset per group, a row per kind of fix. */
+#repair .checklist { display: flex; flex-direction: column; gap: 20px; }
+#repair .fix-groups { display: flex; flex-direction: column; gap: 20px; }
+#repair .fixes { margin: 0; padding: 0; border: 0; min-width: 0; }
+#repair .fixes legend {
+  float: left; width: 100%; padding: 0; margin: 0 0 6px; font-size: 12px; font-weight: 400; letter-spacing: 0.5px; text-transform: uppercase; color: var(--light);
+}
+#repair .fixes.suggested { padding-top: 20px; border-top: 1px solid var(--border-soft); }
+#repair .warn {
+  margin: 4px 0 8px; padding: 10px 14px; font-size: 13px; font-weight: 400; line-height: 1.5; color: var(--text);
+  background: var(--amber-tint); border-left: 3px solid var(--amber); border-radius: 6px;
+}
+#repair ul.fix-list { list-style: none; margin: 0; padding: 0; clear: both; }
+#repair .warn { clear: both; }
+#repair .fix { padding: 2px 0 6px; border-bottom: 1px solid var(--border-soft); }
+#repair .fix:last-child { border-bottom: 0; }
+#repair .fix-label {
+  display: flex; align-items: center; gap: 12px; min-height: 44px; padding: 8px 0;
+  font-size: 14px; font-weight: 400; line-height: 1.45; color: var(--text); cursor: pointer;
+}
+#repair .fix-label input {
+  flex: none; width: 18px; height: 18px; margin: 0; accent-color: var(--accent); cursor: pointer;
+}
+#repair .fix-text { overflow-wrap: anywhere; min-width: 0; }
+#repair .fix-count { font-size: 13px; font-weight: 300; color: var(--light); font-variant-numeric: tabular-nums; white-space: nowrap; }
+#repair .fix-count:not(:empty)::before { content: "· "; color: var(--divider); }
+#repair .fix.is-disabled .fix-label { color: var(--muted); cursor: default; }
+#repair .fix.is-disabled .fix-label input { cursor: default; }
+#repair .fix-reason, #repair .fix-note { margin: 0 0 6px 30px; font-size: 13px; line-height: 1.5; color: var(--muted); max-width: 72ch; }
+#repair .fix-note { color: var(--accent); font-weight: 400; }
+#repair .fix-name { margin: 2px 0 10px 30px; display: flex; flex-direction: column; gap: 6px; max-width: 360px; }
+#repair .fix-name label { font-size: 13px; font-weight: 500; color: var(--text); }
+#repair .fix-name input {
+  min-height: 44px; padding: 10px 12px; font: inherit; font-size: 16px; font-weight: 400; color: var(--text);
+  background: var(--card); border: 1px solid var(--dash); border-radius: 6px;
+}
+#repair .fix-name input:focus-visible { outline-offset: 1px; border-color: var(--accent); }
+#repair .fix-lines { margin: 0 0 4px 30px; }
+#repair .show-lines {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px; padding: 0; border: 0; background: none;
+  font-size: 13px; font-weight: 500; color: var(--accent);
+}
+@media (pointer: coarse) { #repair .show-lines { min-height: 44px; } }
+#repair .show-lines::after {
+  content: ""; width: 6px; height: 6px; border: solid currentColor; border-width: 0 1.5px 1.5px 0;
+  transform: translateY(-2px) rotate(45deg); transition: transform 200ms ease-out;
+}
+#repair .show-lines[aria-expanded="true"]::after { transform: translateY(1px) rotate(-135deg); }
+@media (hover: hover) { #repair .show-lines:hover { color: var(--amber); } }
+#repair .fix-lines-body { padding: 4px 0 8px; }
+#repair .fix-lines-body p { margin: 0; font-size: 13px; color: var(--muted); }
+#repair ol.ex, #repair ol.ex-nested { list-style: none; margin: 0; padding: 0; }
+#repair ol.ex {
+  padding: 8px 0; background: var(--tint); border: 1px solid var(--border-soft); border-radius: 8px;
+  overflow-x: auto; overscroll-behavior-x: contain;
+}
+#repair ol.ex li { padding: 0; }
+#repair .ex-line { display: flex; gap: 14px; width: max-content; min-width: 100%; padding: 1px 14px; font-size: 13px; line-height: 1.6; }
+#repair .ex-line.nested { padding-left: 34px; }
+#repair .ex-at { flex: none; width: 82px; color: var(--faint-strong); font-variant-numeric: tabular-nums; }
+#repair .ex-line code { background: none; padding: 0; white-space: pre; font-size: 13px; }
+#repair .ex-more { margin: 6px 0 0; font-size: 13px; color: var(--light); }
+#repair .run-row { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 12px; }
+#repair .run { min-height: 44px; padding: 10px 20px; font-size: 14px; }
+#repair .run.primary { border: 0; }
+#repair .run[aria-busy="true"]::before {
+  content: ""; width: 12px; height: 12px; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent;
+  animation: spin 800ms linear infinite;
+}
+#repair button:disabled { cursor: progress; opacity: 0.7; }
+@keyframes spin { to { transform: rotate(360deg); } }
+#repair .offer { margin: 0; font-size: 13px; color: var(--light); }
+#repair .run-note { margin: 0; font-size: 13px; color: var(--muted); }
+#repair .run-note:empty { display: none; }
+
+/* After a run. */
+#repair .result { margin-top: 4px; }
+#repair .result > h3:first-child { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; }
+#repair .stale {
+  padding: 2px 10px; border-radius: 4px; font-size: 12px; font-weight: 600; letter-spacing: 0.3px;
+  background: var(--amber-tint); color: var(--amber);
+}
+#repair h4 { margin: 16px 0 6px; font-size: 13px; font-weight: 500; color: var(--text); }
+#repair h4 .applied { font-weight: 300; color: var(--light); font-variant-numeric: tabular-nums; }
+#repair .result.is-stale .changes, #repair .result.is-stale .counts { color: var(--muted); }
+#repair .not-applied li { color: var(--text); }
+#repair .na-label { font-weight: 500; }
+#repair .nothing { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+
 /* Findings. */
 .group { padding-top: 32px; }
 .group + .group { padding-top: 40px; }
@@ -413,4 +502,5 @@ footer a { display: inline-flex; align-items: center; min-height: 24px; font-siz
 
 @media (prefers-reduced-motion: reduce) {
   * { transition: none !important; }
+  #repair .run[aria-busy="true"]::before { animation: none; }
 }

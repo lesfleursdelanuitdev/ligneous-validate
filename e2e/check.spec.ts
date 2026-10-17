@@ -54,7 +54,7 @@ test('e2e: downloads', async ({ page }) => {
   // A file with no end marker: the repair adds "0 TRLR", and the catalog's `0 TRLR` shows as <code>.
   await page.locator('#file').setInputFiles(fixture('no-trailer.ged'));
   await expect(page.locator('#repair')).toBeVisible();
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 format problem automatically');
+  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
   await expect(page.locator('#report')).not.toContainText('`');
   await expect(page.locator('.finding .meaning code').first()).toHaveText('0 TRLR');
 

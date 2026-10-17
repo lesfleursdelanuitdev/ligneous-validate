@@ -177,20 +177,24 @@ test('e2e: under 10 MB there is no size note', async ({ page }) => {
   await expect(page.locator('#status')).toHaveText('Stopped.');
 });
 
-test('e2e: above 5 MB the repair waits for a click and runs in a fresh worker', async ({ page }) => {
+test('e2e: above 5 MB the repair waits for a click on the checklist and runs in a fresh worker', async ({ page }) => {
   test.setTimeout(300_000);
   await instrument(page);
   await page.goto('/');
   const path = bigFile(5 * 1024 * 1024 + 50_000, '\n'); // one blank line: a format problem
   await page.locator('#file').setInputFiles(path);
   await expect(page.locator('#status')).toHaveText(/^Checked: /, { timeout: 240_000 });
-  const make = page.getByRole('button', { name: 'Make a repaired copy' });
+  const make = page.getByRole('button', { name: 'Repair selected (1)' });
   await expect(make).toBeVisible();
+  await expect(page.getByRole('checkbox', { name: 'Remove blank lines' })).toBeChecked();
   await expect(page.locator('#repair')).toContainText('This may take a minute or so.');
   expect(await sent(page)).not.toContain('repair');
+  // Up to 10 MB the checklist is filled from planRepair (its own message, not a repair).
+  await expect.poll(() => sent(page), { timeout: 240_000 }).toContain('plan');
   const before = await made(page);
   await make.click();
-  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 format problem automatically', { timeout: 240_000 });
+  await expect(page.locator('#repair .changes li').first()).toBeVisible({ timeout: 240_000 });
+  await expect(page.locator('#repair h2')).toHaveText('We can fix 1 kind of format problem');
   expect(await made(page)).toBe(before + 1);
   await expect(page.locator('#repair .changes li')).toHaveText([/^Removed a blank line: 1 line \(\d[\d,]*\)$/]);
   await expect(page.getByRole('button', { name: 'Download repaired file' })).toBeVisible();

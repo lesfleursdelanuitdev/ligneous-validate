@@ -1,6 +1,6 @@
 # ligneous-validate
 
-The source of https://validate.ligneous.org/, a page that checks a GEDCOM family tree file in your browser and lists every problem in plain English, with the line it is on. It can also write a repaired copy for format problems it can fix on its own.
+The source of https://validate.ligneous.org/, a page that checks a GEDCOM family tree file in your browser and lists every problem in plain English, with the line it is on. It can also write a repaired copy: a checklist lets you choose which fixes to apply, from format fixes (ticked by default) to suggested fixes that change the family data (unticked until you tick them).
 
 ## Privacy
 
@@ -17,13 +17,13 @@ You need Go 1.23+ and Node.js.
 
     npm install
     npm run build     # builds the wasm checker, then the page into web/dist/
-    npm run check     # go tests, unit tests, build, and browser (Playwright) tests
+    npm run check     # go tests, wasm tests (under Node), unit tests, build, and browser (Playwright) tests
 
 `npm run dev` serves the page locally. The e2e tests need a Chromium for Playwright. They use `chromium_headless_shell-1243` from `~/.cache/ms-playwright` when it is there, and otherwise Playwright's default Chromium (`npx playwright install chromium`). The 20 MB file test takes a couple of minutes.
 
 ## Layout
 
-- `check/` Go package: runs the checks, groups and words the findings, and repairs format problems.
+- `check/` Go package: runs the checks, groups and words the findings, and makes the repaired copy with the fixes chosen.
 - `wasm/` the small Go `main` that exposes `check` to JavaScript.
 - `web/` the page (TypeScript, Vite, no runtime dependencies) and its worker.
 - `e2e/` Playwright tests and fixtures.
