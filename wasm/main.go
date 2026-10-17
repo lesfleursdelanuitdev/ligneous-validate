@@ -67,16 +67,23 @@ func repairFn(_ js.Value, args []js.Value) (ret any) {
 	}
 	// An optional second argument {errors, warnings, hints} is the page's own
 	// count for the original, so it isn't checked a second time. An optional
-	// third argument is called with each stage name.
-	var out check.RepairOut
-	var err error
+	// third argument {fixes, submitterName} chooses the fixes (fixes missing
+	// or null: every format fix; []: none). The last argument, when it is a
+	// function, is called with each stage name.
+	opt, err := check.ParseOptions(optionsJSON(args, 2))
+	if err != nil {
+		return fail("repair options: " + err.Error())
+	}
+	progress := progressFrom(args, len(args)-1)
+	raw := bytesIn(args[0])
+	var before check.Counts
 	if len(args) > 1 && args[1].Type() == js.TypeObject {
 		b := args[1]
-		before := check.Counts{Errors: b.Get("errors").Int(), Warnings: b.Get("warnings").Int(), Hints: b.Get("hints").Int()}
-		out, err = check.RepairWithProgress(bytesIn(args[0]), before, progressFrom(args, 2))
+		before = check.Counts{Errors: b.Get("errors").Int(), Warnings: b.Get("warnings").Int(), Hints: b.Get("hints").Int()}
 	} else {
-		out, err = check.Repair(bytesIn(args[0]))
+		before = check.CountsOf(check.Check(raw)) // no counts given: check the original once
 	}
+	out, err := check.RepairWithOptionsProgress(raw, before, opt, progress)
 	if err != nil {
 		return fail(err.Error())
 	}
@@ -89,10 +96,41 @@ func repairFn(_ js.Value, args []js.Value) (ret any) {
 	return map[string]any{"data": data, "json": string(b)}
 }
 
+// optionsJSON is argument i as JSON text when it is an object, else "".
+func optionsJSON(args []js.Value, i int) string {
+	if len(args) <= i || args[i].Type() != js.TypeObject {
+		return ""
+	}
+	return js.Global().Get("JSON").Call("stringify", args[i]).String()
+}
+
+// planFn returns {available: [...]}: the kinds of fix the file could use,
+// for the checklist, without making the repaired copy's counts.
+func planFn(_ js.Value, args []js.Value) (ret any) {
+	defer func() {
+		if r := recover(); r != nil {
+			ret = errJSON(fmt.Sprint(r))
+		}
+	}()
+	if len(args) < 1 {
+		return errJSON("planRepair needs a Uint8Array")
+	}
+	avail, err := check.PlanRepair(bytesIn(args[0]))
+	if err != nil {
+		return errJSON(err.Error())
+	}
+	b, err := json.Marshal(map[string]any{"available": avail})
+	if err != nil {
+		return errJSON(err.Error())
+	}
+	return string(b)
+}
+
 func main() {
 	api := map[string]any{
-		"check":  js.FuncOf(checkFn),
-		"repair": js.FuncOf(repairFn),
+		"check":      js.FuncOf(checkFn),
+		"repair":     js.FuncOf(repairFn),
+		"planRepair": js.FuncOf(planFn),
 	}
 	js.Global().Set("ligneous", js.ValueOf(api))
 	js.Global().Set("ligneousReady", true)

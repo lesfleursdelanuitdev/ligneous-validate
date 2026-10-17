@@ -2,6 +2,7 @@ package check
 
 import (
 	"bytes"
+	"encoding/json"
 	"strconv"
 
 	"github.com/lesfleursdelanuitdev/ligneous-gedcom-lib/parser"
@@ -19,14 +20,22 @@ type Counts struct {
 	Hints    int `json:"hints"`
 }
 
-// RepairOut is the repaired file plus a before/after comparison.
+// RepairOut is the repaired file plus a before/after comparison, and the
+// kinds of fix: those the file could use (the checklist), those that changed
+// something and those that were chosen but changed nothing, with the reason.
 type RepairOut struct {
-	Data    []byte          `json:"-"`
-	Changes []repair.Change `json:"changes"`
-	Left    []string        `json:"left"`
-	Before  Counts          `json:"before"`
-	After   Counts          `json:"after"`
+	Data      []byte           `json:"-"`
+	Changes   []repair.Change  `json:"changes"`
+	Left      []string         `json:"left"`
+	Before    Counts           `json:"before"`
+	After     Counts           `json:"after"`
+	Available []repair.FixInfo `json:"available"`
+	Applied   []repair.FixInfo `json:"applied"`
+	Skipped   []repair.FixInfo `json:"skipped"`
 }
+
+// CountsOf is the number of findings of each severity in r.
+func CountsOf(r Result) Counts { return countFindings(r) }
 
 func countFindings(r Result) Counts {
 	var c Counts
@@ -68,13 +77,30 @@ const (
 // be nil) is called once at the start of each stage, in order: repair, parse,
 // validate, finish. A failed repair stops after repair.
 func RepairWithProgress(raw []byte, before Counts, progress func(stage string)) (RepairOut, error) {
+	return RepairWithOptionsProgress(raw, before, repair.Options{}, progress)
+}
+
+// RepairWithOptions applies only the kinds of fix chosen in opt (see
+// repair.Options: nil Fixes is every format kind, an empty one none). Like
+// RepairWithBefore, it takes the original's counts from the caller and never
+// checks the original again.
+func RepairWithOptions(raw []byte, before Counts, opt repair.Options) (RepairOut, error) {
+	return RepairWithOptionsProgress(raw, before, opt, nil)
+}
+
+// RepairWithOptionsProgress is RepairWithOptions with the stages of
+// RepairWithProgress.
+func RepairWithOptionsProgress(raw []byte, before Counts, opt repair.Options, progress func(stage string)) (RepairOut, error) {
 	step := stepper(progress)
 	step(StageRepair)
-	res, err := repair.Repair(raw)
+	res, err := repair.RepairWithOptions(raw, opt)
 	if err != nil {
 		return RepairOut{}, err
 	}
-	out := RepairOut{Data: res.Data, Changes: res.Changes, Left: res.Left}
+	out := RepairOut{
+		Data: res.Data, Changes: res.Changes, Left: res.Left,
+		Available: orEmpty(res.Available), Applied: orEmpty(res.Applied), Skipped: orEmpty(res.Skipped),
+	}
 	if out.Changes == nil {
 		out.Changes = []repair.Change{}
 	}
@@ -85,6 +111,39 @@ func RepairWithProgress(raw []byte, before Counts, progress func(stage string)) 
 	out.After = countsOf(res.Data, step)
 	step(StageFinish)
 	return out, nil
+}
+
+func orEmpty(s []repair.FixInfo) []repair.FixInfo {
+	if s == nil {
+		return []repair.FixInfo{}
+	}
+	return s
+}
+
+// PlanRepair lists the kinds of fix the file could use, for the checklist,
+// without the before/after counts. The library has no planning call of its
+// own: it fills Available whatever is chosen, so this runs it with no fix
+// chosen (Fixes: []). That still writes the unchanged copy and checks it for
+// Left, so it costs about as much as a check; the page runs it only where a
+// repair isn't made by itself.
+func PlanRepair(raw []byte) ([]repair.FixInfo, error) {
+	res, err := repair.RepairWithOptions(raw, repair.Options{Fixes: []repair.Fix{}})
+	if err != nil {
+		return nil, err
+	}
+	return orEmpty(res.Available), nil
+}
+
+// ParseOptions reads the page's {fixes, submitterName} as JSON. Empty text,
+// null, or "fixes" missing or null mean every format fix; "fixes": [] means
+// none. Unknown fix names are left for the repair to refuse.
+func ParseOptions(s string) (repair.Options, error) {
+	var opt repair.Options
+	if s == "" || s == "null" {
+		return opt, nil
+	}
+	err := json.Unmarshal([]byte(s), &opt)
+	return opt, err
 }
 
 // countsOf counts what Check would find in data: the parser's findings and
