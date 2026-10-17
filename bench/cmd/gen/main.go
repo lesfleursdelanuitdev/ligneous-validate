@@ -1,9 +1,9 @@
 // Command gen writes the benchmark's generated inputs into a directory:
 //
-//	indented2.ged  5.5 MB, 70,000 people, indented lines (same bytes as the
+//	indented2.ged  5.25 MiB, 70,000 people, indented lines (same bytes as the
 //	               earlier hand-made test file of that name)
-//	synth20.ged    about 20 MB of linked people, families, events, notes, sources
-//	synth50.ged    about 50 MB, same shape
+//	synth20.ged    about 20 MiB of linked people, families, events, notes, sources
+//	synth50.ged    about 50 MiB, same shape
 //
 // It also writes expected.json with the true record counts for each file.
 // Output is deterministic: the same seed gives the same bytes.
