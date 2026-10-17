@@ -115,20 +115,60 @@ func TestRepairBadOptions(t *testing.T) {
 	}
 }
 
-func TestPlanRepair(t *testing.T) {
-	ret := planFn(js.Undefined(), []js.Value{jsBytes(t, suggested)}).(string)
-	var out repairJSON
-	if err := json.Unmarshal([]byte(ret), &out); err != nil {
+type planJSON struct {
+	Available []struct {
+		Fix   string   `json:"fix"`
+		Kind  string   `json:"kind"`
+		Needs []string `json:"needs"`
+	} `json:"available"`
+	Units map[string][]struct {
+		Line  int      `json:"line"`
+		What  string   `json:"what"`
+		Lines []string `json:"lines"`
+	} `json:"units"`
+	Error string `json:"error"`
+}
+
+func callPlan(t *testing.T, args ...js.Value) planJSON {
+	t.Helper()
+	var out planJSON
+	if err := json.Unmarshal([]byte(planFn(js.Undefined(), args).(string)), &out); err != nil {
 		t.Fatal(err)
 	}
+	return out
+}
+
+func TestPlan(t *testing.T) {
+	out := callPlan(t, jsBytes(t, suggested))
 	var got []string
 	for _, a := range out.Available {
 		got = append(got, a.Fix+"/"+a.Kind)
 	}
 	if strings.Join(got, ",") != "blank-lines/format,broken-links/data,empty-families/data,submitter/data" {
-		t.Fatalf("available = %v (%s)", got, ret)
+		t.Fatalf("available = %v", got)
 	}
-	if !strings.Contains(planFn(js.Undefined(), nil).(string), "error") {
+	if u := out.Units["broken-links"]; len(u) != 3 || u[0].Line != 11 || strings.Join(u[0].Lines, "|") != "2 PEDI birth" {
+		t.Fatalf("broken-links units = %+v", u)
+	}
+	// Alone, empty-families removes F2 only (lines 17 and 23); with broken-links chosen, F3 (26) too.
+	if n := len(out.Units["empty-families"]); n != 2 {
+		t.Fatalf("empty-families alone: %d units", n)
+	}
+	with := callPlan(t, jsBytes(t, suggested), jsObject(`{"fixes":["broken-links"]}`))
+	if n := len(with.Units["empty-families"]); n != 3 {
+		t.Fatalf("empty-families with broken-links: %d units %+v", n, with.Units["empty-families"])
+	}
+	named := callPlan(t, jsBytes(t, suggested), jsObject(`{"fixes":[],"submitterName":"Jo March"}`))
+	if u := named.Units["submitter"]; len(u) != 2 || !strings.Contains(strings.Join(u[1].Lines, "|"), "1 NAME Jo March") {
+		t.Fatalf("submitter units = %+v", u)
+	}
+}
+
+func TestPlanErrors(t *testing.T) {
+	if out := callPlan(t); out.Error == "" {
 		t.Fatal("no error without bytes")
+	}
+	if out := callPlan(t, jsBytes(t, suggested), jsObject(`{"fixes":["nope"]}`)); out.Error == "" {
+		t.Fatal("an unknown fix was accepted")
 	}
 }

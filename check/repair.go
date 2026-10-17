@@ -120,18 +120,20 @@ func orEmpty(s []repair.FixInfo) []repair.FixInfo {
 	return s
 }
 
-// PlanRepair lists the kinds of fix the file could use, for the checklist,
-// without the before/after counts. The library has no planning call of its
-// own: it fills Available whatever is chosen, so this runs it with no fix
-// chosen (Fixes: []). That still writes the unchanged copy and checks it for
-// Left, so it costs about as much as a check; the page runs it only where a
-// repair isn't made by itself.
-func PlanRepair(raw []byte) ([]repair.FixInfo, error) {
-	res, err := repair.RepairWithOptions(raw, repair.Options{Fixes: []repair.Fix{}})
+// Plan previews the repair for the checklist (repair.Plan): the kinds of
+// fix the file could use, and for each what it would change if chosen
+// together with opt.Fixes. It writes nothing and checks nothing again, so it
+// costs a fraction of a check and can run for files of any size.
+func Plan(raw []byte, opt repair.Options) (*repair.PlanResult, error) {
+	p, err := repair.Plan(raw, opt)
 	if err != nil {
 		return nil, err
 	}
-	return orEmpty(res.Available), nil
+	p.Available = orEmpty(p.Available)
+	if p.Units == nil {
+		p.Units = map[repair.Fix][]repair.Unit{}
+	}
+	return p, nil
 }
 
 // ParseOptions reads the page's {fixes, submitterName} as JSON. Empty text,

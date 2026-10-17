@@ -104,8 +104,8 @@ func optionsJSON(args []js.Value, i int) string {
 	return js.Global().Get("JSON").Call("stringify", args[i]).String()
 }
 
-// planFn returns {available: [...]}: the kinds of fix the file could use,
-// for the checklist, without making the repaired copy's counts.
+// planFn is plan(bytes, options?): {available, units}, the preview of each
+// kind of fix if chosen together with options.fixes (see check.Plan).
 func planFn(_ js.Value, args []js.Value) (ret any) {
 	defer func() {
 		if r := recover(); r != nil {
@@ -113,13 +113,17 @@ func planFn(_ js.Value, args []js.Value) (ret any) {
 		}
 	}()
 	if len(args) < 1 {
-		return errJSON("planRepair needs a Uint8Array")
+		return errJSON("plan needs a Uint8Array")
 	}
-	avail, err := check.PlanRepair(bytesIn(args[0]))
+	opt, err := check.ParseOptions(optionsJSON(args, 1))
+	if err != nil {
+		return errJSON("plan options: " + err.Error())
+	}
+	p, err := check.Plan(bytesIn(args[0]), opt)
 	if err != nil {
 		return errJSON(err.Error())
 	}
-	b, err := json.Marshal(map[string]any{"available": avail})
+	b, err := json.Marshal(p)
 	if err != nil {
 		return errJSON(err.Error())
 	}
@@ -128,9 +132,9 @@ func planFn(_ js.Value, args []js.Value) (ret any) {
 
 func main() {
 	api := map[string]any{
-		"check":      js.FuncOf(checkFn),
-		"repair":     js.FuncOf(repairFn),
-		"planRepair": js.FuncOf(planFn),
+		"check":  js.FuncOf(checkFn),
+		"repair": js.FuncOf(repairFn),
+		"plan":   js.FuncOf(planFn),
 	}
 	js.Global().Set("ligneous", js.ValueOf(api))
 	js.Global().Set("ligneousReady", true)

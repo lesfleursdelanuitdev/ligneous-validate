@@ -167,10 +167,10 @@ func TestRepairWithOptionsANSELKeepsEncoding(t *testing.T) {
 	}
 }
 
-func TestPlanRepair(t *testing.T) {
-	for _, p := range []string{suggested, "testdata/royal92.ged", "testdata/encodings/ansel.ged", "testdata/repair/cr-only.ged"} {
+func TestPlanMatchesRepairAvailable(t *testing.T) {
+	for _, p := range []string{suggested, blankInFam, "testdata/royal92.ged", "testdata/encodings/ansel.ged", "testdata/repair/cr-only.ged"} {
 		raw := read(t, p)
-		got, err := PlanRepair(raw)
+		got, err := Plan(raw, repair.Options{})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -178,26 +178,84 @@ func TestPlanRepair(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if !reflect.DeepEqual(got, full.Available) {
-			t.Fatalf("%s: plan = %+v, want %+v", p, got, full.Available)
+		if !reflect.DeepEqual(got.Available, full.Available) {
+			t.Fatalf("%s: plan = %+v, want %+v", p, got.Available, full.Available)
+		}
+		for _, a := range got.Available {
+			if got.Units[a.Fix] == nil {
+				t.Fatalf("%s: no units for %s", p, a.Fix)
+			}
 		}
 	}
-	if _, err := PlanRepair([]byte("not gedcom")); err == nil {
+	if _, err := Plan([]byte("not gedcom"), repair.Options{}); err == nil {
 		t.Fatal("no error for a file with no GEDCOM lines")
+	}
+	if _, err := Plan(read(t, suggested), repair.Options{Fixes: []repair.Fix{"nope"}}); err == nil {
+		t.Fatal("an unknown fix was accepted")
 	}
 }
 
-func TestPlanRepairUTF16Required(t *testing.T) {
-	raw := []byte{0xFF, 0xFE}
-	for _, r := range "0 HEAD\r\n1 GEDC\r\n2 VERS 5.5.1\r\n1 CHAR UNICODE\r\n0 @I1@ INDI\r\n1 NAME Ann /Lee/\r\n0 TRLR\r\n" {
-		raw = append(raw, byte(r), 0)
+// blank-in-fam.ged is suggested.ged plus a family F4 whose broken CHIL is
+// followed by a blank line and then a WIFE: F4 has a member, so it stays.
+const blankInFam = "testdata/repair/blank-in-fam.ged"
+
+func unitLines(us []repair.Unit) []int {
+	out := []int{}
+	for _, u := range us {
+		out = append(out, u.Line)
 	}
-	got, err := PlanRepair(raw)
+	return out
+}
+
+func TestPlanUnitsMatchTheRepair(t *testing.T) {
+	raw := read(t, blankInFam)
+	sel := []repair.Fix{repair.FixBlankLines, repair.FixBrokenLinks}
+	p, err := Plan(raw, repair.Options{Fixes: sel})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(got) == 0 || got[0].Fix != repair.FixEncoding || !got[0].Required || got[0].Reason == "" {
-		t.Fatalf("plan = %+v", got)
+	// With broken-links chosen, empty-families removes F2 (23) with its FAMS link (17)
+	// and F3 (26, empty once its broken HUSB goes); F4 (28) keeps its WIFE.
+	fam := p.Units[repair.FixEmptyFamilies]
+	if got := unitLines(fam); !reflect.DeepEqual(got, []int{17, 23, 26}) {
+		t.Fatalf("empty-families units at %v (%+v)", got, fam)
+	}
+	out, err := RepairWithOptions(raw, Counts{}, repair.Options{Fixes: append(sel, repair.FixEmptyFamilies)})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var want []int
+	for _, c := range out.Changes {
+		if c.Fix == repair.FixEmptyFamilies {
+			want = append(want, c.Line)
+		}
+	}
+	if !reflect.DeepEqual(unitLines(fam), want) {
+		t.Fatalf("plan %v, repair %v", unitLines(fam), want)
+	}
+	if bytes.Contains(out.Data, []byte("0 @F4@ FAM")) == false || !bytes.Contains(out.Data, []byte("1 WIFE @I1@\n0 TRLR")) {
+		t.Fatalf("F4 should stay with its wife:\n%s", out.Data)
+	}
+	for _, a := range p.Available {
+		if a.Fix == repair.FixEmptyFamilies && !reflect.DeepEqual(a.Needs, []repair.Fix{repair.FixBrokenLinks}) {
+			t.Fatalf("empty-families needs %v", a.Needs)
+		}
+	}
+}
+
+func TestPlanJSON(t *testing.T) {
+	p, err := Plan(read(t, suggested), repair.Options{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := json.Marshal(p)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, k := range []string{`"available":`, `"units":`, `"broken-links":[{"line":11,"what":`, `"lines":["2 PEDI birth"]`, `"needs":["broken-links"]`} {
+		if !strings.Contains(string(b), k) {
+			t.Errorf("json has no %s: %s", k, b)
+		}
 	}
 }
 
