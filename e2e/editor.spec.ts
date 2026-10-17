@@ -185,6 +185,30 @@ test('e2e editor: Check again after a fix removes the finding from the report an
   await expect(page.locator('.finding')).toHaveCount(1);
 });
 
+test('e2e editor: when Check again finds nothing left, the editor can still be reopened', async ({ page }) => {
+  await report(page, 'editor.ged');
+  await editLine(page, 12);
+  await retype(page, '1 SEX F');
+  // Line 15 points to a family that doesn't exist: delete the line.
+  await page.locator('.cm-line', { hasText: '1 FAMC @F9@' }).click();
+  await page.keyboard.press('Home');
+  await page.keyboard.press('Shift+ArrowDown');
+  await page.keyboard.press('Delete');
+  await page.getByRole('button', { name: 'Check again' }).click();
+  await expect(live(page)).toHaveText('No problems found in 1 person.');
+  await expect(page.locator('#ed-count')).toHaveText('No problems');
+  await expect(page.locator('.cm-lint-marker')).toHaveCount(0);
+  page.once('dialog', d => void d.accept());
+  await page.getByRole('button', { name: 'Close', exact: true }).click();
+  // No findings, so no toolbar: the button by the status line opens it again, with the edits.
+  await expect(page.locator('#status')).toHaveText('No problems found in 1 person.');
+  const reopen = page.getByRole('button', { name: 'Open the editor' });
+  await expect(reopen).toBeFocused();
+  await reopen.click();
+  await expect(page.locator('.cm-content')).not.toContainText('@F9@');
+  await expect(page.locator('#ed-edited')).toBeVisible();
+});
+
 test('e2e editor: Ctrl-click on a pointer jumps to its record', async ({ page }) => {
   await report(page, 'editor.ged');
   await page.getByRole('button', { name: 'Open the editor' }).click();

@@ -46,8 +46,8 @@ export interface EditorHost {
 }
 
 export interface Editor {
-  /** Opens at `line` of the last-checked text (0: line 1). A new file means reset() first. */
-  open(fileName: string, result: Result, line: number, opener: HTMLElement, code?: string): void;
+  /** Opens at `line` of the last-checked text (0: line 1). `result` starts a session (null: reopen it). A new file means reset() first. */
+  open(fileName: string, result: Result | null, line: number, opener: HTMLElement, code?: string): void;
   /** Drops the session (another file was chosen). */
   reset(): void;
   /** A Check again has ended: its result, or null when it failed or was stopped, with the status text. */
@@ -154,7 +154,8 @@ export function createEditor(hostApi: EditorHost): Editor {
   const findBtn = button('ed-find', 'Find and replace', 'find');
   const wrapBox = el('input', { type: 'checkbox', id: 'ed-wrapbox' });
   const wrapLabel = el('label', { class: 'ed-wrap', for: 'ed-wrapbox' }, wrapBox, el('span', { class: 'box', 'aria-hidden': 'true' }), 'Wrap lines');
-  const live = el('div', { id: 'ed-live', class: 'vh', role: 'status', 'aria-live': 'polite' });
+  // Seen as well as heard: "There's no record …", "Checked: …", the finding stepped to.
+  const live = el('p', { id: 'ed-live', class: 'ed-msg', role: 'status', 'aria-live': 'polite' });
   const dialog = el('dialog', { id: 'editor', class: 'editor', 'aria-modal': 'true', 'aria-labelledby': 'ed-name' },
     el('div', { class: 'ed-bar' },
       el('div', { class: 'ed-row' },
@@ -163,8 +164,7 @@ export function createEditor(hostApi: EditorHost): Editor {
         el('div', { class: 'ed-actions' }, checkBtn, saveBtn, closeBtn)),
       barSlot, notes),
     hostEl,
-    el('div', { class: 'ed-status' }, posText, el('span', { class: 'ed-tools' }, findBtn, wrapLabel)),
-    live);
+    el('div', { class: 'ed-status' }, posText, live, el('span', { class: 'ed-tools' }, findBtn, wrapLabel)));
   document.body.append(dialog);
   const shadow = hostEl.attachShadow({ mode: 'open' });
   // The lint gutter's tooltip closes on a window mousemove whose target isn't
@@ -405,8 +405,9 @@ export function createEditor(hostApi: EditorHost): Editor {
 
   let returnTo: HTMLElement | null = null;
 
-  const open = (fileName: string, result: Result, line: number, opener: HTMLElement, code?: string) => {
+  const open = (fileName: string, result: Result | null, line: number, opener: HTMLElement, code?: string) => {
     if (!s) {
+      if (!result) return;
       const view = makeView(result.text, fileName);
       s = {
         name: fileName, view, basis: newBasis(result, view.state.doc), pending: null, dirty: false, saved: false, stale: false,

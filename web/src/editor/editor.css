@@ -85,6 +85,7 @@ html:has(dialog.editor[open]) { overflow: hidden; }
   font-size: 13px; color: var(--muted);
 }
 .ed-pos { font-variant-numeric: tabular-nums; white-space: nowrap; }
+.ed-msg { flex: 1 1 200px; min-width: 0; margin: 0; color: var(--text); font-weight: 400; overflow-wrap: anywhere; }
 .ed-tools { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 .ed-wrap {
   position: relative; display: inline-flex; align-items: center; gap: 8px; min-height: 36px; cursor: pointer;
@@ -100,17 +101,18 @@ html:has(dialog.editor[open]) { overflow: hidden; }
   border: solid var(--on-accent); border-width: 0 1.75px 1.75px 0; transform: rotate(45deg);
 }
 
-.vh { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
-
-/* Phones: the long labels become icons (their text stays the button's name). */
+/* Phones: the long labels become icons (their text stays the button's name);
+   Close sits at the end of the file name's row, and the buttons flow in
+   rows of their own. */
 @media (max-width: 640px) {
-  .ed-row { gap: 8px 12px; }
-  .ed-file { flex-basis: calc(100% - 60px); font-size: 20px; }
+  .ed-row { position: relative; gap: 8px; }
+  .ed-file {
+    flex-basis: 100%; min-height: 44px; padding-right: 56px; font-size: 20px;
+    display: flex; flex-wrap: wrap; align-items: center; column-gap: 0.35em;
+  }
+  #ed-close { position: absolute; top: 0; right: 0; }
+  .ed-nav, .ed-actions { display: contents; }
+  .ed-count { min-width: 4.5em; padding: 0 2px; }
   .ed-btn .lbl.short { position: absolute; width: 1px; height: 1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
   .ed-btn:has(.lbl.short) { min-width: 44px; padding-left: 0; padding-right: 0; }
-  /* Close sits at the end of the file name's row. */
-  .ed-row { position: relative; }
-  #ed-close { position: absolute; top: -4px; right: 0; }
-  .ed-nav { flex: 1 1 auto; }
-  .ed-count { min-width: 0; flex: 1 1 auto; }
 }

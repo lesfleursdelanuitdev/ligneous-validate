@@ -104,6 +104,7 @@ function showFailed() {
   shown = null;
   bar.hide();
   report.replaceChildren();
+  showReopen();
   say(FAILED, '', 'problem');
   restart();
   controls();
@@ -400,12 +401,17 @@ function loadEditor(): Promise<Editor | null> {
 
 async function openEditor(line: number, opener: HTMLElement, code?: string) {
   const view = shown;
-  if (!view) return;
+  // With no report (Check again found no GEDCOM, or failed), only an existing session can open.
+  if (!view && !ed?.active) return;
   const editor = await loadEditor();
   if (!editor) { say(EDITOR_FAILED, '', 'problem'); return; }
-  if (shown !== view && !editor.active) return; // another file came meanwhile
-  if (!editor.active) editName = view.file.name;
-  editor.open(editName, view.result, line, opener, code);
+  if (!editor.active) {
+    if (!view || shown !== view) return; // another file came meanwhile
+    editName = view.file.name;
+    editor.open(editName, view.result, line, opener, code);
+  } else {
+    editor.open(editName, null, line, opener, code);
+  }
 }
 
 const editHooks: EditHooks = { open: (line, opener, code) => void openEditor(line, opener, code) };

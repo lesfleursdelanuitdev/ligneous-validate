@@ -62,7 +62,7 @@ export const editorTheme = EditorView.theme({
     backgroundColor: 'var(--card)', color: 'var(--text)', border: '1px solid var(--border)', borderRadius: '8px',
     boxShadow: '0 1px 2px rgba(0,0,0,.06), 0 8px 24px rgba(0,0,0,.14)', fontFamily: 'var(--sans)',
   },
-  '.cm-tooltip-lint': { maxWidth: 'min(420px, calc(100vw - 32px))', padding: '4px 0' },
+  '.cm-tooltip-lint': { maxWidth: 'min(420px, calc(100vw - 64px))', padding: '4px 0' },
   '.cm-tooltip-lint ul': { margin: '0', padding: '0' },
   '.cm-diagnostic': { padding: '10px 14px', marginLeft: '0', borderLeft: '3px solid var(--accent)', whiteSpace: 'normal' },
   '.cm-diagnostic + .cm-diagnostic': { borderTop: '1px solid var(--border-soft)' },
