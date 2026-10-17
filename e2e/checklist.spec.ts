@@ -1,7 +1,9 @@
 // The repair checklist: choosing which fixes to apply (library v0.3.0).
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 const fixture = (name: string) => join('e2e', 'fixtures', name);
@@ -57,8 +59,8 @@ test('e2e: the suggested fixes start unticked; broken links alone removes exactl
   // Show lines lists each link with the lines nested under it.
   await row(page, 'broken-links').getByRole('button', { name: 'Show lines' }).click();
   const lines = row(page, 'broken-links').locator('.fix-lines-body');
-  await expect(lines.locator('ol.ex > li > .ex-line code')).toHaveText(['1 FAMC @F9@', '1 CHIL @I7@', '1 HUSB @I99@']);
-  await expect(lines.locator('.ex-nested code')).toHaveText(['2 PEDI birth']);
+  await expect(lines.locator('.ex-line:not(.nested) code')).toHaveText(['1 FAMC @F9@', '1 CHIL @I7@', '1 HUSB @I99@']);
+  await expect(lines.locator('.ex-line.nested code')).toHaveText(['2 PEDI birth']);
 
   await box(page, BROKEN).check();
   await page.getByRole('button', { name: 'Repair selected (2)' }).click();
@@ -232,6 +234,84 @@ test('e2e: an open Show lines panel and the focus survive a run', async ({ page 
   const show = page.locator('#fix-broken-links-show');
   await expect(show).toHaveAttribute('aria-expanded', 'true');
   await expect(page.locator('#fix-broken-links-lines')).toBeVisible();
-  await expect(page.locator('#fix-broken-links-lines .ex-nested code')).toHaveText(['2 PEDI birth']);
+  await expect(page.locator('#fix-broken-links-lines .ex-line.nested code')).toHaveText(['2 PEDI birth']);
   expect(await page.evaluate(() => document.activeElement?.id)).toBe('repair-selected');
+});
+
+/** The original lines a kind's Show lines says will go: each unit's line and the rows under it. */
+async function previewRemoved(page: Page, fix: string): Promise<number[]> {
+  const show = page.locator(`#fix-${fix}-show`);
+  if (await show.getAttribute('aria-expanded') !== 'true') await show.click();
+  return page.locator(`#fix-${fix}-lines`).evaluate(body => {
+    const out: number[] = [];
+    for (const li of body.querySelectorAll('ol.ex > li')) {
+      const line = Number((li.querySelector('.ex-at')!.textContent ?? '').replace(/[^\d]/g, ''));
+      const rows = li.querySelectorAll('.ex-line:not(.added)').length;
+      for (let i = 0; i < Math.max(rows, 1); i++) out.push(line + i);
+    }
+    return out;
+  });
+}
+
+test('e2e: a blank line inside a family: the family with a wife stays in the preview', async ({ page }) => {
+  await upload(page, 'blank-in-fam.ged');
+  await expect(row(page, 'empty-families').locator('.fix-count')).toHaveText('4 lines removed'); // alone: F2 and its link
+  await box(page, BROKEN).check();
+  // Planned again with broken-links: F3 (empty once its broken HUSB goes) joins; F4 keeps its WIFE.
+  await expect(row(page, 'empty-families').locator('.fix-count')).toHaveText('6 lines removed');
+  await page.locator('#fix-empty-families-show').click();
+  const body = page.locator('#fix-empty-families-lines');
+  await expect(body.locator('.ex-at')).toHaveText(['Line 17', 'Line 23', 'Line 26']);
+  await expect(body).not.toContainText('@F4@');
+});
+
+test('e2e: the combined broken-links and empty-families preview is what the download removes', async ({ page }) => {
+  await upload(page, 'suggested.ged');
+  await box(page, BROKEN).check();
+  await box(page, EMPTY).check();
+  await expect(row(page, 'empty-families').locator('.fix-count')).toHaveText('6 lines removed');
+  // The preview of the three kinds, once Plan has answered for these ticks.
+  const preview = async () => {
+    const removed = new Set<number>();
+    for (const fix of ['blank-lines', 'broken-links', 'empty-families']) for (const n of await previewRemoved(page, fix)) removed.add(n);
+    return [...removed].sort((a, b) => a - b);
+  };
+  await expect.poll(preview).toEqual([11, 12, 17, 18, 22, 23, 24, 25, 26, 27]);
+  const removed = await preview();
+  await page.getByRole('button', { name: 'Repair selected (3)' }).click();
+  await expect(page.locator('#status')).toHaveText('Repaired: 3 kinds of fix applied.');
+  const original = (await readFile(fixture('suggested.ged'))).toString('utf8');
+  const bytes = await save(page, 'Download repaired file');
+  expect(bytes.toString('utf8')).toBe(without(original, removed));
+  // The result lists each unit with the lines that really went.
+  await expect(page.locator('#repair .changes li', { hasText: 'Removed an empty family @F2@' })).toHaveText('Removed an empty family @F2@: line 23, 3 lines removed');
+});
+
+test('e2e: a file over 10 MB shows the real counts from Plan, and waits for a click', async ({ page }) => {
+  test.setTimeout(300_000);
+  const dir = mkdtempSync(join(tmpdir(), 'validate-e2e-'));
+  try {
+    const head = '0 HEAD\n1 SOUR TestSystem\n1 GEDC\n2 VERS 5.5.1\n2 FORM LINEAGE-LINKED\n1 CHAR UTF-8\n1 SUBM @U1@\n0 @U1@ SUBM\n1 NAME Test\n';
+    const parts = [head];
+    let size = head.length;
+    for (let i = 1; size < 10.5 * 1024 * 1024; i++) {
+      const r = `0 @I${i}@ INDI\n1 NAME Person${i} /Family${i % 500}/\n1 SEX ${i % 2 ? 'M' : 'F'}\n1 NOTE A note to give the file some weight, number ${i}.\n`;
+      parts.push(r);
+      size += r.length;
+      if (i === 1000 || i === 2000 || i === 3000) parts.push('\n');
+    }
+    parts.push('0 TRLR\n');
+    const path = join(dir, 'big.ged');
+    writeFileSync(path, parts.join(''));
+    await page.locator('#file').setInputFiles(path);
+    await expect(page.locator('#status')).toHaveText(/^Checked: /, { timeout: 240_000 });
+    await expect(row(page, 'blank-lines').locator('.fix-count')).toHaveText('3 lines', { timeout: 60_000 });
+    await expect(box(page, 'Remove blank lines')).toBeChecked();
+    await page.locator('#fix-blank-lines-show').click();
+    await expect(page.locator('#fix-blank-lines-lines .ex-at')).toHaveCount(3);
+    await expect(page.getByRole('button', { name: 'Repair selected (1)' })).toBeVisible();
+    await expect(page.locator('#repair-result')).toBeHidden();
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 });

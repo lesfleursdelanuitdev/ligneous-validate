@@ -74,7 +74,19 @@ export interface FixInfo {
   /** Nothing else can be done unless this is chosen too. */
   required: boolean;
   reason?: string;
+  /** Other kinds this one needs to do all it can (empty-families: broken-links). */
+  needs?: Fix[];
 }
+
+/** One change a kind would make (repair.Plan): as its Change would say it, with its lines. */
+export interface Unit {
+  line: number;
+  what: string;
+  /** Removed lines under a removed line (data kinds), "" for a blank line, or the lines added. */
+  lines?: string[];
+}
+
+export type Units = Partial<Record<Fix, Unit[]>>;
 
 export interface Change {
   /** 1-based line in the original file; 0 is the whole file. */
@@ -105,13 +117,16 @@ export interface RepairOptions {
 
 export interface PlanOut {
   available: FixInfo[];
+  /** What each kind would change if chosen with the fixes the plan was asked for. */
+  units?: Units;
   error?: string;
 }
 
 export type ToWorker =
   | { type: 'check'; bytes: ArrayBuffer }
   | { type: 'repair'; bytes: ArrayBuffer; before?: Counts; options?: RepairOptions }
-  | { type: 'plan'; bytes: ArrayBuffer };
+  /** id: answers to an older request are dropped. */
+  | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number };
 
 export type FromWorker =
   | { type: 'status'; text: string }
@@ -122,6 +137,6 @@ export type FromWorker =
   | { type: 'stage'; job: 'check' | 'repair'; stage: string }
   | { type: 'result'; result: Result }
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
-  /** The kinds of fix the file could use, from planRepair(). */
-  | { type: 'planned'; info: PlanOut }
+  /** The preview of each kind of fix, from plan(). */
+  | { type: 'planned'; info: PlanOut; id: number }
   | { type: 'error'; message: string };

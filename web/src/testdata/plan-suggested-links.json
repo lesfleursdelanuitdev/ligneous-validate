@@ -1,0 +1,81 @@
+{
+  "available": [
+    {
+      "fix": "blank-lines",
+      "lines": 1,
+      "required": false,
+      "kind": "format"
+    },
+    {
+      "fix": "broken-links",
+      "lines": 4,
+      "required": false,
+      "kind": "data"
+    },
+    {
+      "fix": "empty-families",
+      "lines": 6,
+      "required": false,
+      "kind": "data",
+      "needs": [
+        "broken-links"
+      ]
+    },
+    {
+      "fix": "submitter",
+      "lines": 3,
+      "required": false,
+      "kind": "data"
+    }
+  ],
+  "units": {
+    "blank-lines": [
+      {
+        "line": 18,
+        "what": "removed a blank line",
+        "lines": [
+          ""
+        ]
+      }
+    ],
+    "broken-links": [
+      {
+        "line": 11,
+        "what": "removed a link to family @F9@, which doesn't exist (and 1 line under it)",
+        "lines": [
+          "2 PEDI birth"
+        ]
+      },
+      {
+        "line": 22,
+        "what": "removed a link to person @I7@, which doesn't exist"
+      },
+      {
+        "line": 27,
+        "what": "removed a link to person @I99@, which doesn't exist"
+      }
+    ],
+    "empty-families": [
+      {
+        "line": 17,
+        "what": "removed a link to the removed family @F2@"
+      },
+      {
+        "line": 23,
+        "what": "removed an empty family @F2@",
+        "lines": [
+          "1 CHAN",
+          "2 DATE 1 JAN 2020"
+        ]
+      },
+      {
+        "line": 26,
+        "what": "removed an empty family @F3@",
+        "lines": [
+          "1 HUSB @I99@"
+        ]
+      }
+    ],
+    "submitter": []
+  }
+}

@@ -20,8 +20,9 @@ export const TICK_ONE = 'Tick at least one fix first.';
 export const STALE_SAY = 'Your choices changed. Repair again to update the copy.';
 export const LEFT_FIXABLE = 'Tick a fix above to fix these here:';
 export const LEFT_OTHER = 'These need fixing in your family tree program:';
-const SUBMITTER_LINES = 'Adds 3 lines: a link in the header, and a short record with your name before the end of the file.';
-const WHOLE_FILE = 'This changes the whole file, not single lines.';
+const SUBMITTER_LINES = 'Type your name to see the 3 lines this adds: a link in the header, and a short record with your name.';
+const NOTHING_NOW = 'Nothing would change with the fixes ticked now.';
+const WORKING = 'Working out the lines…';
 
 export interface CardOptions {
   result: Result;
@@ -29,12 +30,14 @@ export interface CardOptions {
   /** Over 5 MB: say that a repair takes a while. */
   big: boolean;
   onRun(run: Run): void;
+  /** The ticks or the name changed: plan again. */
+  onChange(): void;
   onDownload(): void;
 }
 
 export interface RepairCard {
-  /** Redraws the rows after the list of kinds changed (planRepair, or a run), keeping focus. */
-  redraw(): void;
+  /** Brings the card in line with a new plan or list of kinds, keeping focus and open panels. */
+  update(): void;
   /** Shows a finished run (checklist.ran says what it was). */
   showResult(out: RepairOut): void;
   /** A run that failed: one line where the result goes; the checklist stays. */
@@ -52,6 +55,8 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   let wasStale = false;
   /** Show lines panels that are open; kept across a redraw. */
   const open = new Set<Fix>();
+  /** Redraws an open panel in place (a new plan). */
+  const drawers = new Map<Fix, () => void>();
   // Said politely when the result goes out of date (the stale mark itself is only seen).
   const live = el('p', { class: 'sr-only', id: 'repair-live', role: 'status', 'aria-live': 'polite' });
 
@@ -101,6 +106,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     box.addEventListener('change', () => {
       setChosen(c, v.fix, box.checked);
       refresh();
+      o.onChange();
     });
     const li = el('li', { class: 'fix', 'data-fix': v.fix }, label, reason, note);
     if (v.fix === 'submitter') {
@@ -109,7 +115,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
         autocomplete: 'name', spellcheck: 'false', 'aria-describedby': `${id}-note`,
       });
       input.value = c.name;
-      input.addEventListener('input', () => { setName(c, input.value); refresh(); });
+      input.addEventListener('input', () => { setName(c, input.value); refresh(); o.onChange(); });
       li.append(el('div', { class: 'fix-name', id: `${id}-name` }, el('label', { for: 'submitter-name' }, 'Your name'), input));
     }
     li.append(showLines(v.fix));
@@ -136,37 +142,39 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     toggle.addEventListener('click', () => set(toggle.getAttribute('aria-expanded') !== 'true'));
     // Reopened after a redraw (new list of kinds, or a run), drawn from the latest run.
     queueMicrotask(() => { if (open.has(fix)) set(true); });
-    const draw = () => {
-      body.replaceChildren();
-      const ex = examples(fix, r, shownOut);
-      if (fix === 'submitter' && !shownOut?.changes.some(ch => ch.fix === 'submitter')) {
-        body.append(el('p', {}, SUBMITTER_LINES));
-        return;
-      }
-      if (ex.items.length === 0) {
-        body.append(el('p', {}, WHOLE_FILE));
-        return;
-      }
-      const list = el('ol', { class: 'ex', translate: 'no' });
-      for (const item of ex.items) {
-        const li = el('li', {}, exampleLine(item.line, item.text, false));
-        if (item.nested.length) {
-          const sub = el('ol', { class: 'ex-nested' });
-          for (const n of item.nested) sub.append(el('li', {}, exampleLine(n.line, n.text, true)));
-          li.append(sub);
-        }
-        list.append(li);
-      }
-      body.append(list);
-      if (ex.more > 0) body.append(el('p', { class: 'ex-more' }, `and ${formatNumber(ex.more)} more`));
-    };
+    const draw = () => drawLines(fix, body);
+    drawers.set(fix, () => { if (open.has(fix)) draw(); });
     return el('div', { class: 'fix-lines' }, toggle, body);
   }
 
-  function exampleLine(line: number, text: string, nested: boolean): HTMLElement {
-    return el('span', { class: nested ? 'ex-line nested' : 'ex-line' },
-      el('span', { class: 'ex-at' }, line > 0 ? lineLabel(line) : 'Whole file'),
-      el('code', {}, text === '' ? '(blank)' : text));
+  /** Show lines: Plan's units for the current ticks, each under its line number with its lines. */
+  function drawLines(fix: Fix, body: HTMLElement) {
+    body.replaceChildren();
+    const ex = examples(fix, c, r);
+    if (ex === null) {
+      body.append(el('p', {}, WORKING));
+      return;
+    }
+    if (ex.items.length === 0) {
+      body.append(el('p', {}, fix === 'submitter' ? SUBMITTER_LINES : NOTHING_NOW));
+      return;
+    }
+    const list = el('ol', { class: 'ex', translate: 'no' });
+    for (const item of ex.items) {
+      const rowsEl = el('div', { class: 'ex-rows' });
+      for (const row of item.rows) {
+        rowsEl.append(el('span', { class: `ex-line${row.nested ? ' nested' : ''}${row.added ? ' added' : ''}` },
+          el('span', { class: 'ex-mark', 'aria-hidden': 'true' }, row.added ? '+' : ''),
+          row.added ? el('span', { class: 'sr-only' }, 'Added: ') : null,
+          el('code', {}, row.text === '' ? '(blank)' : row.text)));
+      }
+      list.append(el('li', {},
+        el('p', { class: 'ex-head' }, el('span', { class: 'ex-at' }, item.line > 0 ? lineLabel(item.line) : 'Whole file'),
+          ' ', el('span', { class: 'ex-what', translate: 'yes' }, withCode(item.what))),
+        item.rows.length ? rowsEl : null));
+    }
+    body.append(list);
+    if (ex.more > 0) body.append(el('p', { class: 'ex-more' }, `and ${formatNumber(ex.more)} more`));
   }
 
   /** Builds both groups from the current list of kinds. */
@@ -174,6 +182,7 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     const v = rows(c);
     heading.textContent = checklistHeading(c, r);
     lists.replaceChildren();
+    drawers.clear();
     if (v.format.length) {
       const ul = el('ul', { class: 'fix-list' });
       for (const row of v.format) ul.append(rowItem(row));
@@ -225,6 +234,16 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
     if (stale && !wasStale && dl) live.textContent = STALE_SAY;
     if (!stale) live.textContent = '';
     wasStale = stale;
+  }
+
+  /** A new plan: rows in place when the same kinds are listed (no rebuild under the visitor's hands). */
+  function update() {
+    const want = [...rows(c).format, ...rows(c).data].map(x => x.fix).join();
+    const have = [...lists.querySelectorAll<HTMLElement>('li.fix')].map(li => li.dataset.fix).join();
+    if (want !== have) { redraw(); return; }
+    heading.textContent = checklistHeading(c, r);
+    refresh();
+    for (const d of drawers.values()) d();
   }
 
   function redraw() {
@@ -311,5 +330,5 @@ export function mountRepairCard(slot: HTMLElement, o: CardOptions): RepairCard {
   }
 
   build();
-  return { redraw, showResult, showFailed, setBusy };
+  return { update, showResult, showFailed, setBusy };
 }

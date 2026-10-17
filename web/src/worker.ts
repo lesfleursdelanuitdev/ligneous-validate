@@ -16,7 +16,7 @@ interface GoRuntime {
 interface Api {
   check(bytes: Uint8Array, progress?: (stage: string) => void): string;
   repair(bytes: Uint8Array, before?: Counts, options?: RepairOptions, progress?: (stage: string) => void): { data: Uint8Array; json: string };
-  planRepair(bytes: Uint8Array): string;
+  plan(bytes: Uint8Array, options?: RepairOptions): string;
 }
 
 interface WorkerScope {
@@ -114,11 +114,11 @@ scope.addEventListener('message', async e => {
   } else if (msg.type === 'plan') {
     let info: PlanOut;
     try {
-      const parsed = JSON.parse(api.planRepair(bytes)) as PlanOut | { error: string };
+      const parsed = JSON.parse(api.plan(bytes, msg.options)) as PlanOut | { error: string };
       info = 'available' in parsed ? parsed : { available: [], error: parsed.error };
     } catch (err) {
       info = { available: [], error: String(err) };
     }
-    post({ type: 'planned', info });
+    post({ type: 'planned', info, id: msg.id });
   }
 });

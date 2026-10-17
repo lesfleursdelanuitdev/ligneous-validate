@@ -1,0 +1,64 @@
+{
+  "available": [
+    {
+      "fix": "encoding",
+      "lines": 3,
+      "required": false,
+      "kind": "format"
+    },
+    {
+      "fix": "blank-lines",
+      "lines": 1,
+      "required": false,
+      "kind": "format"
+    },
+    {
+      "fix": "long-lines",
+      "lines": 1,
+      "required": false,
+      "reason": "needs the conversion to UTF-8",
+      "kind": "format"
+    },
+    {
+      "fix": "submitter",
+      "lines": 3,
+      "required": false,
+      "kind": "data"
+    }
+  ],
+  "units": {
+    "blank-lines": [
+      {
+        "line": 10,
+        "what": "removed a blank line",
+        "lines": [
+          ""
+        ]
+      }
+    ],
+    "encoding": [
+      {
+        "line": 0,
+        "what": "converted from ANSEL to UTF-8"
+      },
+      {
+        "line": 4,
+        "what": "set the character set to UTF-8",
+        "lines": [
+          "1 CHAR UTF-8"
+        ]
+      }
+    ],
+    "long-lines": [
+      {
+        "line": 9,
+        "what": "split a 310-character line into 2 lines",
+        "lines": [
+          "1 NOTE This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. This note is long. T",
+          "2 CONC his note is long. This note is long. This note is long."
+        ]
+      }
+    ],
+    "submitter": []
+  }
+}

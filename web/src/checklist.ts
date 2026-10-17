@@ -2,12 +2,10 @@
 // which are ticked, which can be ticked, and what a run did. Pure functions
 // (unit-tested in checklist.test.ts); repaircard.ts draws them.
 
-import {
-  NOTE_55, formatNumber, groupChanges, leftItems, lineCount, lineText, countLabel,
-} from './render';
+import { NOTE_55, countLabel, formatNumber, groupChanges, leftItems, lineText } from './render';
 import type { LeftItem } from './render';
-import { CODES, kindOfCode } from './codes';
-import type { Counts, Fix, FixInfo, RepairOut, Result } from './types';
+import { kindOfCode } from './codes';
+import type { Counts, Fix, FixInfo, PlanOut, RepairOut, Result, Unit, Units } from './types';
 
 export const FORMAT_KINDS: Fix[] = ['encoding', 'bom', 'line-endings', 'blank-lines', 'leading-space', 'long-lines', 'trailer'];
 export const DATA_KINDS: Fix[] = ['broken-links', 'empty-families', 'submitter'];
@@ -33,17 +31,15 @@ export const LABELS = { ...FORMAT_LABELS, ...DATA_LABELS } as Record<Fix, string
 export const MAX_NAME = 120;
 
 // The library's reasons (repair/options.go).
-const R_UTF16 = 'this file is UTF-16, so it has to be converted first';
 const R_NEEDS_UTF8 = 'needs the conversion to UTF-8';
 const R_FAMILY_DATA = 'this family has its own information (events, notes or sources)';
 const R_NEEDS_NAME = 'needs a name';
 const R_NEEDS_LINKS = 'needs broken-links too';
-const R_NAME_LONG = 'the name is too long (at most 120 characters)';
+const R_SOME_FAMILIES = "some families need “Remove links to records that don't exist” too";
+const R_READ_CHANGE = 'skipped: it would change how the file is read';
+const R_NAME_LONG = 'the name is too long';
 
 export { isDataCode } from './codes';
-
-/** Where the list of kinds came from: a repair, planRepair(), or an estimate from the findings. */
-export type Source = 'repair' | 'plan' | 'findings';
 
 export interface Run {
   fixes: Fix[];
@@ -55,29 +51,30 @@ export interface Run {
 
 export interface Checklist {
   available: FixInfo[];
-  source: Source;
+  /** Plan's preview for the current ticks; null until Plan has answered. */
+  units: Units | null;
   /** The visitor's own ticks; a kind that isn't here has its default (format on, data off). */
   user: Map<Fix, boolean>;
   name: string;
-  /** Some empty families only go with broken-links: ticking empty-families ticks it too. */
-  needsLinks: boolean;
   /** Kinds ticked on the visitor's behalf, with the kind that did it (for the note). */
   alsoTicked: Map<Fix, Fix>;
   /** The run on screen, or null. */
   ran: Run | null;
 }
 
-export function newChecklist(available: FixInfo[], source: Source, r: Result): Checklist {
-  return {
-    available: sortInfos(available), source, user: new Map(), name: '',
-    needsLinks: familiesNeedLinks(r), alsoTicked: new Map(), ran: null,
-  };
+export function newChecklist(available: FixInfo[], units: Units | null = null): Checklist {
+  return { available: sortInfos(available), units, user: new Map(), name: '', alsoTicked: new Map(), ran: null };
 }
 
-/** A new list of kinds (from planRepair or a run); the visitor's ticks are kept. */
-export function setAvailable(c: Checklist, available: FixInfo[], source: Source): void {
+/** Plan's answer for the current ticks; the visitor's ticks are kept. */
+export function setPlan(c: Checklist, plan: PlanOut): void {
+  c.available = sortInfos(plan.available);
+  c.units = plan.units ?? null;
+}
+
+/** A run's own list of kinds (the same as Plan's); the visitor's ticks and the preview are kept. */
+export function setAvailable(c: Checklist, available: FixInfo[]): void {
   c.available = sortInfos(available);
-  c.source = source;
 }
 
 const sortInfos = (a: FixInfo[]): FixInfo[] =>
@@ -90,7 +87,7 @@ const notOffered = (a: FixInfo): boolean => a.lines <= 0 && !a.required && !!a.r
 
 /** The rows the checklist shows: offered kinds, plus a not-offered one with its reason. */
 function shown(c: Checklist): FixInfo[] {
-  return c.available.filter(a => a.lines > 0 || a.required || notOffered(a) || (a.fix === 'line-endings' && c.source === 'findings'));
+  return c.available.filter(a => a.lines > 0 || a.required || notOffered(a));
 }
 
 const chosenRaw = (c: Checklist, fix: Fix): boolean => {
@@ -157,12 +154,16 @@ export function setChosen(c: Checklist, fix: Fix, on: boolean): Fix[] {
     c.alsoTicked.delete(fix);
     return [];
   }
-  if (fix === 'empty-families' && c.needsLinks && info(c, 'broken-links') && !chosenRaw(c, 'broken-links')) {
-    c.user.set('broken-links', true);
-    c.alsoTicked.set('broken-links', 'empty-families');
-    return ['broken-links'];
+  // What it needs to do all it can (Plan's Needs) is ticked along with it.
+  const also: Fix[] = [];
+  for (const n of a.needs ?? []) {
+    const need = info(c, n);
+    if (!need || !enabled(c, need) || chosenRaw(c, n)) continue;
+    c.user.set(n, true);
+    c.alsoTicked.set(n, fix);
+    also.push(n);
   }
-  return [];
+  return also;
 }
 
 export function setName(c: Checklist, name: string): void {
@@ -196,7 +197,6 @@ export function markRan(c: Checklist, run: Run, out: RepairOut): void {
   const could = out.available ? new Set(out.available.map(a => a.fix)) : null;
   const fixes = could ? run.fixes.filter(f => could.has(f)) : [...run.fixes];
   c.ran = { fixes, name: run.name, leftOut: [...run.leftOut] };
-  if (out.skipped?.some(s => s.fix === 'empty-families' && s.reason === R_NEEDS_LINKS)) c.needsLinks = true;
 }
 
 /** The ticks no longer match the run on screen. */
@@ -226,13 +226,24 @@ export interface RowView {
 
 const plural = (n: number, one: string, many: string) => `${formatNumber(n)} ${n === 1 ? one : many}`;
 
-export function countText(a: FixInfo, source: Source): string {
-  if (a.fix === 'submitter') return plural(a.lines, 'line added', 'lines added');
-  if (a.fix === 'encoding' || a.lines <= 0) return a.kind === 'data' ? '' : 'whole file';
-  if (source === 'findings') {
-    return a.kind === 'data' ? `${formatNumber(a.lines)} found` : `about ${plural(a.lines, 'line', 'lines')}`;
+/** The lines a unit removes (a data kind's line and those under it) or adds (the submitter). */
+function unitLines(fix: Fix, u: { lines?: string[]; removed?: string[]; what: string }): number {
+  const lines = u.lines ?? u.removed ?? [];
+  if (fix === 'submitter') return lines.length || (u.what.startsWith('added a submitter') ? 2 : 1);
+  return 1 + lines.length;
+}
+
+const ADDS = (fix: Fix) => fix === 'submitter';
+
+/** A row's count: Plan's units for a data kind when there are some, else Available's lines. */
+export function countText(a: FixInfo, units: Unit[] | null | undefined): string {
+  if (a.kind === 'data') {
+    const n = units && units.length ? units.reduce((t, u) => t + unitLines(a.fix, u), 0) : a.lines;
+    if (n <= 0) return '';
+    return ADDS(a.fix) ? plural(n, 'line added', 'lines added') : plural(n, 'line removed', 'lines removed');
   }
-  return a.kind === 'data' ? plural(a.lines, 'line removed', 'lines removed') : plural(a.lines, 'line', 'lines');
+  if (a.fix === 'encoding' || a.lines <= 0) return 'whole file';
+  return plural(a.lines, 'line', 'lines');
 }
 
 const sentence = (s: string) => s.charAt(0).toUpperCase() + s.slice(1) + (/[.!?]$/.test(s) ? '' : '.');
@@ -243,26 +254,39 @@ export function reasonText(fix: Fix, reason: string): string {
     case R_NEEDS_UTF8: return `This needs “${LABELS.encoding}” too.`;
     case R_FAMILY_DATA: return 'The family with nobody in it has its own information (events, notes or sources), so it stays.';
     case R_NEEDS_NAME: return 'Type your name to include this.';
-    case R_NEEDS_LINKS: return linksReason();
+    case R_NEEDS_LINKS:
+      return `These families only have nobody in them once the broken links are gone, so this needs “${LABELS['broken-links']}” too.`;
+    case R_SOME_FAMILIES:
+      return `Some families only have nobody in them once the broken links are gone; they need “${LABELS['broken-links']}” too.`;
+    case R_READ_CHANGE: return 'Left as it is where changing it could change how your file is read.';
+    case R_NAME_LONG: return 'The name is too long.';
     default: return reason ? sentence(reason) : '';
   }
 }
 
-const linksReason = () =>
-  `Some of these families only have nobody in them once the broken links are gone, so this needs “${LABELS['broken-links']}” too.`;
+/** Why a kind wants another (Needs) that isn't ticked. */
+function needsText(a: FixInfo, missing: Fix): string {
+  if (a.fix === 'empty-families' && missing === 'broken-links') {
+    return `Some of these families only have nobody in them once the broken links are gone, so this needs “${LABELS['broken-links']}” too.`;
+  }
+  return `To do all it can, this needs “${LABELS[missing]}” too.`;
+}
 
 export function rowView(c: Checklist, a: FixInfo): RowView {
   const on = checked(c, a);
   let reason: string | null = null;
   if (a.required && a.reason) reason = reasonText(a.fix, a.reason);
   else if (notOffered(a) || blocked(c, a)) reason = reasonText(a.fix, a.reason!);
-  else if (a.fix === 'empty-families' && c.needsLinks && info(c, 'broken-links')) reason = linksReason();
+  else {
+    const missing = (a.needs ?? []).find(n => info(c, n) && !checked(c, info(c, n)!));
+    if (missing) reason = needsText(a, missing);
+  }
   let note: string | null = null;
   const also = [...c.alsoTicked].find(([k, by]) => by === a.fix && chosenRaw(c, k));
   if (a.fix === 'submitter' && on && !hasName(c)) note = reasonText('submitter', nameProblem(c.name)!);
   else if (also && on) note = `Also ticked “${LABELS[also[0]]}”, which this needs.`;
   return {
-    fix: a.fix, kind: a.kind, label: LABELS[a.fix] ?? a.fix, count: countText(a, c.source),
+    fix: a.fix, kind: a.kind, label: LABELS[a.fix] ?? a.fix, count: countText(a, c.units?.[a.fix]),
     checked: on, disabled: !enabled(c, a), reason, note, nameField: a.fix === 'submitter' && on,
   };
 }
@@ -279,138 +303,55 @@ export function checklistHeading(c: Checklist, r: Result): string {
   return `We can fix ${formatNumber(n)} ${n === 1 ? 'kind' : 'kinds'} of format problem`;
 }
 
-// ---------------------------------------------------------------- the estimate
-
-const plainEncoding = (enc: string) => enc === 'UTF-8' || enc === 'ASCII' || enc === '';
-
-/** The kinds of fix the findings point to, when there is no repair or plan (big files). */
-export function estimateAvailable(r: Result): FixInfo[] {
-  const count = new Map<string, number>();
-  for (const f of r.findings) count.set(f.code, (count.get(f.code) ?? 0) + 1);
-  const found = (fix: Fix) => (CODES[fix] ?? []).reduce((n, code) => n + (count.get(code) ?? 0), 0);
-  const enc = r.encoding.detected || r.encoding.declared;
-  const utf16 = enc.startsWith('UTF-16');
-  const out: FixInfo[] = [];
-  const add = (fix: Fix, lines: number, over: Partial<FixInfo> = {}) => {
-    const kind = DATA_KINDS.includes(fix) ? 'data' : 'format';
-    out.push({ fix, kind, lines, required: false, ...(utf16 && fix !== 'encoding' ? { reason: R_NEEDS_UTF8 } : {}), ...over });
-  };
-  if (utf16) add('encoding', Math.max(1, r.summary.lines), { required: true, reason: R_UTF16 });
-  else if (!plainEncoding(enc) || found('encoding') > 0) {
-    add('encoding', r.findings.filter(f => CODES.encoding!.includes(f.code) && f.line > 0).length || 1);
-  }
-  if (r.bom && !utf16) add('bom', 1);
-  if (r.bareCR) add('line-endings', 0);
-  for (const fix of ['blank-lines', 'leading-space'] as Fix[]) if (found(fix)) add(fix, found(fix));
-  if (found('long-lines')) add('long-lines', found('long-lines'), !plainEncoding(enc) || utf16 ? { reason: R_NEEDS_UTF8 } : {});
-  if (found('trailer')) add('trailer', 1);
-  for (const fix of ['broken-links', 'empty-families'] as Fix[]) if (found(fix)) add(fix, found(fix));
-  if (found('submitter')) add('submitter', 3);
-  return out;
-}
-
-// ---------------------------------------------------------------- empty families and broken links
-
-const levelOf = (s: string): number => {
-  const m = /^\s*(\d+)\s/.exec(s);
-  return m ? Number(m[1]) : -1;
-};
-const tagOf = (s: string): string => {
-  const parts = s.trim().split(/\s+/);
-  return (parts[1]?.startsWith('@') ? parts[2] : parts[1]) ?? '';
-};
-
-/**
- * The families that only have nobody in them once their broken links are gone
- * (so empty-families needs broken-links): no member and nothing but CHAN,
- * RIN, _UID and REFN, apart from the broken links. Mirrors the library's
- * "needs broken-links too" from the findings and the text. Their first lines.
- */
-export function linkOnlyFamilies(r: Result): number[] {
-  const broken = new Set(r.findings.filter(f => CODES['broken-links']!.includes(f.code) && f.line > 0).map(f => f.line));
-  const empty = new Set(r.findings.filter(f => f.code === 'EMPTY_FAMILY').map(f => f.line));
-  const out: number[] = [];
-  if (broken.size === 0 || !r.text) return out;
-  const total = lineCount(r.text);
-  const seen = new Set<number>();
-  for (const line of broken) {
-    let top = line;
-    while (top > 1 && levelOf(lineText(r.text, top) ?? '') > 0) top--;
-    if (seen.has(top) || empty.has(top)) continue;
-    seen.add(top);
-    const head = lineText(r.text, top) ?? '';
-    if (levelOf(head) !== 0 || tagOf(head) !== 'FAM') continue;
-    let members = false;
-    let own = false;
-    let anyBroken = false;
-    for (let i = top + 1; i <= total; i++) {
-      const t = lineText(r.text, i) ?? '';
-      const lv = levelOf(t);
-      if (lv <= 0) break;
-      if (lv !== 1) continue;
-      if (broken.has(i)) { anyBroken = true; continue; }
-      const tag = tagOf(t);
-      if (tag === 'HUSB' || tag === 'WIFE' || tag === 'CHIL') members = true;
-      else if (!['CHAN', 'RIN', '_UID', 'REFN'].includes(tag)) own = true;
-    }
-    if (anyBroken && !members && !own) out.push(top);
-  }
-  return out.sort((x, y) => x - y);
-}
-
-export const familiesNeedLinks = (r: Result): boolean => linkOnlyFamilies(r).length > 0;
-
 // ---------------------------------------------------------------- Show lines
 
-export interface ExampleLine { line: number; text: string }
-export interface Example extends ExampleLine { nested: ExampleLine[] }
-
-const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
-
-/** The lines nested under `line` (deeper levels), from the file's text. */
-function nestedFromText(text: string, line: number): ExampleLine[] {
-  const total = lineCount(text);
-  const lv = levelOf(lineText(text, line) ?? '');
-  const out: ExampleLine[] = [];
-  if (lv < 0) return out;
-  for (let i = line + 1; i <= total; i++) {
-    const t = lineText(text, i) ?? '';
-    if (levelOf(t) <= lv) break;
-    out.push({ line: i, text: t });
-  }
-  return out;
+export interface ExampleRow {
+  text: string;
+  /** A line the fix adds (the submitter, the trailer, CHAR, the pieces of a split). */
+  added: boolean;
+  /** Nested under the unit's first line (a removed link's or family's own lines). */
+  nested: boolean;
 }
 
+export interface Example {
+  /** 0: the whole file. */
+  line: number;
+  what: string;
+  rows: ExampleRow[];
+}
+
+const capital = (s: string): string => s.charAt(0).toUpperCase() + s.slice(1);
+const REMOVES: Fix[] = ['broken-links', 'empty-families'];
+
 /**
- * Up to 5 example lines for a format kind (20 for a data kind), and how many
- * more there are: from the changes of the run on screen when it had this
- * kind, or else from the findings that kind fixes. A data kind's lines come
- * with the lines nested under them.
+ * The Show lines of a kind, from Plan's units for the current ticks: each
+ * unit under its line number with what it does and its lines (up to 5 for a
+ * format kind, 20 for a data kind), and how many more. Null before Plan has
+ * answered.
  */
-export function examples(fix: Fix, r: Result, out: RepairOut | null): { items: Example[]; more: number } {
+export function examples(fix: Fix, c: Checklist, r: Result): { items: Example[]; more: number } | null {
+  const units = c.units?.[fix];
+  if (!units) return null;
   const cap = DATA_KINDS.includes(fix) ? 20 : 5;
-  const data = DATA_KINDS.includes(fix);
-  const fileLine = (n: number) => lineText(r.text, n);
-  const changes = out?.changes.filter(ch => ch.fix === fix) ?? [];
-  if (changes.length) {
-    const items = changes.slice(0, cap).map((ch): Example => {
-      const text = ch.line > 0 ? fileLine(ch.line) : null;
-      if (text === null || fix === 'submitter') return { line: ch.line > 0 && text !== null ? ch.line : 0, text: capital(ch.what), nested: [] };
-      return { line: ch.line, text, nested: (ch.removed ?? []).map((t, i) => ({ line: ch.line + i + 1, text: t })) };
-    });
-    return { items, more: changes.length - items.length };
-  }
-  const codes = CODES[fix] ?? [];
-  const found = r.findings.filter(f => codes.includes(f.code) && f.line > 0).map(f => f.line);
-  // Families that go once their broken links are gone have no finding of their own.
-  if (fix === 'empty-families') found.push(...linkOnlyFamilies(r));
-  const lines = [...new Set(found)].sort((a, b) => a - b);
-  const items = lines.slice(0, cap).flatMap((n): Example[] => {
-    const text = fileLine(n);
-    if (text === null) return [];
-    return [{ line: n, text, nested: data ? nestedFromText(r.text, n) : [] }];
+  const items = units.slice(0, cap).map((u): Example => {
+    const own = u.line > 0 ? lineText(r.text, u.line) : null;
+    const lines = u.lines ?? [];
+    let rows: ExampleRow[];
+    if (REMOVES.includes(fix)) {
+      rows = [
+        ...(own !== null ? [{ text: own, added: false, nested: false }] : []),
+        ...lines.map(text => ({ text, added: false, nested: true })),
+      ];
+    } else if (fix === 'blank-lines') {
+      rows = [{ text: '', added: false, nested: false }];
+    } else if (lines.length) {
+      rows = lines.map(text => ({ text, added: true, nested: false }));
+    } else {
+      rows = own !== null ? [{ text: own, added: false, nested: false }] : [];
+    }
+    return { line: u.line, what: capital(u.what), rows };
   });
-  return { items, more: lines.length - items.length };
+  return { items, more: units.length - items.length };
 }
 
 // ---------------------------------------------------------------- after a run
@@ -453,10 +394,24 @@ export function resultView(out: RepairOut, r: Result, leftOut: Fix[]): ResultVie
       fix: fix || null,
       label: fix ? LABELS[fix] : null,
       count: applied ? plural(applied.lines, 'line', 'lines') : null,
-      changes: groupChanges(list),
+      // A data kind's changes one by one (each a unit, with the lines it really
+      // removed or added); a format kind's grouped by what was done.
+      changes: fix && DATA_KINDS.includes(fix)
+        ? list.map(ch => {
+          const n = unitLines(fix, ch);
+          const what = ADDS(fix) ? plural(n, 'line added', 'lines added') : plural(n, 'line removed', 'lines removed');
+          return `${capital(ch.what)}: ${ch.line > 0 ? `line ${formatNumber(ch.line)}, ` : ''}${what}`;
+        })
+        : groupChanges(list),
     });
   }
-  const notApplied = (out.skipped ?? []).map(s => ({ fix: s.fix, label: LABELS[s.fix] ?? s.fix, reason: reasonText(s.fix, s.reason ?? '') }));
+  // A kind can be skipped in part (some families need broken-links): that part says how many lines.
+  const partly = (f: Fix) => !!out.applied?.some(a => a.fix === f);
+  const notApplied = (out.skipped ?? []).map(s => ({
+    fix: s.fix,
+    label: (LABELS[s.fix] ?? s.fix) + (partly(s.fix) && s.lines > 0 ? ` (${plural(s.lines, 'line', 'lines')})` : ''),
+    reason: reasonText(s.fix, s.reason ?? ''),
+  }));
   for (const fix of leftOut) {
     if (!notApplied.some(x => x.fix === fix)) {
       notApplied.push({ fix, label: LABELS[fix], reason: reasonText(fix, R_NEEDS_NAME) });
@@ -477,9 +432,14 @@ export function resultView(out: RepairOut, r: Result, leftOut: Fix[]): ResultVie
 
 /** What the live region says when a run asked for has finished. */
 export function announce(out: RepairOut, leftOut: Fix[]): string {
-  const applied = out.applied?.length ?? 0;
-  const not = (out.skipped?.length ?? 0) + leftOut.filter(f => !out.skipped?.some(s => s.fix === f)).length;
-  if (applied === 0 && not === 0) return 'Repaired: nothing needed changing.';
-  const a = `${formatNumber(applied)} ${applied === 1 ? 'kind' : 'kinds'} of fix applied`;
-  return not ? `Repaired: ${a}, ${formatNumber(not)} not applied.` : `Repaired: ${a}.`;
+  const applied = new Set((out.applied ?? []).map(a => a.fix));
+  const skipped = new Set((out.skipped ?? []).map(s => s.fix));
+  for (const f of leftOut) skipped.add(f);
+  const part = [...skipped].filter(f => applied.has(f)).length;
+  const not = skipped.size - part;
+  if (applied.size === 0 && not === 0) return 'Repaired: nothing needed changing.';
+  const bits = [`${formatNumber(applied.size)} ${applied.size === 1 ? 'kind' : 'kinds'} of fix applied`];
+  if (part) bits.push(`${formatNumber(part)} only in part`);
+  if (not) bits.push(`${formatNumber(not)} not applied`);
+  return `Repaired: ${bits.join(', ')}.`;
 }

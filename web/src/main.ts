@@ -6,7 +6,7 @@ import {
   FAILED, REPAIR_FAILED, countBySeverity, doneText, fillDownloads, fillRepairFailed, renderReport, repairPlan, sizeNote, viewKind,
 } from './render';
 import type { ReportSlots } from './render';
-import { announce, estimateAvailable, markRan, newChecklist, selectedFixes, setAvailable } from './checklist';
+import { announce, markRan, newChecklist, selectedFixes, setAvailable, setPlan } from './checklist';
 import type { Checklist, Run } from './checklist';
 import { mountRepairCard } from './repaircard';
 import type { RepairCard } from './repaircard';
@@ -29,20 +29,18 @@ const bar = progressBar($<HTMLElement>('progress'));
 const LOADING = 'Getting the checker ready…';
 const MAKING_REPAIR = 'Making a repaired copy…';
 const MB = 1024 * 1024;
-/** Above this, nothing runs by itself: the checklist comes from planRepair or the findings. */
+/** Above this the repair waits for a click; the preview (Plan, a fraction of a check) always runs. */
 const AUTO_LIMIT = 5 * MB;
-/**
- * planRepair costs about as much as a check (the library writes and checks
- * the unchanged copy), so above this the checklist is estimated from the
- * findings instead.
- */
-const PLAN_LIMIT = 10 * MB;
+/** Plan again this long after the last change of the ticks or the name. */
+const REPLAN_MS = 150;
 
 let worker: Worker | null = null;
 let ready = false; // the current worker has loaded the checker
 let busy = false; // a check is running
 let repairing = false; // a repair has been asked for and not answered yet
-let planning = false; // planRepair has been asked for and not answered yet
+let planning = false; // a plan has been asked for and not answered yet
+let planSeq = 0; // the id of the latest plan asked for; older answers are dropped
+let replanTimer: ReturnType<typeof setTimeout> | undefined;
 let broken = false;
 let current: File | null = null;
 interface Shown {
@@ -56,6 +54,10 @@ interface Shown {
   card: RepairCard | null;
   /** The run the visitor asked for, while it runs. */
   pending: Run | null;
+  /** The repair made by itself failed: the slot says so, and later plans are dropped. */
+  failed: boolean;
+  /** The id of the plan whose answer is on screen. */
+  planShown: number;
 }
 let shown: Shown | null = null;
 let loadPercent = 0; // how much of the current worker's checker has downloaded
@@ -126,7 +128,9 @@ function onResult(result: Result) {
   say(doneText(result), '', kind === 'failed' || kind === 'not-gedcom' ? 'problem' : kind === 'clean' ? 'good' : '');
   const file = current!;
   const slots = renderReport(report, result, file.name);
-  const view: Shown = { file, result, slots, repair: null, data: null, checklist: null, card: null, pending: null };
+  const view: Shown = {
+    file, result, slots, repair: null, data: null, checklist: null, card: null, pending: null, failed: false, planShown: 0,
+  };
   shown = view;
   if (kind === 'report') {
     fillDownloads(slots.downloads,
@@ -138,30 +142,37 @@ function onResult(result: Result) {
     return;
   }
   const plan = repairPlan(result, file.size);
+  if (plan === 'skip') return;
+  // The checklist comes from Plan, for every size. The repair runs by itself
+  // only up to 5 MB; above that it waits for a click.
+  void askPlan(view);
   if (plan === 'auto') void askRepair(file, false);
-  else if (plan === 'offer') {
-    // Nothing runs by itself: the checklist from the findings, then from planRepair when that is cheap.
-    showCard(view, estimateAvailable(result), 'findings');
-    if (file.size <= PLAN_LIMIT) void askPlan(file);
-  }
 }
 
 /** Puts up the checklist for the file on screen (once), or gives it a new list of kinds. */
-function showCard(view: Shown, available: FixInfo[], source: 'repair' | 'plan' | 'findings') {
+function showCard(view: Shown, available: FixInfo[], units: PlanOut['units'] | null) {
   if (view.checklist) {
-    setAvailable(view.checklist, available, source);
-    view.card?.redraw();
+    if (units !== null) setPlan(view.checklist, { available, units });
+    else setAvailable(view.checklist, available);
+    view.card?.update();
     return;
   }
-  const c = newChecklist(available, source, view.result);
+  const c = newChecklist(available, units ?? null);
   view.checklist = c;
   view.card = mountRepairCard(view.slots.repair, {
     result: view.result, checklist: c, big: view.file.size > AUTO_LIMIT,
     onRun: run => runAsked(view, run),
+    onChange: () => schedulePlan(view),
     onDownload: () => {
       if (view.data) save(view.data, 'application/octet-stream', downloadName(view.file.name, 'repaired'));
     },
   });
+}
+
+/** Plans again for the current ticks, once they have stopped changing for a moment. */
+function schedulePlan(view: Shown) {
+  clearTimeout(replanTimer);
+  replanTimer = setTimeout(() => { if (shown === view) void askPlan(view); }, REPLAN_MS);
 }
 
 /** "Repair everything" or "Repair selected": a run with the bar and Stop; big files get a fresh worker. */
@@ -200,19 +211,23 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   if (!shown || shown.file !== current) return;
   const view = shown;
   if (info.error) {
-    if (view.card) {
+    if (view.card && view.pending) {
       view.card.showFailed();
-      if (view.pending) say(REPAIR_FAILED, '', 'problem');
+      say(REPAIR_FAILED, '', 'problem');
       runEnded(view);
     } else {
+      // The repair made by itself failed: one line, in place of the checklist.
+      view.failed = true;
+      view.card = null;
+      view.checklist = null;
       fillRepairFailed(view.slots.repair);
     }
     return;
   }
-  // An older checker (or a test's fake) may leave out the list of kinds: estimate it.
-  const available = info.available ?? estimateAvailable(view.result);
+  // An older checker (or a test's fake) may leave out the list of kinds.
+  const available = info.available ?? view.checklist?.available ?? [];
   if (!view.checklist && available.length === 0 && info.changes.length === 0) return; // nothing to fix
-  showCard(view, available, info.available ? 'repair' : 'findings');
+  showCard(view, available, null);
   // The run made by itself changed nothing (only suggested fixes are on offer):
   // no copy to download, just the checklist.
   if (!view.pending && info.changes.length === 0) return;
@@ -224,14 +239,25 @@ function onRepaired(data: ArrayBuffer, info: RepairOut) {
   view.card!.showResult(info);
   if (view.pending) say(announce(info, run.leftOut));
   runEnded(view);
+  // A fresh worker for a big file dropped any plan still on its way: ask again.
+  if (view.planShown !== planSeq) schedulePlan(view);
 }
 
-function onPlanned(info: PlanOut) {
+function onPlanned(info: PlanOut, id: number) {
+  if (id !== planSeq) return; // an answer for older ticks
   planning = false;
-  // A failed plan (out of memory, say) can leave the runtime dead; the estimate stays.
-  if (info.error) { restart(); return; }
-  if (!shown || shown.file !== current || !shown.checklist || shown.checklist.source !== 'findings') return;
-  showCard(shown, info.available, 'plan');
+  if (!shown || shown.file !== current || shown.failed) return;
+  const view = shown;
+  if (info.error) {
+    // A failed plan (out of memory, say) can leave the runtime dead. Without a
+    // checklist yet and no repair coming by itself, say the copy can't be made.
+    restart();
+    if (!view.checklist && view.file.size > AUTO_LIMIT) fillRepairFailed(view.slots.repair);
+    return;
+  }
+  view.planShown = id;
+  if (!view.checklist && info.available.length === 0) return; // nothing to fix
+  showCard(view, info.available, info.units ?? {});
 }
 
 function onMessage(e: MessageEvent<FromWorker>) {
@@ -257,7 +283,7 @@ function onMessage(e: MessageEvent<FromWorker>) {
   } else if (msg.type === 'repaired') {
     onRepaired(msg.data, msg.info);
   } else if (msg.type === 'planned') {
-    onPlanned(msg.info);
+    onPlanned(msg.info, msg.id);
   }
   controls();
 }
@@ -315,7 +341,7 @@ async function askRepair(file: File, fresh: boolean, options?: RepairOptions) {
     return;
   }
   if (current !== file || !shown) { repairBarEnd(false); return; }
-  if (fresh || planning) restart();
+  if (fresh) restart();
   const c = countBySeverity(shown.result.findings);
   repairing = true;
   const before = { errors: c.error, warnings: c.warning, hints: c.hint };
@@ -323,17 +349,24 @@ async function askRepair(file: File, fresh: boolean, options?: RepairOptions) {
   controls();
 }
 
-/** Asks for the list of kinds of fix only (planRepair), for the checklist of a big file. */
-async function askPlan(file: File) {
+/**
+ * Asks for the preview (Plan) for the current ticks: what each kind would
+ * change if chosen with them. Before there is a checklist, the default ticks
+ * (every format kind).
+ */
+async function askPlan(view: Shown) {
+  const id = ++planSeq;
   let bytes: ArrayBuffer;
   try {
-    bytes = await file.arrayBuffer();
+    bytes = await view.file.arrayBuffer();
   } catch {
-    return; // the estimate stays
+    return;
   }
-  if (current !== file || !shown || busy || repairing) return;
+  if (id !== planSeq || shown !== view || current !== view.file || busy) return;
+  const c = view.checklist;
+  const options: RepairOptions | undefined = c ? { fixes: selectedFixes(c), submitterName: c.name } : undefined;
   planning = true;
-  worker?.postMessage({ type: 'plan', bytes }, [bytes]);
+  worker?.postMessage(options ? { type: 'plan', bytes, options, id } : { type: 'plan', bytes, id }, [bytes]);
 }
 
 async function check(file: File) {
