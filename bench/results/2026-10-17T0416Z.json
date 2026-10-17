@@ -1,0 +1,2589 @@
+{
+  "env": {
+    "date": "2026-10-17T04:59:02Z",
+    "runs": 10,
+    "nproc": 12,
+    "cpu": "AMD EPYC 9634 84-Core Processor",
+    "memTotal": "32863692 kB",
+    "kernel": "6.8.0-124-generic",
+    "loadStart": "0.26 0.34 0.16",
+    "loadEnd": "3.54 2.67 3.18",
+    "go": "go1.24.4",
+    "node": "v22.23.3",
+    "lease": "015c324a0fcb",
+    "libraries": {
+      "ligneous-gedcom-lib": "v0.3.1",
+      "gedcom-go": "v1.2.0",
+      "read-gedcom": "0.3.2"
+    },
+    "siteCommit": "8c07957",
+    "siteWasmBytes": 5013103,
+    "benchWasmBytes": 3027737,
+    "chromium": "153.0.8010.12"
+  },
+  "expected": {
+    "minimal551.ged": {
+      "individuals": 1,
+      "families": 0,
+      "bytes": 204
+    },
+    "royal92.ged": {
+      "individuals": 3010,
+      "families": 1422,
+      "bytes": 499666
+    },
+    "pres2020.ged": {
+      "individuals": 2322,
+      "families": 1115,
+      "bytes": 1106168
+    },
+    "indented2.ged": {
+      "individuals": 70000,
+      "families": 0,
+      "bytes": 5507917
+    },
+    "synth20.ged": {
+      "individuals": 49989,
+      "families": 12736,
+      "bytes": 21041866
+    },
+    "synth50.ged": {
+      "individuals": 125153,
+      "families": 32066,
+      "bytes": 53175675
+    }
+  },
+  "results": [
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        0.027,
+        0.04,
+        0.033,
+        0.018,
+        0.038,
+        0.034,
+        0.022,
+        0.031,
+        0.015,
+        0.042
+      ],
+      "medianMs": 0.03,
+      "minMs": 0.015,
+      "maxMs": 0.042,
+      "memory": {
+        "totalAllocMiB": 0.01,
+        "peakHeapInuseMiB": 0.03,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        0.052,
+        0.037,
+        0.025,
+        0.022,
+        0.017,
+        0.014,
+        0.01,
+        0.059,
+        0.028,
+        0.075
+      ],
+      "medianMs": 0.03,
+      "minMs": 0.01,
+      "maxMs": 0.075,
+      "memory": {
+        "totalAllocMiB": 0.06,
+        "peakHeapInuseMiB": 0.05,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.185,
+        0.08,
+        0.124,
+        0.089,
+        0.113,
+        0.073,
+        0.083,
+        0.066,
+        0.107,
+        0.078
+      ],
+      "medianMs": 0.09,
+      "minMs": 0.066,
+      "maxMs": 0.185,
+      "memory": {
+        "totalAllocMiB": 0.03,
+        "peakHeapInuseMiB": 0.05,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.029,
+        0.029,
+        0.035,
+        0.029,
+        0.02,
+        0.068,
+        0.044,
+        0.067,
+        0.024,
+        0.077
+      ],
+      "medianMs": 0.03,
+      "minMs": 0.02,
+      "maxMs": 0.077,
+      "memory": {
+        "totalAllocMiB": 0.05,
+        "peakHeapInuseMiB": 0.05,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.015,
+        0.014,
+        0.007,
+        0.018,
+        0.013,
+        0.008,
+        0.016,
+        0.007,
+        0.018,
+        0.015
+      ],
+      "medianMs": 0.01,
+      "minMs": 0.007,
+      "maxMs": 0.018,
+      "memory": {
+        "totalAllocMiB": 0,
+        "peakHeapInuseMiB": 0.01,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.007,
+        0.014,
+        0.008,
+        0.017,
+        0.02,
+        0.011,
+        0.018,
+        0.008,
+        0.008,
+        0.006
+      ],
+      "medianMs": 0.01,
+      "minMs": 0.006,
+      "maxMs": 0.02,
+      "memory": {
+        "totalAllocMiB": 0,
+        "peakHeapInuseMiB": 0.01,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "runs": 10,
+      "timesMs": [
+        19.723,
+        25.096,
+        21.54,
+        26.642,
+        25.774,
+        25.911,
+        23.985,
+        23.973,
+        20.271,
+        24.332
+      ],
+      "medianMs": 24.16,
+      "minMs": 19.723,
+      "maxMs": 26.642,
+      "memory": {
+        "totalAllocMiB": 26.31,
+        "peakHeapInuseMiB": 10.44,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "runs": 10,
+      "timesMs": [
+        25.407,
+        22.16,
+        23.018,
+        23.846,
+        23.962,
+        28.237,
+        30.317,
+        26.042,
+        28.362,
+        27.081
+      ],
+      "medianMs": 25.72,
+      "minMs": 22.16,
+      "maxMs": 30.317,
+      "memory": {
+        "totalAllocMiB": 22.24,
+        "peakHeapInuseMiB": 8.63,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "findings": 67,
+      "runs": 10,
+      "timesMs": [
+        102.036,
+        112.182,
+        97.279,
+        92.366,
+        95.986,
+        99.28,
+        102.442,
+        99.712,
+        104.97,
+        97.036
+      ],
+      "medianMs": 99.5,
+      "minMs": 92.366,
+      "maxMs": 112.182,
+      "memory": {
+        "totalAllocMiB": 67.24,
+        "peakHeapInuseMiB": 19.37,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "findings": 66,
+      "runs": 10,
+      "timesMs": [
+        30.521,
+        36.125,
+        36.441,
+        34.044,
+        30.3,
+        29.032,
+        38.792,
+        34.855,
+        32.989,
+        31.165
+      ],
+      "medianMs": 33.52,
+      "minMs": 29.032,
+      "maxMs": 38.792,
+      "memory": {
+        "totalAllocMiB": 12.01,
+        "peakHeapInuseMiB": 3.91,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "findings": 20,
+      "runs": 10,
+      "timesMs": [
+        188.28,
+        158.123,
+        162.887,
+        168.958,
+        157.494,
+        159.492,
+        152.583,
+        155.544,
+        169.651,
+        163.281
+      ],
+      "medianMs": 161.19,
+      "minMs": 152.583,
+      "maxMs": 188.28,
+      "memory": {
+        "totalAllocMiB": 287.38,
+        "peakHeapInuseMiB": 14.28,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "findings": 20,
+      "runs": 10,
+      "timesMs": [
+        3.1,
+        2.117,
+        1.956,
+        2.043,
+        1.92,
+        2.803,
+        1.791,
+        2.389,
+        1.857,
+        2.22
+      ],
+      "medianMs": 2.08,
+      "minMs": 1.791,
+      "maxMs": 3.1,
+      "memory": {
+        "totalAllocMiB": 0.55,
+        "peakHeapInuseMiB": 0.43,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "runs": 10,
+      "timesMs": [
+        26.531,
+        36.617,
+        30.335,
+        34.731,
+        28.297,
+        33.046,
+        29.26,
+        35.279,
+        31.389,
+        32.322
+      ],
+      "medianMs": 31.86,
+      "minMs": 26.531,
+      "maxMs": 36.617,
+      "memory": {
+        "totalAllocMiB": 40.99,
+        "peakHeapInuseMiB": 15.53,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "runs": 10,
+      "timesMs": [
+        30.649,
+        29.799,
+        29.803,
+        27.929,
+        30.265,
+        29.802,
+        28.486,
+        30.594,
+        35.961,
+        26.655
+      ],
+      "medianMs": 29.8,
+      "minMs": 26.655,
+      "maxMs": 35.961,
+      "memory": {
+        "totalAllocMiB": 24.37,
+        "peakHeapInuseMiB": 13.39,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "findings": 64,
+      "runs": 10,
+      "timesMs": [
+        99.336,
+        103.046,
+        102.884,
+        119.968,
+        101.528,
+        115.634,
+        130.529,
+        114.128,
+        104.922,
+        106.208
+      ],
+      "medianMs": 105.57,
+      "minMs": 99.336,
+      "maxMs": 130.529,
+      "memory": {
+        "totalAllocMiB": 79.61,
+        "peakHeapInuseMiB": 26.98,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "findings": 41,
+      "runs": 10,
+      "timesMs": [
+        33.974,
+        33.91,
+        33.511,
+        32.152,
+        35.107,
+        31.262,
+        39.466,
+        28.497,
+        38.332,
+        31.695
+      ],
+      "medianMs": 33.71,
+      "minMs": 28.497,
+      "maxMs": 39.466,
+      "memory": {
+        "totalAllocMiB": 10.2,
+        "peakHeapInuseMiB": 5.86,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        112.451,
+        113.347,
+        98.448,
+        111.104,
+        98.896,
+        86.52,
+        88.738,
+        75.413,
+        72.582,
+        75.398
+      ],
+      "medianMs": 93.59,
+      "minMs": 72.582,
+      "maxMs": 113.347,
+      "memory": {
+        "totalAllocMiB": 310.66,
+        "peakHeapInuseMiB": 15.49,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.998,
+        1.636,
+        0.999,
+        1.199,
+        0.984,
+        1.718,
+        0.974,
+        0.954,
+        0.972,
+        0.969
+      ],
+      "medianMs": 0.99,
+      "minMs": 0.954,
+      "maxMs": 1.718,
+      "memory": {
+        "totalAllocMiB": 0.33,
+        "peakHeapInuseMiB": 0.28,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        198.906,
+        178.834,
+        175.009,
+        224.44,
+        184.957,
+        183.236,
+        201.224,
+        194.841,
+        203.574,
+        183.69
+      ],
+      "medianMs": 189.9,
+      "minMs": 175.009,
+      "maxMs": 224.44,
+      "memory": {
+        "totalAllocMiB": 372.75,
+        "peakHeapInuseMiB": 141.02,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        202.644,
+        194.333,
+        210.56,
+        205.21,
+        231.126,
+        240.79,
+        232.516,
+        211.836,
+        222.469,
+        212.793
+      ],
+      "medianMs": 212.31,
+      "minMs": 194.333,
+      "maxMs": 240.79,
+      "memory": {
+        "totalAllocMiB": 219.77,
+        "peakHeapInuseMiB": 129.97,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "findings": 280007,
+      "runs": 10,
+      "timesMs": [
+        1660.459,
+        1633.384,
+        1961.465,
+        1726.694,
+        1992.434,
+        1764.813,
+        1696.799,
+        1670.739,
+        1761.259,
+        1709.064
+      ],
+      "medianMs": 1717.88,
+      "minMs": 1633.384,
+      "maxMs": 1992.434,
+      "memory": {
+        "totalAllocMiB": 1485.25,
+        "peakHeapInuseMiB": 276.86,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        489.287,
+        487.666,
+        472.11,
+        454.382,
+        570.412,
+        553.62,
+        477.873,
+        463.261,
+        522.43,
+        477.455
+      ],
+      "medianMs": 482.77,
+      "minMs": 454.382,
+      "maxMs": 570.412,
+      "memory": {
+        "totalAllocMiB": 169.33,
+        "peakHeapInuseMiB": 53.52,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "skipped": true,
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "error": "did not finish one run in 2m0s (child process killed)",
+      "runs": 0,
+      "timesMs": null,
+      "medianMs": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "memory": null,
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "did not finish"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        18.434,
+        21.672,
+        23.246,
+        21.329,
+        21.027,
+        24.252,
+        18.18,
+        18.774,
+        21.606,
+        17.317
+      ],
+      "medianMs": 21.18,
+      "minMs": 17.317,
+      "maxMs": 24.252,
+      "memory": {
+        "totalAllocMiB": 5.3,
+        "peakHeapInuseMiB": 5.32,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "runs": 10,
+      "timesMs": [
+        622.884,
+        632.167,
+        671.969,
+        577.631,
+        595.176,
+        628.923,
+        418.761,
+        548.997,
+        506.728,
+        642.696
+      ],
+      "medianMs": 609.03,
+      "minMs": 418.761,
+      "maxMs": 671.969,
+      "memory": {
+        "totalAllocMiB": 867.07,
+        "peakHeapInuseMiB": 376.48,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "runs": 10,
+      "timesMs": [
+        590.922,
+        656.07,
+        631.461,
+        565.577,
+        656.559,
+        577.08,
+        628.47,
+        622.106,
+        614.489,
+        606.352
+      ],
+      "medianMs": 618.3,
+      "minMs": 565.577,
+      "maxMs": 656.559,
+      "memory": {
+        "totalAllocMiB": 579.2,
+        "peakHeapInuseMiB": 286.6,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "findings": 137,
+      "runs": 10,
+      "timesMs": [
+        2856.82,
+        3045.776,
+        3090.186,
+        3300.434,
+        3213.639,
+        3664.526,
+        3407.331,
+        3130.631,
+        3066.198,
+        2904.72
+      ],
+      "medianMs": 3110.41,
+      "minMs": 2856.82,
+      "maxMs": 3664.526,
+      "memory": {
+        "totalAllocMiB": 2064.12,
+        "peakHeapInuseMiB": 528.4,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "findings": 137,
+      "runs": 10,
+      "timesMs": [
+        1185.634,
+        1088.818,
+        1058.219,
+        1290.683,
+        1054.576,
+        1128.374,
+        1144.981,
+        1162.149,
+        1077.415,
+        1166.609
+      ],
+      "medianMs": 1136.68,
+      "minMs": 1054.576,
+      "maxMs": 1290.683,
+      "memory": {
+        "totalAllocMiB": 282.2,
+        "peakHeapInuseMiB": 124.42,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "note": "one run took 76 s in the probe, so 3 timed runs instead of 10",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "findings": 1,
+      "runs": 3,
+      "timesMs": [
+        75781.16,
+        63791.504,
+        63585.176
+      ],
+      "medianMs": 63791.504,
+      "minMs": 63585.176,
+      "maxMs": 75781.16,
+      "memory": {
+        "totalAllocMiB": 189123.76,
+        "peakHeapInuseMiB": 451.88,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        171.272,
+        154.479,
+        156.222,
+        138.937,
+        171.696,
+        257.213,
+        219.697,
+        259.053,
+        216.097,
+        222.168
+      ],
+      "medianMs": 193.9,
+      "minMs": 138.937,
+      "maxMs": 259.053,
+      "memory": {
+        "totalAllocMiB": 8.72,
+        "peakHeapInuseMiB": 6.63,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "runs": 10,
+      "timesMs": [
+        2031.657,
+        2071.074,
+        1801.45,
+        1624.483,
+        1773.124,
+        1997.986,
+        2289.83,
+        1777.374,
+        1803.554,
+        1841.557
+      ],
+      "medianMs": 1822.56,
+      "minMs": 1624.483,
+      "maxMs": 2289.83,
+      "memory": {
+        "totalAllocMiB": 2347.82,
+        "peakHeapInuseMiB": 973,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "gedcom-go",
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "runs": 10,
+      "timesMs": [
+        2139.909,
+        2024.71,
+        1978.075,
+        1825.605,
+        1799.798,
+        1718.548,
+        1717.965,
+        2186.505,
+        2178.915,
+        1694.173
+      ],
+      "medianMs": 1901.84,
+      "minMs": 1694.173,
+      "maxMs": 2186.505,
+      "memory": {
+        "totalAllocMiB": 1441.05,
+        "peakHeapInuseMiB": 702.78,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "findings": 292,
+      "runs": 10,
+      "timesMs": [
+        8570.889,
+        8553.722,
+        8248.866,
+        8400.885,
+        8246.122,
+        8093.007,
+        8408.599,
+        8894.989,
+        8516.559,
+        8518.07
+      ],
+      "medianMs": 8462.58,
+      "minMs": 8093.007,
+      "maxMs": 8894.989,
+      "memory": {
+        "totalAllocMiB": 5294.43,
+        "peakHeapInuseMiB": 1192.88,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "ligneous-gedcom-lib",
+      "variant": "ValidateWithOptions DateConsistency",
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "findings": 292,
+      "runs": 10,
+      "timesMs": [
+        3186.845,
+        3369.636,
+        3001.778,
+        3155.467,
+        3249.697,
+        3371.525,
+        3310.199,
+        3033.25,
+        3013.386,
+        3105.654
+      ],
+      "medianMs": 3171.16,
+      "minMs": 3001.778,
+      "maxMs": 3371.525,
+      "memory": {
+        "totalAllocMiB": 690.43,
+        "peakHeapInuseMiB": 308.04,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll",
+      "skipped": true,
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "error": "did not finish one run in 2m0s (child process killed)",
+      "runs": 0,
+      "timesMs": null,
+      "medianMs": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "memory": null,
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "did not finish"
+    },
+    {
+      "task": "validate",
+      "library": "gedcom-go",
+      "variant": "ValidateAll minus duplicates",
+      "runtime": "go-native",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        468.024,
+        416.206,
+        419.894,
+        450.048,
+        471.567,
+        405.62,
+        435.516,
+        417.779,
+        443.142,
+        414.467
+      ],
+      "medianMs": 427.71,
+      "minMs": 405.62,
+      "maxMs": 471.567,
+      "memory": {
+        "totalAllocMiB": 22.45,
+        "peakHeapInuseMiB": 16.02,
+        "note": "separate untimed run; peak HeapInuse above the pre-run baseline, sampled every 2 ms"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        0.22,
+        0.19,
+        0.18,
+        0.27,
+        0.19,
+        0.3,
+        0.19,
+        0.29,
+        0.23,
+        0.2
+      ],
+      "medianMs": 0.21,
+      "minMs": 0.18,
+      "maxMs": 0.3,
+      "memory": {
+        "rssMiB": 76.34,
+        "heapUsedDeltaMiB": 0.01,
+        "wasmLinearMemoryMiB": 8,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "runs": 10,
+      "timesMs": [
+        89.85,
+        84.75,
+        82.89,
+        97.5,
+        84.02,
+        80.38,
+        88.31,
+        93.12,
+        88.49,
+        98.31
+      ],
+      "medianMs": 88.4,
+      "minMs": 80.38,
+      "maxMs": 98.31,
+      "memory": {
+        "rssMiB": 103.22,
+        "heapUsedDeltaMiB": 0.01,
+        "wasmLinearMemoryMiB": 24,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "runs": 10,
+      "timesMs": [
+        86.44,
+        85.91,
+        91.92,
+        89.79,
+        88.88,
+        89.61,
+        93.69,
+        95.72,
+        100.26,
+        89.32
+      ],
+      "medianMs": 89.7,
+      "minMs": 85.91,
+      "maxMs": 100.26,
+      "memory": {
+        "rssMiB": 115.09,
+        "heapUsedDeltaMiB": 0.01,
+        "wasmLinearMemoryMiB": 36,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        997.91,
+        906.57,
+        1021.46,
+        1103.42,
+        1119.21,
+        1100.48,
+        1025.57,
+        977.83,
+        1048.87,
+        1238.48
+      ],
+      "medianMs": 1037.22,
+      "minMs": 906.57,
+      "maxMs": 1238.48,
+      "memory": {
+        "rssMiB": 383.34,
+        "heapUsedDeltaMiB": 0.1,
+        "wasmLinearMemoryMiB": 296,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "runs": 10,
+      "timesMs": [
+        1996.21,
+        2091.38,
+        1954.18,
+        1705.82,
+        1722.9,
+        2277.08,
+        1742.1,
+        2025.34,
+        1789.94,
+        1729.22
+      ],
+      "medianMs": 1872.06,
+      "minMs": 1705.82,
+      "maxMs": 2277.08,
+      "memory": {
+        "rssMiB": 581.82,
+        "heapUsedDeltaMiB": 0.15,
+        "wasmLinearMemoryMiB": 480,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "runs": 10,
+      "timesMs": [
+        5316.49,
+        5288.18,
+        5074.85,
+        5058.56,
+        4967.57,
+        5245.41,
+        5302.33,
+        4893.11,
+        5113.19,
+        4818.4
+      ],
+      "medianMs": 5094.02,
+      "minMs": 4818.4,
+      "maxMs": 5316.49,
+      "memory": {
+        "rssMiB": 1684.83,
+        "heapUsedDeltaMiB": 0.14,
+        "wasmLinearMemoryMiB": 1552,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "runs": 10,
+      "timesMs": [
+        0.41,
+        0.36,
+        0.35,
+        0.4,
+        0.28,
+        0.24,
+        0.22,
+        0.41,
+        0.25,
+        0.23
+      ],
+      "medianMs": 0.31,
+      "minMs": 0.22,
+      "maxMs": 0.41,
+      "memory": {
+        "rssMiB": 56.07,
+        "heapUsedDeltaMiB": 0.07,
+        "note": "heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "runs": 10,
+      "timesMs": [
+        86.37,
+        87.19,
+        71.89,
+        77.86,
+        71.52,
+        73.43,
+        70.99,
+        72.66,
+        70.07,
+        72.11
+      ],
+      "medianMs": 72.39,
+      "minMs": 70.07,
+      "maxMs": 87.19,
+      "memory": {
+        "rssMiB": 120.21,
+        "heapUsedDeltaMiB": 24.81,
+        "note": "heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "runs": 10,
+      "timesMs": [
+        129.09,
+        139.37,
+        116.83,
+        109.86,
+        125.09,
+        119.36,
+        116.53,
+        114.66,
+        147.11,
+        131.97
+      ],
+      "medianMs": 122.22,
+      "minMs": 109.86,
+      "maxMs": 147.11,
+      "memory": {
+        "rssMiB": 193.08,
+        "heapUsedDeltaMiB": 57.89,
+        "note": "heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 0,
+      "families": 0,
+      "error": "Invalid format for line 2: \"  1 SOUR X\"",
+      "runs": 0,
+      "timesMs": [],
+      "medianMs": 0,
+      "minMs": 0,
+      "maxMs": 0,
+      "memory": null,
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "invalid: error"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "runs": 10,
+      "timesMs": [
+        2789.34,
+        2741.04,
+        2769.51,
+        2727.81,
+        2875.23,
+        2596.81,
+        2813.66,
+        2862.71,
+        2739.01,
+        2949.96
+      ],
+      "medianMs": 2779.42,
+      "minMs": 2596.81,
+      "maxMs": 2949.96,
+      "memory": {
+        "rssMiB": 1380.68,
+        "heapUsedDeltaMiB": 511.63,
+        "note": "heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "node-js",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "runs": 10,
+      "timesMs": [
+        8752.53,
+        9093.27,
+        8420.15,
+        8211.65,
+        8425.64,
+        8545.69,
+        8423.99,
+        8549.33,
+        8043.05,
+        8294.79
+      ],
+      "medianMs": 8424.81,
+      "minMs": 8043.05,
+      "maxMs": 9093.27,
+      "memory": {
+        "rssMiB": 2569.17,
+        "heapUsedDeltaMiB": 1280.06,
+        "note": "heapUsedDelta = JS heap still held by the returned tree after the call; rss = process total"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "minimal551.ged",
+      "bytes": 204,
+      "individuals": 1,
+      "families": 0,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.78,
+        0.69,
+        0.7,
+        0.69,
+        0.66,
+        0.55,
+        0.66,
+        0.51,
+        0.46,
+        0.57
+      ],
+      "medianMs": 0.66,
+      "minMs": 0.46,
+      "maxMs": 0.78,
+      "memory": {
+        "rssMiB": 88.55,
+        "heapUsedDeltaMiB": 0.01,
+        "wasmLinearMemoryMiB": 8,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "royal92.ged",
+      "bytes": 499666,
+      "individuals": 3010,
+      "families": 1422,
+      "findings": 67,
+      "runs": 10,
+      "timesMs": [
+        429.58,
+        398.38,
+        351.28,
+        368.12,
+        378.02,
+        346.45,
+        347.9,
+        379.75,
+        336.84,
+        379.23
+      ],
+      "medianMs": 373.07,
+      "minMs": 336.84,
+      "maxMs": 429.58,
+      "memory": {
+        "rssMiB": 137.55,
+        "heapUsedDeltaMiB": 1.48,
+        "wasmLinearMemoryMiB": 40,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "pres2020.ged",
+      "bytes": 1106168,
+      "individuals": 2322,
+      "families": 1115,
+      "findings": 64,
+      "runs": 10,
+      "timesMs": [
+        321.5,
+        313.02,
+        331.19,
+        350.25,
+        329.45,
+        323.55,
+        332.44,
+        385.52,
+        359.04,
+        399.09
+      ],
+      "medianMs": 331.81,
+      "minMs": 313.02,
+      "maxMs": 399.09,
+      "memory": {
+        "rssMiB": 157.26,
+        "heapUsedDeltaMiB": 2.61,
+        "wasmLinearMemoryMiB": 52,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "indented2.ged",
+      "bytes": 5507917,
+      "individuals": 70000,
+      "families": 0,
+      "findings": 280007,
+      "runs": 10,
+      "timesMs": [
+        6515.13,
+        6457.61,
+        6119.96,
+        6432.99,
+        7299.02,
+        6664.6,
+        6220.02,
+        7711.46,
+        6649.58,
+        6227.58
+      ],
+      "medianMs": 6486.37,
+      "minMs": 6119.96,
+      "maxMs": 7711.46,
+      "memory": {
+        "rssMiB": 1426.09,
+        "heapUsedDeltaMiB": 92.16,
+        "wasmLinearMemoryMiB": 996,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "synth20.ged",
+      "bytes": 21041866,
+      "individuals": 49989,
+      "families": 12736,
+      "findings": 137,
+      "runs": 10,
+      "timesMs": [
+        11347.49,
+        12281.25,
+        11314.21,
+        10815.02,
+        10863.84,
+        10893.63,
+        10761.46,
+        10784.7,
+        10796.65,
+        10328.16
+      ],
+      "medianMs": 10839.43,
+      "minMs": 10328.16,
+      "maxMs": 12281.25,
+      "memory": {
+        "rssMiB": 1488.26,
+        "heapUsedDeltaMiB": 49.02,
+        "wasmLinearMemoryMiB": 999.25,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "node-wasm",
+      "file": "synth50.ged",
+      "bytes": 53175675,
+      "individuals": 125153,
+      "families": 32066,
+      "findings": 292,
+      "runs": 10,
+      "timesMs": [
+        26771.07,
+        27373.8,
+        26840.7,
+        28788.74,
+        30115.45,
+        31093.83,
+        28579.1,
+        27394.43,
+        28454.86,
+        28179.04
+      ],
+      "medianMs": 28316.95,
+      "minMs": 26771.07,
+      "maxMs": 31093.83,
+      "memory": {
+        "rssMiB": 2630.89,
+        "heapUsedDeltaMiB": 124.22,
+        "wasmLinearMemoryMiB": 2040,
+        "note": "wasmLinearMemory = Go heap size after the run (it never shrinks, so it is the peak so far); rss = process total"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "minimal551.ged",
+      "individuals": 1,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 204,
+      "runs": 10,
+      "timesMs": [
+        0.3,
+        0.3,
+        0.2,
+        0.1,
+        0.1,
+        0.4,
+        0.4,
+        0.3,
+        0.2,
+        0.2
+      ],
+      "medianMs": 0.25,
+      "minMs": 0.1,
+      "maxMs": 0.4,
+      "memory": {
+        "wasmLinearMemoryMiB": 8,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "royal92.ged",
+      "individuals": 3010,
+      "families": 1422,
+      "gcBetweenRuns": true,
+      "bytes": 499666,
+      "runs": 10,
+      "timesMs": [
+        84.5,
+        83.7,
+        98.6,
+        81.3,
+        78.1,
+        91.3,
+        89.9,
+        81.8,
+        88.2,
+        93.2
+      ],
+      "medianMs": 86.35,
+      "minMs": 78.1,
+      "maxMs": 98.6,
+      "memory": {
+        "wasmLinearMemoryMiB": 24,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "pres2020.ged",
+      "individuals": 2322,
+      "families": 1115,
+      "gcBetweenRuns": true,
+      "bytes": 1106168,
+      "runs": 10,
+      "timesMs": [
+        87.4,
+        88.5,
+        86.3,
+        83.7,
+        83.7,
+        81.5,
+        80.7,
+        86.2,
+        87.9,
+        89.9
+      ],
+      "medianMs": 86.25,
+      "minMs": 80.7,
+      "maxMs": 89.9,
+      "memory": {
+        "wasmLinearMemoryMiB": 36,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "indented2.ged",
+      "individuals": 70000,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 5507917,
+      "runs": 10,
+      "timesMs": [
+        956.5,
+        963.7,
+        1118.5,
+        1027.4,
+        1017.8,
+        907.2,
+        962.6,
+        1309.9,
+        1204.7,
+        1108.3
+      ],
+      "medianMs": 1022.6,
+      "minMs": 907.2,
+      "maxMs": 1309.9,
+      "memory": {
+        "wasmLinearMemoryMiB": 276.25,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "synth20.ged",
+      "individuals": 49989,
+      "families": 12736,
+      "gcBetweenRuns": true,
+      "bytes": 21041866,
+      "runs": 10,
+      "timesMs": [
+        1641,
+        1999,
+        1972.5,
+        1842.4,
+        1846.9,
+        1805.8,
+        1949.3,
+        1912.4,
+        1950.1,
+        1782.6
+      ],
+      "medianMs": 1879.65,
+      "minMs": 1641,
+      "maxMs": 1999,
+      "memory": {
+        "wasmLinearMemoryMiB": 480,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "synth50.ged",
+      "individuals": 125153,
+      "families": 32066,
+      "gcBetweenRuns": true,
+      "bytes": 53175675,
+      "runs": 10,
+      "timesMs": [
+        5735,
+        5547.2,
+        5095.6,
+        4940.2,
+        4556,
+        4737.1,
+        4677.8,
+        4754.8,
+        4576.2,
+        5155.1
+      ],
+      "medianMs": 4847.5,
+      "minMs": 4556,
+      "maxMs": 5735,
+      "memory": {
+        "wasmLinearMemoryMiB": 1550.63,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "minimal551.ged",
+      "individuals": 1,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 204,
+      "runs": 10,
+      "timesMs": [
+        0.3,
+        0.5,
+        0.4,
+        0.3,
+        0.2,
+        0.3,
+        0.3,
+        0.3,
+        0.2,
+        0.2
+      ],
+      "medianMs": 0.3,
+      "minMs": 0.2,
+      "maxMs": 0.5,
+      "memory": {
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "royal92.ged",
+      "individuals": 3010,
+      "families": 1422,
+      "gcBetweenRuns": true,
+      "bytes": 499666,
+      "runs": 10,
+      "timesMs": [
+        59.4,
+        43.9,
+        40.3,
+        39.5,
+        56,
+        44.9,
+        40.6,
+        40.7,
+        31,
+        33.8
+      ],
+      "medianMs": 40.65,
+      "minMs": 31,
+      "maxMs": 59.4,
+      "memory": {
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "pres2020.ged",
+      "individuals": 2322,
+      "families": 1115,
+      "gcBetweenRuns": true,
+      "bytes": 1106168,
+      "runs": 10,
+      "timesMs": [
+        53.7,
+        64.1,
+        52.3,
+        56.2,
+        53.3,
+        53.2,
+        53.5,
+        55.7,
+        53,
+        62.7
+      ],
+      "medianMs": 53.6,
+      "minMs": 52.3,
+      "maxMs": 64.1,
+      "memory": {
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "indented2.ged",
+      "individuals": 0,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 5507917,
+      "error": "Invalid format for line 2: \"  1 SOUR X\"",
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "invalid: error"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "synth20.ged",
+      "individuals": 49989,
+      "families": 12736,
+      "gcBetweenRuns": true,
+      "bytes": 21041866,
+      "runs": 10,
+      "timesMs": [
+        1852.2,
+        1831.1,
+        1720.4,
+        1995.8,
+        1865.8,
+        2022.5,
+        1939.2,
+        1930.1,
+        2084.7,
+        2113.7
+      ],
+      "medianMs": 1934.65,
+      "minMs": 1720.4,
+      "maxMs": 2113.7,
+      "memory": {
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "parse",
+      "library": "read-gedcom",
+      "runtime": "chromium-worker-js",
+      "chromium": "153.0.8010.12",
+      "file": "synth50.ged",
+      "individuals": 125153,
+      "families": 32066,
+      "gcBetweenRuns": true,
+      "bytes": 53175675,
+      "runs": 10,
+      "timesMs": [
+        5326.3,
+        5528.1,
+        5152.5,
+        4921.6,
+        5430.3,
+        5847.7,
+        6036.7,
+        6329.9,
+        5721.7,
+        5659.1
+      ],
+      "medianMs": 5593.6,
+      "minMs": 4921.6,
+      "maxMs": 6329.9,
+      "memory": {
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "minimal551.ged",
+      "individuals": 1,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 204,
+      "findings": 1,
+      "runs": 10,
+      "timesMs": [
+        0.9,
+        0.5,
+        0.5,
+        0.6,
+        0.8,
+        0.7,
+        1.1,
+        1.3,
+        0.7,
+        0.5
+      ],
+      "medianMs": 0.7,
+      "minMs": 0.5,
+      "maxMs": 1.3,
+      "memory": {
+        "wasmLinearMemoryMiB": 8,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 1,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "royal92.ged",
+      "individuals": 3010,
+      "families": 1422,
+      "gcBetweenRuns": true,
+      "bytes": 499666,
+      "findings": 67,
+      "runs": 10,
+      "timesMs": [
+        413.2,
+        407.8,
+        449.9,
+        450.8,
+        439.4,
+        348.4,
+        383.1,
+        371.3,
+        436.5,
+        340.1
+      ],
+      "medianMs": 410.5,
+      "minMs": 340.1,
+      "maxMs": 450.8,
+      "memory": {
+        "wasmLinearMemoryMiB": 40,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 3010,
+        "families": 1422
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "pres2020.ged",
+      "individuals": 2322,
+      "families": 1115,
+      "gcBetweenRuns": true,
+      "bytes": 1106168,
+      "findings": 64,
+      "runs": 10,
+      "timesMs": [
+        513.5,
+        439.1,
+        333.2,
+        334.6,
+        348.5,
+        367.5,
+        373,
+        327.9,
+        371.2,
+        415.9
+      ],
+      "medianMs": 369.35,
+      "minMs": 327.9,
+      "maxMs": 513.5,
+      "memory": {
+        "wasmLinearMemoryMiB": 52,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 2322,
+        "families": 1115
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "indented2.ged",
+      "individuals": 70000,
+      "families": 0,
+      "gcBetweenRuns": true,
+      "bytes": 5507917,
+      "findings": 280007,
+      "runs": 10,
+      "timesMs": [
+        6992.9,
+        6618.8,
+        7402.4,
+        6856.7,
+        6296.5,
+        6642.4,
+        6933.4,
+        7286.3,
+        7303.2,
+        6917.6
+      ],
+      "medianMs": 6925.5,
+      "minMs": 6296.5,
+      "maxMs": 7402.4,
+      "memory": {
+        "wasmLinearMemoryMiB": 784,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 70000,
+        "families": 0
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "synth20.ged",
+      "individuals": 49989,
+      "families": 12736,
+      "gcBetweenRuns": true,
+      "bytes": 21041866,
+      "findings": 137,
+      "runs": 10,
+      "timesMs": [
+        10751.8,
+        11332.1,
+        11552.3,
+        10830.1,
+        11420.3,
+        11565.1,
+        10696,
+        10490.8,
+        10729.2,
+        10745.4
+      ],
+      "medianMs": 10790.95,
+      "minMs": 10490.8,
+      "maxMs": 11565.1,
+      "memory": {
+        "wasmLinearMemoryMiB": 920,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 49989,
+        "families": 12736
+      },
+      "status": "valid"
+    },
+    {
+      "task": "check",
+      "library": "ligneous-gedcom-lib",
+      "runtime": "chromium-worker-wasm",
+      "chromium": "153.0.8010.12",
+      "file": "synth50.ged",
+      "individuals": 125153,
+      "families": 32066,
+      "gcBetweenRuns": true,
+      "bytes": 53175675,
+      "findings": 292,
+      "runs": 10,
+      "timesMs": [
+        26703.5,
+        27208.7,
+        26157.3,
+        27318.8,
+        26094.1,
+        26658.5,
+        26488.8,
+        26944.9,
+        27948.3,
+        26452.9
+      ],
+      "medianMs": 26681,
+      "minMs": 26094.1,
+      "maxMs": 27948.3,
+      "memory": {
+        "wasmLinearMemoryMiB": 2216,
+        "note": "performance.memory not exposed in a worker; JS heap n/a"
+      },
+      "expected": {
+        "individuals": 125153,
+        "families": 32066
+      },
+      "status": "valid"
+    }
+  ]
+}
