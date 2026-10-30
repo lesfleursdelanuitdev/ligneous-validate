@@ -183,38 +183,68 @@ describe('no partner: a placeholder per family, never one shared id', () => {
   });
 });
 
-describe('the living rule', () => {
+describe('the living rule (T10)', () => {
   const t = build(livingJSON);
   const living = (id: string) => person(t, id).isLiving;
 
   it.each([
-    ['@I1@', true, 'born 100 years ago (1926): within the last 100 years'],
-    ['@I2@', false, 'born 101 years ago (1925)'],
+    // A death, burial or cremation: dead, whatever the dates.
     ['@I3@', false, 'a DEAT with no date'],
     ['@I4@', false, 'a death year that can\'t be read'],
-    ['@I5@', false, 'a BURI'],
-    ['@I6@', false, 'a CREM'],
-    ['@I7@', true, 'no dates at all'],
-    ['@I8@', false, 'no birth, but a christening in 1850'],
-    ['@I9@', false, 'no dates of their own, but married in 1850'],
-    ['@I10@', true, 'a birth date with no year the enricher can read, and nothing else'],
+    ['@I5@', false, 'a BURI, born 1990'],
+    ['@I6@', false, 'a CREM, born 1990'],
+    // The birth year: dead when over 100 years ago.
+    ['@I1@', true, 'born 1926, 100 years ago: not over'],
+    ['@I2@', false, 'born 1925, 101 years ago'],
     ['@I11@', true, 'born in the future (2099)'],
-    ['@I12@', false, 'no birth, christened in 2010: the rule as written says dead (see the ledger)'],
-    ['@I13@', false, 'no dates of their own, married in 2015: the rule as written says dead (see the ledger)'],
     ['@I14@', false, 'BET 1920 AND 1930: the enricher\'s year is the first, 1920'],
+    // (1) No birth year: the earliest dated event of their own or of their families.
+    ['@I15@', true, 'christened 1926'],
+    ['@I16@', false, 'christened 1925'],
+    ['@I8@', false, 'christened 1850'],
+    ['@I12@', true, 'christened 2010 (dead under the old rule)'],
+    ['@I9@', false, 'married 1850'],
+    ['@I13@', true, 'married 2015 (dead under the old rule)'],
+    ['@I30@', false, 'christened 1990 but a dated event in 1900: the earliest counts'],
+    // (2) Then the children's births minus 15 years: the earliest child.
+    ['@I17@', true, 'a child born 1941: 1926'],
+    ['@I19@', false, 'a child born 1940: 1925'],
+    ['@I31@', false, 'children born 1960 and 1930: 1915'],
+    // (3) Then the parents' births plus 15 years: the later parent.
+    ['@I21@', true, 'a parent born 1911: 1926'],
+    ['@I23@', false, 'a parent born 1910: 1925'],
+    ['@I34@', true, 'parents born 1800 and 1950: 1965'],
+    // In that order.
+    ['@I25@', true, 'christened 2000, a child born 1900: their own event first'],
+    ['@I27@', true, 'a child born 1960, a parent born 1800: the children before the parents'],
+    // No dates anywhere: living.
+    ['@I7@', true, 'no dates at all'],
+    ['@I10@', true, 'a birth date with no year the enricher can read, and nothing else'],
+    ['@I37@', true, 'a parent with a death but no birth: a parent\'s own estimate isn\'t used'],
   ])('%s is living: %s (%s)', (id, want) => {
     expect(living(id)).toBe(want);
   });
 
+  it('every person of the fixture is in the table above, or a parent or child in it', () => {
+    expect(t.graph.people.filter(p => !isPlaceholder(p.id))).toHaveLength(38);
+  });
+
   it('moves with the year it is given', () => {
     expect(person(build(livingJSON, 2027), '@I1@').isLiving).toBe(false);
+    expect(person(build(livingJSON, 2027), '@I17@').isLiving).toBe(false);
     expect(person(build(livingJSON, 2025), '@I2@').isLiving).toBe(true);
+    expect(person(build(livingJSON, 2025), '@I23@').isLiving).toBe(true);
   });
 
   it('death year and place come from DEAT, as the enricher reads them', () => {
     expect(person(t, '@I4@')).toMatchObject({ birthYear: 2000, deathYear: null });
     expect(t.details.people.get('@I4@')?.death).toEqual({ date: 'UNKNOWN', year: null, place: '' });
     expect(t.details.people.get('@I3@')?.death).toBeNull(); // DEAT Y: no date or place
+  });
+
+  it('an estimate is never shown as a birth year', () => {
+    expect(person(t, '@I12@')).toMatchObject({ birthYear: null, isLiving: true });
+    expect(t.details.people.get('@I12@')?.birth).toBeNull();
   });
 });
 

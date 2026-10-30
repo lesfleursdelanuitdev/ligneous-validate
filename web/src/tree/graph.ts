@@ -4,12 +4,12 @@
 // "The shared shape"). Every value is the enricher's: names, dates and places
 // are read from its tables, never parsed again. The chart rules that the
 // enricher has no part in live here: a placeholder partner per family, the
-// child type (PEDI in lower case), and the living rule. One pass over each table: O(rows).
+// child type (PEDI in lower case), and the living rule (T10). One pass over each table: O(rows).
 //
 // No value imports: Node runs this file as it is (scripts/enrich-times.mjs).
 
 import type { DescendancyPerson, UnionChild, UnionRecord } from './engine';
-import type { EnrichedEvent, Enriched, ParentChildEdge, ParsedDate, Tables } from './tables';
+import type { Enriched, ParentChildEdge, ParsedDate, Tables } from './tables';
 
 /** A person as the conversion gives them: the engine's type, with every field it fills always set. */
 export interface GraphPerson extends DescendancyPerson {
@@ -112,8 +112,10 @@ export function isPlaceholder(id: string): boolean {
   return PLACEHOLDER.test(id);
 }
 
-/** How many years back "born within the last 100 years" reaches: 1926 counts in 2026. */
+/** Born over this many years ago is dead: 1925 in 2026, not 1926. */
 const LIVING_YEARS = 100;
+/** The years between a parent's birth and a child's, for the estimate (T10). */
+const GENERATION_YEARS = 15;
 const DEATH_EVENTS = new Set(['DEAT', 'BURI', 'CREM']);
 
 /** Display gender, as the Gonsalves site maps it (lib/individual-mapper.ts formatGender). */
@@ -207,7 +209,6 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
   const placeOf = (i: number): string | null => (i >= 0 ? t.Places[i]?.original ?? null : null);
   const datePlace = (d: number, p: number): DatePlace | null =>
     d < 0 && p < 0 ? null : { date: date(d)?.original ?? '', year: yearOf(d), place: placeOf(p) ?? '' };
-  const dated = (ev: EnrichedEvent) => yearOf(ev.date_index) !== null;
 
   const people = firstOfEach(t.Individuals, e.lines.individuals);
   const families = firstOfEach(t.Families, e.lines.families);
@@ -217,22 +218,48 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
   const childrenOf = groupBy(t.FamilyChildren, c => c.family_xref);
   const edgesOf = groupBy(t.ParentChild, pc => `${pc.family_xref} ${pc.child_xref}`);
 
-  // A dated family event dates both partners, for "no dates at all".
-  const datedByFamily = new Set<string>();
-  for (const { row: f } of families.first.values()) {
-    if ((eventsOf.get(`FAM ${f.xref}`) ?? []).some(dated)) {
-      for (const x of [f.husband_xref, f.wife_xref]) if (x) datedByFamily.add(x);
+  // What the living rule reads, per person: their birth year, their earliest
+  // dated event (their own or one of the families they are a partner in),
+  // their children's earliest birth and their parents' latest birth. Births
+  // are years the enricher read from BIRT; estimates are never chained.
+  const birthOf = new Map<string, number | null>();
+  for (const [xref, { row: p }] of people.first) birthOf.set(xref, yearOf(p.birth_date_index));
+  const earliestEvent = new Map<string, number>();
+  const earliestChild = new Map<string, number>();
+  const latestParent = new Map<string, number>();
+  const lower = (m: Map<string, number>, k: string, y: number | null) => {
+    if (y !== null && !(y >= (m.get(k) ?? Infinity))) m.set(k, y);
+  };
+  const higher = (m: Map<string, number>, k: string, y: number | null) => {
+    if (y !== null && !(y <= (m.get(k) ?? -Infinity))) m.set(k, y);
+  };
+  for (const xref of people.first.keys()) {
+    for (const ev of eventsOf.get(`INDI ${xref}`) ?? []) lower(earliestEvent, xref, yearOf(ev.date_index));
+  }
+  for (const [famXref, { row: f }] of families.first) {
+    const partners = [f.husband_xref, f.wife_xref].filter((x): x is string => !!x && people.first.has(x));
+    const kids = (childrenOf.get(famXref) ?? []).map(c => c.child_xref);
+    for (const ev of eventsOf.get(`FAM ${famXref}`) ?? []) for (const x of partners) lower(earliestEvent, x, yearOf(ev.date_index));
+    for (const k of kids) for (const x of partners) {
+      lower(earliestChild, x, birthOf.get(k) ?? null);
+      higher(latestParent, k, birthOf.get(x) ?? null);
     }
   }
 
-  // The living rule (spec Part 2): no DEAT, BURI or CREM, and either born
-  // within the last 100 years or no dates at all. A death whose year can't
-  // be read still counts as a death.
-  const living = (xref: string, birthYear: number | null): boolean => {
-    const own = eventsOf.get(`INDI ${xref}`) ?? [];
-    if (own.some(ev => DEATH_EVENTS.has(ev.event_type))) return false;
-    if (birthYear !== null) return birthYear >= opts.thisYear - LIVING_YEARS;
-    return !own.some(dated) && !datedByFamily.has(xref);
+  // The living rule (spec T10). Dead with a DEAT, BURI or CREM event (a
+  // death whose year can't be read is still a death). Otherwise the birth
+  // year, or when it's missing an estimate, first of: (1) the earliest dated
+  // event, (2) the earliest child's birth minus 15 years, (3) the later
+  // parent's birth plus 15 years. Dead when that is over 100 years ago; with
+  // no dates anywhere, living.
+  const living = (xref: string): boolean => {
+    if ((eventsOf.get(`INDI ${xref}`) ?? []).some(ev => DEATH_EVENTS.has(ev.event_type))) return false;
+    const child = earliestChild.get(xref);
+    const parent = latestParent.get(xref);
+    const year = birthOf.get(xref) ?? earliestEvent.get(xref)
+      ?? (child === undefined ? undefined : child - GENERATION_YEARS)
+      ?? (parent === undefined ? undefined : parent + GENERATION_YEARS);
+    return year === undefined || opts.thisYear - year <= LIVING_YEARS;
   };
 
   const graphPeople: GraphPerson[] = [];
@@ -250,7 +277,7 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
       birthPlace: placeOf(p.birth_place_index),
       deathPlace: placeOf(p.death_place_index),
       gender: genderOf(p.sex, p.gender),
-      isLiving: living(xref, birthYear),
+      isLiving: living(xref),
     });
     personDetails.set(xref, {
       line,
