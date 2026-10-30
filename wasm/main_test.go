@@ -9,6 +9,8 @@ import (
 	"strings"
 	"syscall/js"
 	"testing"
+
+	"github.com/lesfleursdelanuitdev/ligneous-validate/check"
 )
 
 func jsBytes(t *testing.T, path string) js.Value {
@@ -170,5 +172,53 @@ func TestPlanErrors(t *testing.T) {
 	}
 	if out := callPlan(t, jsBytes(t, suggested), jsObject(`{"fixes":["nope"]}`)); out.Error == "" {
 		t.Fatal("an unknown fix was accepted")
+	}
+}
+
+// enrich(bytes, progress?) returns check.Enrich as JSON, the same bytes as
+// marshalling it natively, and calls progress with each stage.
+func TestEnrich(t *testing.T) {
+	const royal = "../check/testdata/royal92.ged"
+	raw, err := os.ReadFile(royal)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var stages []string
+	progress := js.FuncOf(func(_ js.Value, a []js.Value) any { stages = append(stages, a[0].String()); return nil })
+	defer progress.Release()
+	got := enrichFn(js.Undefined(), []js.Value{jsBytes(t, royal), progress.Value}).(string)
+	want, err := json.Marshal(check.Enrich(raw))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got != string(want) {
+		t.Fatalf("enrich JSON differs from check.Enrich (%d against %d bytes)", len(got), len(want))
+	}
+	if strings.Join(stages, ",") != "parse,enrich,finish" {
+		t.Fatalf("stages = %v", stages)
+	}
+	// Without a callback, and with one that throws: the same answer.
+	if enrichFn(js.Undefined(), []js.Value{jsBytes(t, royal)}).(string) != got {
+		t.Fatal("no callback: a different answer")
+	}
+	throws := js.Global().Get("Function").New("throw new Error('no')")
+	if enrichFn(js.Undefined(), []js.Value{jsBytes(t, royal), throws}).(string) != got {
+		t.Fatal("a throwing callback changed the answer")
+	}
+}
+
+func TestEnrichErrors(t *testing.T) {
+	var out struct {
+		Error    string `json:"error"`
+		IsGedcom bool   `json:"isGedcom"`
+	}
+	if err := json.Unmarshal([]byte(enrichFn(js.Undefined(), nil).(string)), &out); err != nil || out.Error == "" {
+		t.Fatalf("no bytes: %+v %v", out, err)
+	}
+	png := js.Global().Get("Uint8Array").New(4)
+	js.CopyBytesToJS(png, []byte{0x89, 'P', 'N', 'G'})
+	out.Error = ""
+	if err := json.Unmarshal([]byte(enrichFn(js.Undefined(), []js.Value{png}).(string)), &out); err != nil || out.Error != "" || out.IsGedcom {
+		t.Fatalf("png: %+v %v", out, err)
 	}
 }

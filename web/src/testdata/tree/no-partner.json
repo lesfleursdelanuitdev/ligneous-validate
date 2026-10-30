@@ -1,0 +1,277 @@
+{
+ "isGedcom": true,
+ "parseFindings": {
+  "errors": 0,
+  "warnings": 0,
+  "hints": 0
+ },
+ "tables": {
+  "Individuals": [
+   {
+    "xref": "@I1@",
+    "full_name": "Martha /Lone/",
+    "full_name_lower": "martha /lone/",
+    "sex": "F",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "lone"
+   },
+   {
+    "xref": "@I2@",
+    "full_name": "Tom /Lone/",
+    "full_name_lower": "tom /lone/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "lone"
+   },
+   {
+    "xref": "@I3@",
+    "full_name": "Hugh /Solo/",
+    "full_name_lower": "hugh /solo/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "solo"
+   },
+   {
+    "xref": "@I4@",
+    "full_name": "Ivy /Gone/",
+    "full_name_lower": "ivy /gone/",
+    "sex": "F",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "gone"
+   },
+   {
+    "xref": "@I5@",
+    "full_name": "Orphan /Nobody/",
+    "full_name_lower": "orphan /nobody/",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "nobody"
+   }
+  ],
+  "Families": [
+   {
+    "xref": "@F1@",
+    "wife_xref": "@I1@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 2
+   },
+   {
+    "xref": "@F2@",
+    "husband_xref": "@I3@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 0
+   },
+   {
+    "xref": "@F3@",
+    "husband_xref": "@I99@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F4@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   }
+  ],
+  "Dates": [],
+  "Places": [],
+  "Events": [],
+  "IndividualEvents": [],
+  "FamilyEvents": [],
+  "Spouses": [],
+  "ParentChild": [
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I2@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   }
+  ],
+  "FamilyChildren": [
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I2@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F3@",
+    "child_xref": "@I4@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F4@",
+    "child_xref": "@I5@",
+    "birth_order": 1
+   }
+  ],
+  "NameForms": [
+   {
+    "individual_xref": "@I1@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I2@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I3@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I4@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I5@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   }
+  ],
+  "NameFormGivenNames": [
+   {
+    "name_form_index": 0,
+    "given_name_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "given_name_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "given_name_index": 2,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "given_name_index": 3,
+    "position": 1
+   },
+   {
+    "name_form_index": 4,
+    "given_name_index": 4,
+    "position": 1
+   }
+  ],
+  "NameFormSurnames": [
+   {
+    "name_form_index": 0,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "surname_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "surname_index": 2,
+    "position": 1
+   },
+   {
+    "name_form_index": 4,
+    "surname_index": 3,
+    "position": 1
+   }
+  ],
+  "GivenNames": [
+   {
+    "value": "Martha",
+    "lower": "martha",
+    "frequency": 1
+   },
+   {
+    "value": "Tom",
+    "lower": "tom",
+    "frequency": 1
+   },
+   {
+    "value": "Hugh",
+    "lower": "hugh",
+    "frequency": 1
+   },
+   {
+    "value": "Ivy",
+    "lower": "ivy",
+    "frequency": 1
+   },
+   {
+    "value": "Orphan",
+    "lower": "orphan",
+    "frequency": 1
+   }
+  ],
+  "Surnames": [
+   {
+    "value": "Lone",
+    "lower": "lone",
+    "frequency": 2
+   },
+   {
+    "value": "Solo",
+    "lower": "solo",
+    "frequency": 1
+   },
+   {
+    "value": "Gone",
+    "lower": "gone",
+    "frequency": 1
+   },
+   {
+    "value": "Nobody",
+    "lower": "nobody",
+    "frequency": 1
+   }
+  ]
+ },
+ "lines": {
+  "individuals": [
+   6,
+   10,
+   14,
+   18,
+   22
+  ],
+  "families": [
+   25,
+   29,
+   31,
+   34
+  ]
+ }
+}

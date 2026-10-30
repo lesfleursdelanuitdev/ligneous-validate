@@ -1,0 +1,297 @@
+{
+ "isGedcom": true,
+ "parseFindings": {
+  "errors": 0,
+  "warnings": 0,
+  "hints": 0
+ },
+ "tables": {
+  "Individuals": [
+   {
+    "xref": "@I1@",
+    "full_name": "Ada /Twice/",
+    "full_name_lower": "ada /twice/",
+    "sex": "F",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "twice"
+   },
+   {
+    "xref": "@I2@",
+    "full_name": "Ben /Twice/",
+    "full_name_lower": "ben /twice/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "twice"
+   },
+   {
+    "xref": "@I3@",
+    "full_name": "Cy /Twice/",
+    "full_name_lower": "cy /twice/",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "twice"
+   },
+   {
+    "xref": "@I4@",
+    "full_name": "Di /Twice/",
+    "full_name_lower": "di /twice/",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "twice"
+   }
+  ],
+  "Families": [
+   {
+    "xref": "@F1@",
+    "husband_xref": "@I2@",
+    "wife_xref": "@I1@",
+    "marriage_date_index": 0,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F1@",
+    "husband_xref": "@I2@",
+    "wife_xref": "@I1@",
+    "marriage_date_index": 1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   }
+  ],
+  "Dates": [
+   {
+    "original": "1900",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1900,
+    "hash": "663d1036c4b570cb9faeacb09f496376"
+   },
+   {
+    "original": "1910",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1910,
+    "hash": "bea50435547d93b5a7df056531b0f38a"
+   }
+  ],
+  "Places": [],
+  "Events": [
+   {
+    "index": 0,
+    "event_type": "MARR",
+    "event_label": "Marriage",
+    "date_index": 0,
+    "place_index": -1,
+    "owner_xref": "@F1@",
+    "owner_type": "FAM",
+    "sort_order": 0
+   },
+   {
+    "index": 1,
+    "event_type": "MARR",
+    "event_label": "Marriage",
+    "date_index": 1,
+    "place_index": -1,
+    "owner_xref": "@F1@",
+    "owner_type": "FAM",
+    "sort_order": 0
+   }
+  ],
+  "IndividualEvents": [],
+  "FamilyEvents": [
+   {
+    "family_xref": "@F1@",
+    "event_index": 0
+   },
+   {
+    "family_xref": "@F1@",
+    "event_index": 1
+   }
+  ],
+  "Spouses": [
+   {
+    "individual_xref": "@I2@",
+    "spouse_xref": "@I1@",
+    "family_xref": "@F1@"
+   },
+   {
+    "individual_xref": "@I1@",
+    "spouse_xref": "@I2@",
+    "family_xref": "@F1@"
+   },
+   {
+    "individual_xref": "@I2@",
+    "spouse_xref": "@I1@",
+    "family_xref": "@F1@"
+   },
+   {
+    "individual_xref": "@I1@",
+    "spouse_xref": "@I2@",
+    "family_xref": "@F1@"
+   }
+  ],
+  "ParentChild": [
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I3@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I3@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I4@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I4@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   }
+  ],
+  "FamilyChildren": [
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I3@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I4@",
+    "birth_order": 1
+   }
+  ],
+  "NameForms": [
+   {
+    "individual_xref": "@I1@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I2@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I3@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I4@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   }
+  ],
+  "NameFormGivenNames": [
+   {
+    "name_form_index": 0,
+    "given_name_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "given_name_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "given_name_index": 2,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "given_name_index": 3,
+    "position": 1
+   }
+  ],
+  "NameFormSurnames": [
+   {
+    "name_form_index": 0,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "surname_index": 0,
+    "position": 1
+   }
+  ],
+  "GivenNames": [
+   {
+    "value": "Ada",
+    "lower": "ada",
+    "frequency": 1
+   },
+   {
+    "value": "Ben",
+    "lower": "ben",
+    "frequency": 1
+   },
+   {
+    "value": "Cy",
+    "lower": "cy",
+    "frequency": 1
+   },
+   {
+    "value": "Di",
+    "lower": "di",
+    "frequency": 1
+   }
+  ],
+  "Surnames": [
+   {
+    "value": "Twice",
+    "lower": "twice",
+    "frequency": 4
+   }
+  ]
+ },
+ "lines": {
+  "individuals": [
+   6,
+   10,
+   14,
+   17
+  ],
+  "families": [
+   20,
+   26
+  ]
+ }
+}

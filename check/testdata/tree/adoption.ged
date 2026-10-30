@@ -1,0 +1,61 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Adam /Stone/
+1 SEX M
+1 FAMS @F1@
+0 @I2@ INDI
+1 NAME Eve /Stone/
+1 SEX F
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME Abel /Stone/
+1 SEX M
+1 FAMC @F1@
+2 PEDI adopted
+1 FAMC @F2@
+2 PEDI birth
+0 @I4@ INDI
+1 NAME Cain /Stone/
+1 SEX M
+1 FAMC @F1@
+2 PEDI foster
+0 @I5@ INDI
+1 NAME Seth /Stone/
+1 SEX M
+1 FAMC @F1@
+0 @I6@ INDI
+1 NAME Enos /Stone/
+1 SEX M
+1 FAMC @F1@
+2 PEDI ADOPTED
+0 @I7@ INDI
+1 NAME Noah /Stone/
+1 SEX M
+1 FAMC @F1@
+2 NOTE Ligneous mixed parentage: biological=@I1@; adoptive=@I2@
+0 @I8@ INDI
+1 NAME Ruth /Field/
+1 SEX F
+1 FAMS @F2@
+0 @I9@ INDI
+1 NAME Lot /Stone/
+1 SEX M
+1 FAMC @F1@
+2 PEDI sealing
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I3@
+1 CHIL @I4@
+1 CHIL @I5@
+1 CHIL @I6@
+1 CHIL @I7@
+1 CHIL @I9@
+0 @F2@ FAM
+1 WIFE @I8@
+1 CHIL @I3@
+0 TRLR

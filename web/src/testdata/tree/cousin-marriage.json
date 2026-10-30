@@ -1,0 +1,990 @@
+{
+ "isGedcom": true,
+ "parseFindings": {
+  "errors": 0,
+  "warnings": 0,
+  "hints": 0
+ },
+ "tables": {
+  "Individuals": [
+   {
+    "xref": "@I1@",
+    "full_name": "George /Hall/",
+    "full_name_lower": "george /hall/",
+    "sex": "M",
+    "birth_date_index": 0,
+    "birth_place_index": -1,
+    "death_date_index": 1,
+    "death_place_index": -1,
+    "primary_surname_lower": "hall",
+    "age_at_death": 70
+   },
+   {
+    "xref": "@I2@",
+    "full_name": "Grace /Hill/",
+    "full_name_lower": "grace /hill/",
+    "sex": "F",
+    "birth_date_index": 2,
+    "birth_place_index": -1,
+    "death_date_index": 3,
+    "death_place_index": -1,
+    "primary_surname_lower": "hill",
+    "age_at_death": 70
+   },
+   {
+    "xref": "@I3@",
+    "full_name": "Arthur /Hall/",
+    "full_name_lower": "arthur /hall/",
+    "sex": "M",
+    "birth_date_index": 4,
+    "birth_place_index": -1,
+    "death_date_index": 5,
+    "death_place_index": -1,
+    "primary_surname_lower": "hall",
+    "age_at_death": 70
+   },
+   {
+    "xref": "@I4@",
+    "full_name": "Bertha /Hall/",
+    "full_name_lower": "bertha /hall/",
+    "sex": "F",
+    "birth_date_index": 6,
+    "birth_place_index": -1,
+    "death_date_index": 7,
+    "death_place_index": -1,
+    "primary_surname_lower": "hall",
+    "age_at_death": 73
+   },
+   {
+    "xref": "@I5@",
+    "full_name": "Clara /Moss/",
+    "full_name_lower": "clara /moss/",
+    "sex": "F",
+    "birth_date_index": 8,
+    "birth_place_index": -1,
+    "death_date_index": 9,
+    "death_place_index": -1,
+    "primary_surname_lower": "moss",
+    "age_at_death": 79
+   },
+   {
+    "xref": "@I6@",
+    "full_name": "David /Reed/",
+    "full_name_lower": "david /reed/",
+    "sex": "M",
+    "birth_date_index": 10,
+    "birth_place_index": -1,
+    "death_date_index": 11,
+    "death_place_index": -1,
+    "primary_surname_lower": "reed",
+    "age_at_death": 66
+   },
+   {
+    "xref": "@I7@",
+    "full_name": "Edward /Hall/",
+    "full_name_lower": "edward /hall/",
+    "sex": "M",
+    "birth_date_index": 12,
+    "birth_place_index": -1,
+    "death_date_index": 13,
+    "death_place_index": -1,
+    "primary_surname_lower": "hall",
+    "age_at_death": 65
+   },
+   {
+    "xref": "@I8@",
+    "full_name": "Flora /Reed/",
+    "full_name_lower": "flora /reed/",
+    "sex": "F",
+    "birth_date_index": 14,
+    "birth_place_index": -1,
+    "death_date_index": 15,
+    "death_place_index": -1,
+    "primary_surname_lower": "reed",
+    "age_at_death": 73
+   },
+   {
+    "xref": "@I9@",
+    "full_name": "Henry /Hall/",
+    "full_name_lower": "henry /hall/",
+    "sex": "M",
+    "birth_date_index": 16,
+    "birth_place_index": -1,
+    "death_date_index": 17,
+    "death_place_index": -1,
+    "primary_surname_lower": "hall",
+    "age_at_death": 70
+   }
+  ],
+  "Families": [
+   {
+    "xref": "@F1@",
+    "husband_xref": "@I1@",
+    "wife_xref": "@I2@",
+    "marriage_date_index": 18,
+    "marriage_place_index": 0,
+    "children_count": 2
+   },
+   {
+    "xref": "@F2@",
+    "husband_xref": "@I3@",
+    "wife_xref": "@I5@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F3@",
+    "husband_xref": "@I6@",
+    "wife_xref": "@I4@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F4@",
+    "husband_xref": "@I7@",
+    "wife_xref": "@I8@",
+    "marriage_date_index": 19,
+    "marriage_place_index": -1,
+    "children_count": 1
+   }
+  ],
+  "Dates": [
+   {
+    "original": "1820",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1820,
+    "hash": "d7b7d1b53fa5ebc37371ddabf83f7520"
+   },
+   {
+    "original": "1890",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1890,
+    "hash": "321f028822c046509c3ba6999f7fae3a"
+   },
+   {
+    "original": "1825",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1825,
+    "hash": "0dcdb1d0844837c823a92bf821cc373f"
+   },
+   {
+    "original": "1895",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1895,
+    "hash": "b113299df2eaf6bfdbe60dc4062d1ea9"
+   },
+   {
+    "original": "1850",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1850,
+    "hash": "fb602ce4a1576561b6ff52a18abd5af8"
+   },
+   {
+    "original": "1920",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1920,
+    "hash": "a4a7a03b1b8ffc80df2518bf789f787a"
+   },
+   {
+    "original": "1852",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1852,
+    "hash": "a98390120b3e0b0febdf809919644d4e"
+   },
+   {
+    "original": "1925",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1925,
+    "hash": "a5e3b564f3f714a14e93b7e40f808726"
+   },
+   {
+    "original": "1851",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1851,
+    "hash": "d6f2635122e10e2d6761a5b2bced7db2"
+   },
+   {
+    "original": "1930",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1930,
+    "hash": "4e842be45a07d79bbdeb1005c2d77e79"
+   },
+   {
+    "original": "1849",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1849,
+    "hash": "f1916156be7814fbff5691d6066931c6"
+   },
+   {
+    "original": "1915",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1915,
+    "hash": "1521713d088cd47e16dc378e96f8827e"
+   },
+   {
+    "original": "1875",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1875,
+    "hash": "7ea2f0b3b0e71538d1f3531d31fb7aff"
+   },
+   {
+    "original": "1940",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1940,
+    "hash": "12e005cd3942172a2d0529fd11a5705a"
+   },
+   {
+    "original": "1877",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1877,
+    "hash": "2cf18a6b911bd24f33c81231bea585db"
+   },
+   {
+    "original": "1950",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1950,
+    "hash": "0291e8a0c873527c93a083e1dbf340f8"
+   },
+   {
+    "original": "1900",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1900,
+    "hash": "663d1036c4b570cb9faeacb09f496376"
+   },
+   {
+    "original": "1970",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1970,
+    "hash": "94ca4dfc76b5f3ffeb529f8f2d168727"
+   },
+   {
+    "original": "1848",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1848,
+    "hash": "e881d3eedb9741490aeec89256d62c21"
+   },
+   {
+    "original": "12 JUN 1898",
+    "type": "EXACT",
+    "calendar": "GREGORIAN",
+    "year": 1898,
+    "month": 6,
+    "day": 12,
+    "hash": "fd892d01f731840c3062ca11ea3735d6"
+   }
+  ],
+  "Places": [
+   {
+    "original": "York, Yorkshire, England",
+    "name": "York",
+    "state": "Yorkshire",
+    "country": "England",
+    "hash": "58a38273171a0d3d17bb12313119924b"
+   }
+  ],
+  "Events": [
+   {
+    "index": 0,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 0,
+    "place_index": -1,
+    "owner_xref": "@I1@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 1,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 1,
+    "place_index": -1,
+    "owner_xref": "@I1@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 2,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 2,
+    "place_index": -1,
+    "owner_xref": "@I2@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 3,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 3,
+    "place_index": -1,
+    "owner_xref": "@I2@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 4,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 4,
+    "place_index": -1,
+    "owner_xref": "@I3@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 5,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 5,
+    "place_index": -1,
+    "owner_xref": "@I3@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 6,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 6,
+    "place_index": -1,
+    "owner_xref": "@I4@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 7,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 7,
+    "place_index": -1,
+    "owner_xref": "@I4@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 8,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 8,
+    "place_index": -1,
+    "owner_xref": "@I5@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 9,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 9,
+    "place_index": -1,
+    "owner_xref": "@I5@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 10,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 10,
+    "place_index": -1,
+    "owner_xref": "@I6@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 11,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 11,
+    "place_index": -1,
+    "owner_xref": "@I6@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 12,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 12,
+    "place_index": -1,
+    "owner_xref": "@I7@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 13,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 13,
+    "place_index": -1,
+    "owner_xref": "@I7@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 14,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 14,
+    "place_index": -1,
+    "owner_xref": "@I8@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 15,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 15,
+    "place_index": -1,
+    "owner_xref": "@I8@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 16,
+    "event_type": "BIRT",
+    "event_label": "Birth",
+    "date_index": 16,
+    "place_index": -1,
+    "owner_xref": "@I9@",
+    "owner_type": "INDI",
+    "sort_order": 0
+   },
+   {
+    "index": 17,
+    "event_type": "DEAT",
+    "event_label": "Death",
+    "date_index": 17,
+    "place_index": -1,
+    "owner_xref": "@I9@",
+    "owner_type": "INDI",
+    "sort_order": 1
+   },
+   {
+    "index": 18,
+    "event_type": "MARR",
+    "event_label": "Marriage",
+    "date_index": 18,
+    "place_index": 0,
+    "owner_xref": "@F1@",
+    "owner_type": "FAM",
+    "sort_order": 0
+   },
+   {
+    "index": 19,
+    "event_type": "MARR",
+    "event_label": "Marriage",
+    "date_index": 19,
+    "place_index": -1,
+    "owner_xref": "@F4@",
+    "owner_type": "FAM",
+    "sort_order": 0
+   }
+  ],
+  "IndividualEvents": [
+   {
+    "individual_xref": "@I1@",
+    "event_index": 0,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I1@",
+    "event_index": 1,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I2@",
+    "event_index": 2,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I2@",
+    "event_index": 3,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I3@",
+    "event_index": 4,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I3@",
+    "event_index": 5,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I4@",
+    "event_index": 6,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I4@",
+    "event_index": 7,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I5@",
+    "event_index": 8,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I5@",
+    "event_index": 9,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I6@",
+    "event_index": 10,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I6@",
+    "event_index": 11,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I7@",
+    "event_index": 12,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I7@",
+    "event_index": 13,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I8@",
+    "event_index": 14,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I8@",
+    "event_index": 15,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I9@",
+    "event_index": 16,
+    "role": "principal"
+   },
+   {
+    "individual_xref": "@I9@",
+    "event_index": 17,
+    "role": "principal"
+   }
+  ],
+  "FamilyEvents": [
+   {
+    "family_xref": "@F1@",
+    "event_index": 18
+   },
+   {
+    "family_xref": "@F4@",
+    "event_index": 19
+   }
+  ],
+  "Spouses": [
+   {
+    "individual_xref": "@I1@",
+    "spouse_xref": "@I2@",
+    "family_xref": "@F1@"
+   },
+   {
+    "individual_xref": "@I2@",
+    "spouse_xref": "@I1@",
+    "family_xref": "@F1@"
+   },
+   {
+    "individual_xref": "@I3@",
+    "spouse_xref": "@I5@",
+    "family_xref": "@F2@"
+   },
+   {
+    "individual_xref": "@I5@",
+    "spouse_xref": "@I3@",
+    "family_xref": "@F2@"
+   },
+   {
+    "individual_xref": "@I6@",
+    "spouse_xref": "@I4@",
+    "family_xref": "@F3@"
+   },
+   {
+    "individual_xref": "@I4@",
+    "spouse_xref": "@I6@",
+    "family_xref": "@F3@"
+   },
+   {
+    "individual_xref": "@I7@",
+    "spouse_xref": "@I8@",
+    "family_xref": "@F4@"
+   },
+   {
+    "individual_xref": "@I8@",
+    "spouse_xref": "@I7@",
+    "family_xref": "@F4@"
+   }
+  ],
+  "ParentChild": [
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I3@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I3@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I4@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I4@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I3@",
+    "child_xref": "@I7@",
+    "family_xref": "@F2@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I5@",
+    "child_xref": "@I7@",
+    "family_xref": "@F2@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I6@",
+    "child_xref": "@I8@",
+    "family_xref": "@F3@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I4@",
+    "child_xref": "@I8@",
+    "family_xref": "@F3@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I7@",
+    "child_xref": "@I9@",
+    "family_xref": "@F4@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I8@",
+    "child_xref": "@I9@",
+    "family_xref": "@F4@",
+    "parent_type": "mother",
+    "relationship_type": "biological"
+   }
+  ],
+  "FamilyChildren": [
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I3@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I4@",
+    "birth_order": 2
+   },
+   {
+    "family_xref": "@F2@",
+    "child_xref": "@I7@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F3@",
+    "child_xref": "@I8@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F4@",
+    "child_xref": "@I9@",
+    "birth_order": 1
+   }
+  ],
+  "NameForms": [
+   {
+    "individual_xref": "@I1@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I2@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I3@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I4@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I5@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I6@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I7@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I8@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I9@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   }
+  ],
+  "NameFormGivenNames": [
+   {
+    "name_form_index": 0,
+    "given_name_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "given_name_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "given_name_index": 2,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "given_name_index": 3,
+    "position": 1
+   },
+   {
+    "name_form_index": 4,
+    "given_name_index": 4,
+    "position": 1
+   },
+   {
+    "name_form_index": 5,
+    "given_name_index": 5,
+    "position": 1
+   },
+   {
+    "name_form_index": 6,
+    "given_name_index": 6,
+    "position": 1
+   },
+   {
+    "name_form_index": 7,
+    "given_name_index": 7,
+    "position": 1
+   },
+   {
+    "name_form_index": 8,
+    "given_name_index": 8,
+    "position": 1
+   }
+  ],
+  "NameFormSurnames": [
+   {
+    "name_form_index": 0,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "surname_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 3,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 4,
+    "surname_index": 2,
+    "position": 1
+   },
+   {
+    "name_form_index": 5,
+    "surname_index": 3,
+    "position": 1
+   },
+   {
+    "name_form_index": 6,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 7,
+    "surname_index": 3,
+    "position": 1
+   },
+   {
+    "name_form_index": 8,
+    "surname_index": 0,
+    "position": 1
+   }
+  ],
+  "GivenNames": [
+   {
+    "value": "George",
+    "lower": "george",
+    "frequency": 1
+   },
+   {
+    "value": "Grace",
+    "lower": "grace",
+    "frequency": 1
+   },
+   {
+    "value": "Arthur",
+    "lower": "arthur",
+    "frequency": 1
+   },
+   {
+    "value": "Bertha",
+    "lower": "bertha",
+    "frequency": 1
+   },
+   {
+    "value": "Clara",
+    "lower": "clara",
+    "frequency": 1
+   },
+   {
+    "value": "David",
+    "lower": "david",
+    "frequency": 1
+   },
+   {
+    "value": "Edward",
+    "lower": "edward",
+    "frequency": 1
+   },
+   {
+    "value": "Flora",
+    "lower": "flora",
+    "frequency": 1
+   },
+   {
+    "value": "Henry",
+    "lower": "henry",
+    "frequency": 1
+   }
+  ],
+  "Surnames": [
+   {
+    "value": "Hall",
+    "lower": "hall",
+    "frequency": 5
+   },
+   {
+    "value": "Hill",
+    "lower": "hill",
+    "frequency": 1
+   },
+   {
+    "value": "Moss",
+    "lower": "moss",
+    "frequency": 1
+   },
+   {
+    "value": "Reed",
+    "lower": "reed",
+    "frequency": 2
+   }
+  ]
+ },
+ "lines": {
+  "individuals": [
+   6,
+   14,
+   22,
+   31,
+   40,
+   48,
+   56,
+   65,
+   74
+  ],
+  "families": [
+   82,
+   90,
+   94,
+   98
+  ]
+ }
+}

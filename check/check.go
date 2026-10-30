@@ -94,10 +94,7 @@ func CheckWithProgress(raw []byte, progress func(stage string)) (res Result) {
 		return res
 	}
 	res.Encoding = doc.Encoding
-	hasHead := doc.Header.Tag == "HEAD"
-	records := len(doc.Individuals) + len(doc.Families) + len(doc.Sources) + len(doc.Notes) +
-		len(doc.Repositories) + len(doc.Media) + len(doc.Submitters)
-	res.IsGedcom = err == nil && (hasHead || records > 0)
+	res.IsGedcom = isGedcom(doc, err)
 
 	step(StageValidate)
 	vopts := validator.DefaultOptions()

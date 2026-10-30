@@ -1,0 +1,73 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Born /Hundred/
+1 BIRT
+2 DATE 1926
+0 @I2@ INDI
+1 NAME Born /Older/
+1 BIRT
+2 DATE 1925
+0 @I3@ INDI
+1 NAME Died /Young/
+1 BIRT
+2 DATE 2000
+1 DEAT Y
+0 @I4@ INDI
+1 NAME Died /Unreadable/
+1 BIRT
+2 DATE 2000
+1 DEAT
+2 DATE UNKNOWN
+0 @I5@ INDI
+1 NAME Buried /Only/
+1 BIRT
+2 DATE 1990
+1 BURI
+0 @I6@ INDI
+1 NAME Cremated /Only/
+1 BIRT
+2 DATE 1990
+1 CREM
+2 PLAC Leeds, Yorkshire, England
+0 @I7@ INDI
+1 NAME No /Dates/
+1 SEX F
+0 @I8@ INDI
+1 NAME Christened /Long Ago/
+1 CHR
+2 DATE 1850
+0 @I9@ INDI
+1 NAME Married /Long Ago/
+1 FAMS @F1@
+0 @I10@ INDI
+1 NAME Unreadable /Birth/
+1 BIRT
+2 DATE abt. 1990s
+0 @I11@ INDI
+1 NAME Future /Birth/
+1 BIRT
+2 DATE 2099
+0 @I12@ INDI
+1 NAME Christened /Recently/
+1 CHR
+2 DATE 2010
+0 @I13@ INDI
+1 NAME Married /Recently/
+1 FAMS @F2@
+0 @I14@ INDI
+1 NAME Born /Between/
+1 BIRT
+2 DATE BET 1920 AND 1930
+0 @F1@ FAM
+1 HUSB @I9@
+1 MARR
+2 DATE 1850
+0 @F2@ FAM
+1 WIFE @I13@
+1 MARR
+2 DATE 2015
+0 TRLR

@@ -1,0 +1,209 @@
+{
+ "isGedcom": true,
+ "parseFindings": {
+  "errors": 0,
+  "warnings": 0,
+  "hints": 0
+ },
+ "tables": {
+  "Individuals": [
+   {
+    "xref": "@I1@",
+    "full_name": "Paul /Loop/",
+    "full_name_lower": "paul /loop/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "loop"
+   },
+   {
+    "xref": "@I2@",
+    "full_name": "Peter /Loop/",
+    "full_name_lower": "peter /loop/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "loop"
+   },
+   {
+    "xref": "@I3@",
+    "full_name": "Sam /Self/",
+    "full_name_lower": "sam /self/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "self"
+   }
+  ],
+  "Families": [
+   {
+    "xref": "@F1@",
+    "husband_xref": "@I2@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F2@",
+    "husband_xref": "@I1@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   },
+   {
+    "xref": "@F3@",
+    "husband_xref": "@I3@",
+    "marriage_date_index": -1,
+    "marriage_place_index": -1,
+    "children_count": 1
+   }
+  ],
+  "Dates": [],
+  "Places": [],
+  "Events": [],
+  "IndividualEvents": [],
+  "FamilyEvents": [],
+  "Spouses": [],
+  "ParentChild": [
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I1@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I1@",
+    "child_xref": "@I2@",
+    "family_xref": "@F2@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   },
+   {
+    "parent_xref": "@I3@",
+    "child_xref": "@I3@",
+    "family_xref": "@F3@",
+    "parent_type": "father",
+    "relationship_type": "biological"
+   }
+  ],
+  "FamilyChildren": [
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I1@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F2@",
+    "child_xref": "@I2@",
+    "birth_order": 1
+   },
+   {
+    "family_xref": "@F3@",
+    "child_xref": "@I3@",
+    "birth_order": 1
+   }
+  ],
+  "NameForms": [
+   {
+    "individual_xref": "@I1@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I2@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   },
+   {
+    "individual_xref": "@I3@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
+   }
+  ],
+  "NameFormGivenNames": [
+   {
+    "name_form_index": 0,
+    "given_name_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "given_name_index": 1,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "given_name_index": 2,
+    "position": 1
+   }
+  ],
+  "NameFormSurnames": [
+   {
+    "name_form_index": 0,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 1,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 2,
+    "surname_index": 1,
+    "position": 1
+   }
+  ],
+  "GivenNames": [
+   {
+    "value": "Paul",
+    "lower": "paul",
+    "frequency": 1
+   },
+   {
+    "value": "Peter",
+    "lower": "peter",
+    "frequency": 1
+   },
+   {
+    "value": "Sam",
+    "lower": "sam",
+    "frequency": 1
+   }
+  ],
+  "Surnames": [
+   {
+    "value": "Loop",
+    "lower": "loop",
+    "frequency": 2
+   },
+   {
+    "value": "Self",
+    "lower": "self",
+    "frequency": 1
+   }
+  ]
+ },
+ "lines": {
+  "individuals": [
+   6,
+   11,
+   16
+  ],
+  "families": [
+   21,
+   24,
+   27
+  ]
+ }
+}

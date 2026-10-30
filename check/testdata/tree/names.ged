@@ -1,0 +1,31 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME John /Smith/
+1 SEX M
+0 @I2@ INDI
+1 NAME JOHN /SMITH/
+1 SEX M
+0 @I3@ INDI
+1 NAME Mary Ann /Jones/
+2 GIVN Mary Ann
+2 SURN Jonas
+1 NAME Mary /Brown/
+2 TYPE married
+1 NAME Polly
+2 TYPE aka
+1 SEX F
+0 @I4@ INDI
+1 SEX U
+0 @I5@ INDI
+1 NAME /Nogiven/
+0 @I6@ INDI
+1 NAME Cher
+1 SEX F
+0 @I7@ INDI
+1 NAME Bob @@work /Smith/
+1 SEX X
+0 TRLR

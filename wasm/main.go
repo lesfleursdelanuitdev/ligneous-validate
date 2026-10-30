@@ -1,6 +1,7 @@
 //go:build js && wasm
 
-// Command wasm exposes the check package to JavaScript as globalThis.ligneous.
+// Command wasm exposes the check package to JavaScript as globalThis.ligneous:
+// check, repair, plan and save for the validator, enrich for the tree viewer.
 package main
 
 import (
@@ -153,12 +154,32 @@ func saveFn(_ js.Value, args []js.Value) (ret any) {
 	return map[string]any{"data": data, "json": "{}"}
 }
 
+// enrichFn is enrich(bytes, progress?): check.Enrich as JSON, the enricher's
+// own tables for the tree viewer (never the parsed document). The optional
+// second argument is called with each stage name, as check's is.
+func enrichFn(_ js.Value, args []js.Value) (ret any) {
+	defer func() {
+		if r := recover(); r != nil {
+			ret = errJSON(fmt.Sprint(r))
+		}
+	}()
+	if len(args) < 1 {
+		return errJSON("enrich needs a Uint8Array")
+	}
+	b, err := json.Marshal(check.EnrichWithProgress(bytesIn(args[0]), progressFrom(args, 1)))
+	if err != nil {
+		return errJSON(err.Error())
+	}
+	return string(b)
+}
+
 func main() {
 	api := map[string]any{
 		"check":  js.FuncOf(checkFn),
 		"repair": js.FuncOf(repairFn),
 		"plan":   js.FuncOf(planFn),
 		"save":   js.FuncOf(saveFn),
+		"enrich": js.FuncOf(enrichFn),
 	}
 	js.Global().Set("ligneous", js.ValueOf(api))
 	js.Global().Set("ligneousReady", true)
