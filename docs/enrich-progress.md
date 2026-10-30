@@ -123,6 +123,36 @@ Speed, 70k, `buildGraph` alone (Node, 7 runs alternating with the T10 version on
 
 Final check, round 3: `npm run check` under a lease, exit 0: Go ok (`check`, `wasm`), vitest 347 passed in 16 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped, including both privacy tests and the enrich test on desktop and phone; `npx tsc --noEmit -p .` exit 0.
 
+## Round 4: the life-events timeline (T40, amends T25)
+
+### 15. Tables back, and the timeline
+
+- `enrich` brings back **IndividualEvents and FamilyEvents** (Spouses stays out) and adds **Attributes** (OCCU, EDUC, FACT and the rest) and **Residences** (RESI): the enricher keeps occupation and residence out of Events, and the timeline shows them. Both carry their owner, so their link tables aren't needed. All four in the compact form; the every-sample test checks they read back exactly.
+- `web/src/tree/timeline.ts`: `timelineSource(enriched, tree)` indexes the tables once; `timelineFor(id, source, { hideLiving })` gives one person's `TimelineEvent[]`: type (the tag), label (the enricher's `event_label`; for attributes and residence, the same catalogue, mirrored from `enricher/event_label.go`), date as written, year (for sorting), place as written, value (an occupation, an address, `Y`), `context`, and for family events and context the `relation`, `personId` and `familyId`. Own events, attributes and residences; each family's events with the partner; then context: children's births, partners' and parents' deaths, each relative once. Ordered by year, month, day; on a tie, own (in the record's order: the enricher shares one sort order across a person's events, attributes and residences), then family, then context; undated last in the same order. Under Hide living people: nothing for a living person, and no context about a living relative (a dead person's own family events still name a living partner's id; the page shows that person as Living).
+- Why a source and not `timelineFor(id, tables)`: scanning 192,000 events for every click at 70k would cost more than indexing once. The worker builds the source **after posting the tree** (not in "ready") and keeps the last file's; `{type: 'timeline', id, hideLiving, request}` gets `{type: 'timeline', request, id, events}` (or `error: 'no file has been read'`). The tables never go to the page.
+- Tests (`timeline.test.ts`, `check/testdata/tree/timeline.ged`): a long life (birth, christening, residence with an address, occupation twice, an EVEN with a TYPE, death, burial, an undated EDUC; a parent's dated and undated deaths), two partners (marriage, divorce, a family residence, children in each, the first partner's death; the partner's own view), undated events last in file order, a living person (nothing under Hide living people; their events otherwise), a dead grandparent whose living grandchild's birth is left out under Hide living people, nobody and a placeholder. Worker: an answer after a read, none before. Mutation checks: no living-relative filter (1 fails), undated sorted as year 0 (3 fail).
+
+### 16. Measurements, round 4 (2026-10-30 20:55-20:58 UTC, load 0.4-1.5)
+
+| | royal92 before → after | 70k before → after |
+|---|---:|---:|
+| JSON | 1,334,026 → 1,518,240 B (1.27 → 1.45 MiB, +14%) | 41,130,016 → 49,344,507 B (39.2 → 47.1 MiB, +20%) |
+| Ready, Chromium, 5 runs | 397 (382-398) → 386 (364-402) ms | 11,889 (11,644-12,378) → 11,859 (11,282-12,104) ms |
+| Ready, Node, 5 runs | 304 → 294 ms | 12,092 → 12,112 ms |
+| Longest main-thread task | none over 50 ms | none over 50 ms |
+| Timeline index, after ready (Node) | 5-12 ms | 264-452 ms |
+| 1,000 timelines (Node) | 5-16 ms | 32-43 ms |
+| Go heap, one read | 32 → 56 MiB | 1,008 → 1,020 MiB |
+| Renderer peak, Chromium | 189 → 211 MiB | 1,648 → 1,718 MiB |
+
+Budgets (T24): royal92 under 2 s, met; 70k about 13 s with a progress bar and no freeze, met. The time didn't move measurably: the finish stage grew about 0.1 s (1,520 → 1,628 ms), within the run-to-run spread. New tables at 70k: IndividualEvents 5.4 MB, Attributes 1.8 MB, Residences 0.6 MB, FamilyEvents 0.35 MB. The renderer keeps the timeline index (+70 MiB at 70k).
+
+**The phone threshold (T33, 3 MiB) under T40:** pres2020 214 MiB (was 210), people5000 (1.98 MiB) 282 (267), people10000 (4.04 MiB) 545 (511), indented2 (5.25 MiB) 766 (738). Linked files put a 3 MiB file near 410 MiB; royal92's rate, now about 162 MiB per MiB of file, puts a 3 MiB file of its density near 620 MiB, over the assumed 512 MiB. Left at 3 MiB (decided); flagged for momolig: 2 MiB would keep every measured rate under 512 MiB.
+
+`ENRICH_STAGES` unchanged: the 70k split is now 24/51/14/10, within a point or two of the table.
+
+Final check, round 4: `npm run check` under a lease, exit 0: Go ok (`check`, `wasm`), vitest 356 passed in 17 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped, including both privacy tests and the enrich test on desktop and phone; `npx tsc --noEmit -p .` exit 0.
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
@@ -222,3 +252,5 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | c3c62f7 | progress weights and threshold numbers from the final run |
 | 75af2a9 | this ledger, round 2 |
 | 8a5935c | T32: the living rule across the family; this ledger, round 3 |
+| 1d156f7 | T40: IndividualEvents, FamilyEvents, Attributes, Residences; timelineFor; the worker's timeline message |
+| (next) | this ledger, round 4 |

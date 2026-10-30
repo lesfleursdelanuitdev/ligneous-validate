@@ -17,6 +17,7 @@ import { createRequire } from 'node:module';
 import { buildGraph } from '../web/src/tree/graph.ts';
 import { suggestStart } from '../web/src/tree/start.ts';
 import { readEnriched } from '../web/src/tree/tables.ts';
+import { timelineFor, timelineSource } from '../web/src/tree/timeline.ts';
 
 const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
 const args = process.argv.slice(2);
@@ -52,8 +53,16 @@ function once(bytes) {
   const t4 = performance.now();
   const start = suggestStart(tree.graph, enriched.home);
   const t5 = performance.now();
+  // After the tree is posted, the worker indexes the timelines (not in "ready").
+  const source = timelineSource(enriched, tree);
+  const t6 = performance.now();
+  const ids = tree.graph.people.filter(p => p.xref !== null).map(p => p.id);
+  let events = 0;
+  for (let i = 0; i < 1000 && ids.length > 0; i++) events += timelineFor(ids[(i * 7919) % ids.length], source, { hideLiving: false }).length;
+  const t7 = performance.now();
   const stages = Object.fromEntries(marks.map(([s, t], i) => [s, (i + 1 < marks.length ? marks[i + 1][1] : t1) - t]));
-  return { json, parsed, tree, start, enrich: t1 - t0, parse: t2 - t1, read: t3 - t2, graph: t4 - t3, start_: t5 - t4, total: t5 - t0, stages };
+  return { json, parsed, tree, start, enrich: t1 - t0, parse: t2 - t1, read: t3 - t2, graph: t4 - t3, start_: t5 - t4, total: t5 - t0,
+    index: t6 - t5, per1000: t7 - t6, events, stages };
 }
 
 for (const f of files) {
@@ -64,7 +73,7 @@ for (const f of files) {
   const people = warm.tree.graph.people.filter(p => p.xref !== null).length;
   const placeholders = warm.tree.graph.people.length - people;
   const living = warm.tree.graph.people.filter(p => p.xref !== null && p.isLiving).length;
-  const t = { enrich: [], parse: [], read: [], graph: [], start_: [], total: [] };
+  const t = { enrich: [], parse: [], read: [], graph: [], start_: [], total: [], index: [], per1000: [] };
   const stageT = {};
   for (let i = 0; i < Math.max(runs, 1); i++) {
     globalThis.gc?.();
@@ -77,6 +86,7 @@ for (const f of files) {
   console.log(`  ms, median (min-max) of ${runs || 'the one read'}: enrich() ${fmt(t.enrich)}, JSON.parse ${fmt(t.parse)}, tables read back ${fmt(t.read)}, ` +
     `graph ${fmt(t.graph)}, start ${fmt(t.start_)}, ready ${fmt(t.total)}`);
   console.log('  inside enrich(): ' + Object.entries(stageT).map(([s, xs]) => `${s} ${fmt(xs)}`).join(', '));
+  console.log(`  after ready: timeline index ${fmt(t.index)} ms; 1,000 timelines ${fmt(t.per1000)} ms (${warm.events} events)`);
   console.log(`  Go heap (wasm linear memory) so far: ${mib(goHeap())}`);
   if (tables) {
     const rows = Object.entries(warm.parsed.tables)
