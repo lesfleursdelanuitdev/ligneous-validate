@@ -129,4 +129,4 @@ All tested as they are now; none fixed (library read only).
 | 1a543db | worker: the enrich message (`tree/job.ts`) |
 | aa75c17 | measurement scripts, `ENRICH_STAGES`, e2e test |
 | 8768742 | this ledger's measurements, findings and open questions |
-| (next) | `pedi` = the PEDI in lower case, as the engine asked |
+| 4258a2a | `pedi` = the PEDI in lower case, as the engine asked |
