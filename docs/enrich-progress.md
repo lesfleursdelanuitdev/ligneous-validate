@@ -183,6 +183,8 @@ An ADOP event names the next adoptive family's parents (in FAMC order): `relatio
 
 Checks, round 5: `npx tsc --noEmit -p .` exit 0; Go ok (`check`, `wasm`); vitest 384 passed in 17 files; the build ok. **Playwright did not pass: 98 failed, 100 passed, 2 skipped.** 95 of the failures are `net::ERR_CONNECTION_REFUSED at http://localhost:5199/`: the test server went away mid-run while another session's "1034 release check e2e, 7 batches" and a Gonsalves production build ran (load 10.8, momolig's slice at 21.2 of 22 GiB); the other 3 are timeouts in the same minutes. Rerun once those leases end (below).
 
+Rerun after those leases ended: one editor test failed twice in full runs (the first keystroke landing after the rest, "1 SEX F" read " SEX F1"), and a stress run of the editor spec lost its test server again (71 × `ERR_CONNECTION_REFUSED`). momolig's slice had recorded **5 OOM kills** (`memory.events`: `oom_kill 5`, `high` 34.7 million), with another session's 2.3 GB service and several sessions running; the base commit's suite passed (196) between those runs. The editor test passed 5 of 5 on its own, and the editor code and test are unchanged on this branch. With 3 workers instead of 6 (`npx playwright test --workers=3`): **198 passed, 2 skipped, exit 0, no new OOM kill**, both privacy tests and the enrich test on desktop and phone. While the slice is this full, run the suite with fewer workers.
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
@@ -284,4 +286,5 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | 8a5935c | T32: the living rule across the family; this ledger, round 3 |
 | 1d156f7 | T40: IndividualEvents, FamilyEvents, Attributes, Residences; timelineFor; the worker's timeline message |
 | bdaf86e | this ledger, round 4; the timing script times the timeline |
-| (next) | T47-T49: family fixtures, fams/famsOrder, parent and partner families, the two-pass living search, timeline adoptions |
+| ee9c8f8 | T47-T49: family fixtures, fams/famsOrder, parent and partner families, the two-pass living search, timeline adoptions |
+| (next) | ledger: the e2e reruns under memory pressure |
