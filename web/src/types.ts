@@ -1,6 +1,7 @@
 // Mirrors check/check.go, check/summary.go and check/repair.go.
 
 import type { TreeData } from './tree/graph';
+import type { TreePart, TreeSummary } from './tree/parts';
 import type { StartSuggestion } from './tree/start';
 
 export type Severity = 'error' | 'warning' | 'hint';
@@ -160,5 +161,8 @@ export type FromWorker =
   /** The preview of each kind of fix, from plan(). */
   | { type: 'planned'; info: PlanOut; id: number }
   | { type: 'saved'; data: ArrayBuffer; error?: string }
-  | { type: 'enriched'; result: TreeResult }
+  /** The tree viewer: one part of the tree (web/src/tree/parts.ts treeAssembler joins them). */
+  | { type: 'tree-part'; part: TreePart }
+  /** The tree viewer: the rest of the tree, after its parts. */
+  | { type: 'enriched'; summary: TreeSummary }
   | { type: 'error'; message: string };

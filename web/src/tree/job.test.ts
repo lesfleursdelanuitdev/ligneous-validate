@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { runEnrich } from './job';
 import type { EnrichApi } from './job';
+import { treeAssembler } from './parts';
 import type { FromWorker } from '../types';
 import cousinJSON from '../testdata/tree/cousin-marriage.json';
 
@@ -27,10 +28,13 @@ function run(api: EnrichApi, thisYear = 2026): FromWorker[] {
   return posted;
 }
 
+/** The tree as the page gets it: its parts joined, after the summary that ends them. */
 const result = (posted: FromWorker[]) => {
   const last = posted.at(-1);
   if (last?.type !== 'enriched') throw new Error(`last message: ${JSON.stringify(last)}`);
-  return last.result;
+  const join = treeAssembler();
+  for (const m of posted) if (m.type === 'tree-part') join.add(m.part);
+  return join.finish(last.summary);
 };
 
 describe('the worker\'s enrich job', () => {
@@ -38,13 +42,16 @@ describe('the worker\'s enrich job', () => {
     const api = fakeApi(answer);
     const posted = run(api);
     expect(api.got).toEqual([BYTES]);
-    expect(posted.slice(0, -1)).toEqual([
+    expect(posted.slice(0, 5)).toEqual([
       { type: 'status', text: 'Reading the file…' },
       { type: 'stage', job: 'enrich', stage: 'parse' },
       { type: 'stage', job: 'enrich', stage: 'enrich' },
       { type: 'stage', job: 'enrich', stage: 'finish' },
       { type: 'stage', job: 'enrich', stage: 'graph' },
     ]);
+    // Then the tree's parts (one per kind, at this size), then the summary.
+    expect(posted.slice(5).map(m => m.type === 'tree-part' ? m.part.kind : m.type))
+      .toEqual(['people', 'unions', 'personDetails', 'familyDetails', 'enriched']);
     const r = result(posted);
     expect(r.error).toBeUndefined();
     expect(r.isGedcom).toBe(true);

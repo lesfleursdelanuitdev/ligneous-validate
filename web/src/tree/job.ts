@@ -4,6 +4,7 @@
 // tested without the wasm.
 
 import { buildGraph } from './graph';
+import { splitTree } from './parts';
 import { suggestStart } from './start';
 import { readEnriched } from './tables';
 import type { FromWorker, TreeResult } from '../types';
@@ -34,7 +35,8 @@ function errorOnly(json: unknown): string | undefined {
 }
 
 /**
- * Reads the file into a tree and posts it as `enriched`. Each stage is posted
+ * Reads the file into a tree and posts it: `tree-part` messages (parts.ts),
+ * then `enriched` with the rest and the number of parts. Each stage is posted
  * while the job is still running. Any failure (a recovered panic in Go, a
  * crash in the wasm, an answer in the wrong shape) posts an empty tree with
  * the error, as check posts an empty result.
@@ -55,5 +57,7 @@ export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWor
   } catch (err) {
     result = failed(String(err));
   }
-  post({ type: 'enriched', result });
+  const { parts, summary } = splitTree(result);
+  for (const part of parts) post({ type: 'tree-part', part });
+  post({ type: 'enriched', summary });
 }
