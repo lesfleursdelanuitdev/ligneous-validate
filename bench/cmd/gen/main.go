@@ -325,14 +325,38 @@ type counts struct {
 	Families    int `json:"families"`
 }
 
+// people writes a file of about n linked people, in the same shape as the
+// synth files, and returns its counts.
+func people(path string, n int, seed int64) (int, int, error) {
+	r := rand.New(rand.NewSource(seed))
+	ps, fs := build(r, n)
+	f, err := os.Create(path)
+	if err != nil {
+		return 0, 0, err
+	}
+	write(f, r, ps, fs)
+	return len(ps), len(fs), f.Close()
+}
+
 func main() {
 	out := flag.String("out", "", "output directory")
+	n := flag.Int("people", 0, "write only people<N>.ged, about N linked people (the tree viewer's size test)")
 	flag.Parse()
 	if *out == "" {
-		log.Fatal("usage: gen -out DIR")
+		log.Fatal("usage: gen -out DIR [-people N]")
 	}
 	if err := os.MkdirAll(*out, 0o755); err != nil {
 		log.Fatal(err)
+	}
+	if *n > 0 {
+		name := fmt.Sprintf("people%d.ged", *n)
+		i, f, err := people(filepath.Join(*out, name), *n, int64(*n))
+		if err != nil {
+			log.Fatal(err)
+		}
+		b, _ := json.MarshalIndent(map[string]counts{name: {i, f}}, "", "  ")
+		fmt.Println(string(b))
+		return
 	}
 	exp := map[string]counts{"indented2.ged": {70000, 0}}
 	if err := indented(filepath.Join(*out, "indented2.ged")); err != nil {
