@@ -69,25 +69,31 @@ func isEmpty(v reflect.Value) bool {
 	return false
 }
 
-func (t Table[T]) MarshalJSON() ([]byte, error) {
-	rt := reflect.TypeFor[T]()
+// MarshalJSON writes the table compactly (see Table). The work is in
+// marshalCompact, which isn't generic, so the wasm holds it once, not once
+// per row type.
+func (t Table[T]) MarshalJSON() ([]byte, error) { return marshalCompact(reflect.ValueOf([]T(t))) }
+
+func marshalCompact(rows reflect.Value) ([]byte, error) {
+	rt := rows.Type().Elem()
 	if rt.Kind() != reflect.Struct {
 		return nil, fmt.Errorf("compact table of %s: rows must be structs", rt)
 	}
+	n := rows.Len()
 	all := fieldsOf(rt)
 	null := func(row reflect.Value, f field) bool { return f.omitEmpty && isEmpty(row.Field(f.index)) }
 	// Only the columns some row has a value for.
 	var cols []field
 	for _, f := range all {
-		for i := range t {
-			if !null(reflect.ValueOf(&t[i]).Elem(), f) {
+		for i := 0; i < n; i++ {
+			if !null(rows.Index(i), f) {
 				cols = append(cols, f)
 				break
 			}
 		}
 	}
 	var b bytes.Buffer
-	b.Grow(64 + len(t)*16*max(len(cols), 1))
+	b.Grow(64 + n*16*max(len(cols), 1))
 	b.WriteString(`{"columns":[`)
 	for i, f := range cols {
 		if i > 0 {
@@ -96,8 +102,8 @@ func (t Table[T]) MarshalJSON() ([]byte, error) {
 		appendString(&b, f.name)
 	}
 	b.WriteString(`],"rows":[`)
-	for i := range t {
-		row := reflect.ValueOf(&t[i]).Elem()
+	for i := 0; i < n; i++ {
+		row := rows.Index(i)
 		if i > 0 {
 			b.WriteByte(',')
 		}
