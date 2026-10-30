@@ -3,6 +3,7 @@ package check
 import (
 	"bytes"
 	"fmt"
+	"strings"
 
 	"github.com/lesfleursdelanuitdev/ligneous-gedcom-lib/enricher"
 	"github.com/lesfleursdelanuitdev/ligneous-gedcom-lib/gedcom"
@@ -19,34 +20,47 @@ type Enriched struct {
 	// ParseFindings counts the parser's findings (decoding and line-level
 	// problems) by severity. The validator's own findings are not counted:
 	// enrich doesn't run it.
-	ParseFindings Counts `json:"parseFindings"`
-	Tables        Tables `json:"tables"`
-	Lines         Lines  `json:"lines"`
+	ParseFindings Counts       `json:"parseFindings"`
+	Tables        Tables       `json:"tables"`
+	Lines         Lines        `json:"lines"`
+	Home          HomePointers `json:"home"`
 	// Error is set when the library itself failed (a recovered panic).
 	Error string `json:"error,omitempty"`
 }
 
 // Tables are whole tables of enricher.EnrichedDocument, under its own field
-// names and types, never reshaped. To leave a table out, delete its field.
-// Never the Document: the parsed tree is many times the size of the tables.
+// names, their rows never reshaped; as JSON each names its fields once (see
+// Table). To leave a table out, delete its field. IndividualEvents,
+// FamilyEvents and Spouses are left out (spec T25): Events and Families say
+// the same. Never the Document: the parsed tree is many times the size.
 type Tables struct {
-	Individuals      []enricher.EnrichedIndividual
-	Families         []enricher.EnrichedFamily
-	Dates            []enricher.ParsedDate
-	Places           []enricher.ParsedPlace
-	Events           []enricher.Event
-	IndividualEvents []enricher.IndividualEventLink
-	FamilyEvents     []enricher.FamilyEventLink
-	Spouses          []enricher.SpouseEdge
-	ParentChild      []enricher.ParentChildEdge
-	FamilyChildren   []enricher.FamilyChildEdge
+	Individuals    Table[enricher.EnrichedIndividual]
+	Families       Table[enricher.EnrichedFamily]
+	Dates          Table[enricher.ParsedDate]
+	Places         Table[enricher.ParsedPlace]
+	Events         Table[enricher.Event]
+	ParentChild    Table[enricher.ParentChildEdge]
+	FamilyChildren Table[enricher.FamilyChildEdge]
 	// The names: NameForms says whose each form is; its given names and
 	// surnames are in the link tables, their text in GivenNames and Surnames.
-	NameForms          []enricher.NameForm
-	NameFormGivenNames []enricher.NameFormGivenNameLink
-	NameFormSurnames   []enricher.NameFormSurnameLink
-	GivenNames         []enricher.GivenName
-	Surnames           []enricher.Surname
+	NameForms          Table[enricher.NameForm]
+	NameFormGivenNames Table[enricher.NameFormGivenNameLink]
+	NameFormSurnames   Table[enricher.NameFormSurnameLink]
+	GivenNames         Table[enricher.GivenName]
+	Surnames           Table[enricher.Surname]
+}
+
+// HomePointers are the header's pointers to the file's home person (spec
+// T26), as written, trimmed; "" when there is none. Which to use, and whether
+// it names a person, is the page's choice (web/src/tree/start.ts).
+type HomePointers struct {
+	// Home is HEAD's own _HOME line.
+	Home string `json:"home"`
+	// Root is HEAD's own _ROOT line.
+	Root string `json:"root"`
+	// Submitter is the first pointer to an INDI record on the submitter
+	// record that HEAD's SUBM names, whatever its tag (programs differ).
+	Submitter string `json:"submitter"`
 }
 
 // Lines are the 1-based line numbers of the records behind the rows:
@@ -93,50 +107,72 @@ func EnrichWithProgress(raw []byte, progress func(stage string)) (out Enriched) 
 	step(StageEnrich)
 	ed := enricher.Enrich(doc)
 	out.Tables = Tables{
-		Individuals:        nonNil(ed.Individuals),
-		Families:           nonNil(ed.Families),
-		Dates:              nonNil(ed.Dates),
-		Places:             nonNil(ed.Places),
-		Events:             nonNil(ed.Events),
-		IndividualEvents:   nonNil(ed.IndividualEvents),
-		FamilyEvents:       nonNil(ed.FamilyEvents),
-		Spouses:            nonNil(ed.Spouses),
-		ParentChild:        nonNil(ed.ParentChild),
-		FamilyChildren:     nonNil(ed.FamilyChildren),
-		NameForms:          nonNil(ed.NameForms),
-		NameFormGivenNames: nonNil(ed.NameFormGivenNames),
-		NameFormSurnames:   nonNil(ed.NameFormSurnames),
-		GivenNames:         nonNil(ed.GivenNames),
-		Surnames:           nonNil(ed.Surnames),
+		Individuals:        ed.Individuals,
+		Families:           ed.Families,
+		Dates:              ed.Dates,
+		Places:             ed.Places,
+		Events:             ed.Events,
+		ParentChild:        ed.ParentChild,
+		FamilyChildren:     ed.FamilyChildren,
+		NameForms:          ed.NameForms,
+		NameFormGivenNames: ed.NameFormGivenNames,
+		NameFormSurnames:   ed.NameFormSurnames,
+		GivenNames:         ed.GivenNames,
+		Surnames:           ed.Surnames,
 	}
 
 	step(StageFinish)
+	out.Home = homePointers(doc)
 	out.Lines.Individuals = linesOf(doc.Individuals, len(ed.Individuals), func(i int) string { return ed.Individuals[i].Xref })
 	out.Lines.Families = linesOf(doc.Families, len(ed.Families), func(i int) string { return ed.Families[i].Xref })
 	return out
 }
 
+// emptyEnriched is the answer for a file with nothing in it. An empty Table
+// is written as {"columns":[],"rows":[]}, never null.
 func emptyEnriched() Enriched {
-	return Enriched{
-		Tables: Tables{
-			Individuals: []enricher.EnrichedIndividual{}, Families: []enricher.EnrichedFamily{},
-			Dates: []enricher.ParsedDate{}, Places: []enricher.ParsedPlace{}, Events: []enricher.Event{},
-			IndividualEvents: []enricher.IndividualEventLink{}, FamilyEvents: []enricher.FamilyEventLink{},
-			Spouses: []enricher.SpouseEdge{}, ParentChild: []enricher.ParentChildEdge{},
-			FamilyChildren: []enricher.FamilyChildEdge{}, NameForms: []enricher.NameForm{},
-			NameFormGivenNames: []enricher.NameFormGivenNameLink{}, NameFormSurnames: []enricher.NameFormSurnameLink{},
-			GivenNames: []enricher.GivenName{}, Surnames: []enricher.Surname{},
-		},
-		Lines: Lines{Individuals: []int{}, Families: []int{}},
-	}
+	return Enriched{Lines: Lines{Individuals: []int{}, Families: []int{}}}
 }
 
-// nonNil makes an empty table an empty JSON array rather than null.
-func nonNil[T any](s []T) []T {
-	if s == nil {
-		return []T{}
+// pointer is a value that is a pointer (@X1@), trimmed, or "".
+func pointer(v string) string {
+	v = strings.TrimSpace(v)
+	if len(v) > 2 && v[0] == '@' && v[len(v)-1] == '@' && v != "@@" && !strings.HasPrefix(v, "@#") {
+		return v
 	}
-	return s
+	return ""
+}
+
+// homePointers reads the header's home-person pointers (see HomePointers).
+func homePointers(doc *gedcom.GedcomDocument) HomePointers {
+	var h HomePointers
+	if c := doc.Header.FirstChildByTag("_HOME"); c != nil {
+		h.Home = pointer(c.Value)
+	}
+	if c := doc.Header.FirstChildByTag("_ROOT"); c != nil {
+		h.Root = pointer(c.Value)
+	}
+	subm := pointer(doc.Header.ChildValue("SUBM"))
+	if subm == "" {
+		return h
+	}
+	people := make(map[string]bool, len(doc.Individuals))
+	for i := range doc.Individuals {
+		people[doc.Individuals[i].Xref] = true
+	}
+	for i := range doc.Submitters {
+		if doc.Submitters[i].Xref != subm {
+			continue
+		}
+		for _, c := range doc.Submitters[i].Children {
+			if p := pointer(c.Value); p != "" && people[p] {
+				h.Submitter = p
+				return h
+			}
+		}
+		return h // the first record with that xref only
+	}
+	return h
 }
 
 // linesOf gives each of the n enriched rows the line of its record. The

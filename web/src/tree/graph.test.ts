@@ -313,30 +313,41 @@ describe('royal92', () => {
   });
 });
 
-describe('readEnriched checks the answer\'s shape', () => {
-  const good = (): Record<string, unknown> => structuredClone(cousinJSON) as unknown as Record<string, unknown>;
+describe('readEnriched reads the compact answer back into the enricher\'s records', () => {
+  type Table = { columns: string[]; rows: unknown[][] };
+  const good = () => structuredClone(cousinJSON) as unknown as { tables: Record<string, Table>; [k: string]: unknown };
 
   it('accepts every fixture', () => {
     for (const json of Object.values(FIXTURES)) expect(readEnriched(json).isGedcom).toBe(true);
   });
 
-  it('keeps the error of a failed answer', () => {
-    const failed = { ...good(), isGedcom: false, error: 'boom' };
-    expect(readEnriched(failed).error).toBe('boom');
+  it('gives each row as a record, a null being a field left out', () => {
+    const t = readEnriched(namesJSON).tables;
+    expect(t.Individuals[0]).toEqual({
+      xref: '@I1@', full_name: 'John /Smith/', full_name_lower: 'john /smith/', sex: 'M',
+      birth_date_index: -1, birth_place_index: -1, death_date_index: -1, death_place_index: -1, primary_surname_lower: 'smith',
+    });
+    expect('sex' in t.Individuals[4]).toBe(false); // @I5@ has no SEX
+    expect(t.NameForms[3]).toEqual({ individual_xref: '@I3@', name_type: 'married', is_primary: false, sort_order: 1 });
+  });
+
+  it('keeps the header\'s home pointers and the error of a failed answer', () => {
+    expect(readEnriched(cousinJSON).home).toEqual({ home: '', root: '', submitter: '' });
+    expect(readEnriched({ ...good(), isGedcom: false, error: 'boom' }).error).toBe('boom');
   });
 
   it.each([
     ['not an object', () => 'nope'],
     ['no tables', () => ({ ...good(), tables: undefined })],
-    ['a missing table', () => { const j = good(); delete (j.tables as Record<string, unknown>).ParentChild; return j; }],
-    ['a renamed field', () => {
-      const j = good();
-      const rows = (j.tables as Record<string, Record<string, unknown>[]>).Individuals;
-      rows[0] = { ...rows[0], full_name: undefined, fullName: 'x' };
-      return j;
-    }],
+    ['a missing table', () => { const j = good(); delete j.tables.ParentChild; return j; }],
+    ['a table as a plain list (the old answer)', () => { const j = good(); (j.tables as Record<string, unknown>).Families = []; return j; }],
+    ['a renamed field', () => { const j = good(); j.tables.Individuals.columns[1] = 'fullName'; return j; }],
+    ['a value of the wrong type', () => { const j = good(); j.tables.Individuals.rows[0][0] = 7; return j; }],
+    ['a row with a value missing', () => { const j = good(); j.tables.Dates.rows[3].pop(); return j; }],
+    ['a __proto__ column', () => { const j = good(); j.tables.Places.columns[0] = '__proto__'; return j; }],
     ['lines that don\'t match the rows', () => ({ ...good(), lines: { individuals: [1], families: [] } })],
     ['parse findings without counts', () => ({ ...good(), parseFindings: {} })],
+    ['no home pointers', () => ({ ...good(), home: undefined })],
   ])('refuses %s', (_, make) => {
     expect(() => readEnriched(make())).toThrow(/expected shape/);
   });

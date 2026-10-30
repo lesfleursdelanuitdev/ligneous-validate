@@ -38,22 +38,91 @@ func enrichDirect(t *testing.T, raw []byte) *enricher.EnrichedDocument {
 }
 
 // sameTables reports the first table of out that isn't the enricher's own,
-// unchanged: every field of Tables must be a field of EnrichedDocument with
-// the same name and type, and hold the same rows (nil and empty are equal).
+// unchanged: every field of Tables must hold a field of EnrichedDocument with
+// the same name and row type, with the same rows (nil and empty are equal).
 func sameTables(out Tables, ed *enricher.EnrichedDocument) string {
 	tv, ev := reflect.ValueOf(out), reflect.ValueOf(*ed)
 	for i := 0; i < tv.NumField(); i++ {
 		name := tv.Type().Field(i).Name
 		ef, ok := ev.Type().FieldByName(name)
-		if !ok || ef.Type != tv.Type().Field(i).Type {
-			return name + ": not a table of EnrichedDocument with the same type"
+		if !ok || ef.Type != reflect.SliceOf(tv.Type().Field(i).Type.Elem()) {
+			return name + ": not a table of EnrichedDocument with the same row type"
 		}
-		got, want := tv.Field(i), ev.FieldByName(name)
+		got, want := tv.Field(i).Convert(ef.Type), ev.FieldByName(name)
 		if got.Len() == 0 && want.Len() == 0 {
 			continue
 		}
 		if !reflect.DeepEqual(got.Interface(), want.Interface()) {
 			return name + ": rows differ from the enricher's"
+		}
+	}
+	return ""
+}
+
+// plainRecords is a table as encoding/json writes it, read back: one map per row.
+func plainRecords(t *testing.T, rows any) []map[string]any {
+	t.Helper()
+	b, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var out []map[string]any
+	if err := json.Unmarshal(b, &out); err != nil {
+		t.Fatal(err)
+	}
+	return out
+}
+
+// compactRecords reads a compact table back into one map per row, as the
+// page does (web/src/tree/tables.ts): a null value is a field left out.
+func compactRecords(t *testing.T, b []byte) []map[string]any {
+	t.Helper()
+	var c struct {
+		Columns []string `json:"columns"`
+		Rows    [][]any  `json:"rows"`
+	}
+	dec := json.NewDecoder(bytes.NewReader(b))
+	dec.DisallowUnknownFields()
+	if err := dec.Decode(&c); err != nil {
+		t.Fatalf("compact table: %v in %.200s", err, b)
+	}
+	if c.Columns == nil || c.Rows == nil {
+		t.Fatalf("compact table without columns or rows: %.200s", b)
+	}
+	out := make([]map[string]any, len(c.Rows))
+	for i, r := range c.Rows {
+		if len(r) != len(c.Columns) {
+			t.Fatalf("row %d has %d values for %d columns", i, len(r), len(c.Columns))
+		}
+		out[i] = map[string]any{}
+		for j, v := range r {
+			if v != nil {
+				out[i][c.Columns[j]] = v
+			}
+		}
+	}
+	return out
+}
+
+// sameRecords reports the first table whose compact JSON doesn't read back as
+// exactly the records encoding/json would write for it.
+func sameRecords(t *testing.T, out Tables) string {
+	t.Helper()
+	tv := reflect.ValueOf(out)
+	for i := 0; i < tv.NumField(); i++ {
+		name := tv.Type().Field(i).Name
+		f := tv.Field(i)
+		b, err := json.Marshal(f.Interface())
+		if err != nil {
+			return name + ": " + err.Error()
+		}
+		got := compactRecords(t, b)
+		want := plainRecords(t, f.Convert(reflect.SliceOf(f.Type().Elem())).Interface())
+		if len(got) == 0 && len(want) == 0 {
+			continue
+		}
+		if !reflect.DeepEqual(got, want) {
+			return name + ": the compact rows read back differently"
 		}
 	}
 	return ""
@@ -83,25 +152,83 @@ func TestEnrichJSONShape(t *testing.T) {
 	if err := json.Unmarshal(b, &top); err != nil {
 		t.Fatal(err)
 	}
-	if got := keys(top); strings.Join(got, ",") != "isGedcom,lines,parseFindings,tables" {
+	if got := keys(top); strings.Join(got, ",") != "home,isGedcom,lines,parseFindings,tables" {
 		t.Fatalf("top-level keys = %v", got)
 	}
 	var tables map[string]json.RawMessage
 	if err := json.Unmarshal(top["tables"], &tables); err != nil {
 		t.Fatal(err)
 	}
-	want := "Dates,Events,Families,FamilyChildren,FamilyEvents,GivenNames,IndividualEvents,Individuals," +
-		"NameFormGivenNames,NameFormSurnames,NameForms,ParentChild,Places,Spouses,Surnames"
+	// T25: IndividualEvents, FamilyEvents and Spouses are left out.
+	want := "Dates,Events,Families,FamilyChildren,GivenNames,Individuals," +
+		"NameFormGivenNames,NameFormSurnames,NameForms,ParentChild,Places,Surnames"
 	if got := keys(tables); strings.Join(got, ",") != want {
 		t.Fatalf("tables = %v\nwant %s", got, want)
+	}
+	// T24: each table names its fields once, then gives the rows as lists.
+	var people struct {
+		Columns []string `json:"columns"`
+		Rows    [][]any  `json:"rows"`
+	}
+	if err := json.Unmarshal(tables["Individuals"], &people); err != nil {
+		t.Fatal(err)
+	}
+	if strings.Join(people.Columns, ",") != "xref,full_name,full_name_lower,sex,birth_date_index,birth_place_index,"+
+		"death_date_index,death_place_index,primary_surname_lower,birth_country,birth_country_lower" ||
+		len(people.Rows) != 3 || people.Rows[0][0] != "@I1@" || people.Rows[1][9] != nil {
+		t.Fatalf("Individuals = %+v", people)
 	}
 	if bytes.Contains(b, []byte(`"Document"`)) || bytes.Contains(b, []byte(`"children"`)) {
 		t.Fatal("the parsed document was serialized")
 	}
-	// A file with no events: every table is still an array, never null.
+	// A file with no events: every table still has its columns and rows.
 	b, _ = json.Marshal(Enrich([]byte("0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 @I1@ INDI\n0 TRLR\n")))
-	if bytes.Contains(b, []byte("null")) {
-		t.Fatalf("null in %s", b)
+	_ = json.Unmarshal(b, &top)
+	_ = json.Unmarshal(top["tables"], &tables)
+	for name, raw := range tables {
+		if got := compactRecords(t, raw); got == nil {
+			t.Errorf("%s: %s", name, raw)
+		}
+	}
+	if string(tables["Events"]) != `{"columns":[],"rows":[]}` {
+		t.Errorf("Events = %s", tables["Events"])
+	}
+}
+
+// The compact form of a table reads back as the records encoding/json writes,
+// whatever the values: omitted empty fields, odd strings, lists, pointers.
+func TestCompactTable(t *testing.T) {
+	type row struct {
+		ID    string   `json:"id,omitempty"`
+		Name  string   `json:"name"`
+		N     int      `json:"n"`
+		Opt   int      `json:"opt,omitempty"`
+		Flag  bool     `json:"flag"`
+		F     float64  `json:"f,omitempty"`
+		List  []string `json:"list,omitempty"`
+		Age   *int     `json:"age,omitempty"`
+		Skip  string   `json:"-"`
+		inner string
+	}
+	age := 82
+	rows := Table[row]{
+		{Name: "Zoë \"Q\" O'Brien\\ <b>&</b>", N: -3, Flag: true, F: 51.5, List: []string{"a", "é\u2028"}, Age: &age, Skip: "x", inner: "y"},
+		{Name: "tab\tnew\nline\x01 \xff bad utf-8", Opt: 7, F: 1e21},
+		{},
+	}
+	b, err := json.Marshal(rows)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got, want := compactRecords(t, b), plainRecords(t, []row(rows)); !reflect.DeepEqual(got, want) {
+		t.Fatalf("read back:\n%v\nwant\n%v\nfrom %s", got, want, b)
+	}
+	// "id" is empty in every row, so it isn't a column; "-" and unexported fields never are.
+	if !bytes.HasPrefix(b, []byte(`{"columns":["name","n","opt","flag","f","list","age"],"rows":[`)) {
+		t.Fatalf("got %s", b)
+	}
+	if b, _ := json.Marshal(Table[row](nil)); string(b) != `{"columns":[],"rows":[]}` {
+		t.Fatalf("empty: %s", b)
 	}
 }
 
@@ -199,11 +326,40 @@ func parseCounts(t *testing.T, raw []byte) Counts {
 	return c
 }
 
+// T26: the header's home-person pointers, as written. The page decides which
+// to use (web/src/tree/start.ts).
+func TestEnrichHome(t *testing.T) {
+	head := "0 HEAD\n1 GEDC\n2 VERS 5.5.1\n1 CHAR UTF-8\n"
+	people := "0 @I1@ INDI\n1 NAME A /B/\n0 @I2@ INDI\n0 @M1@ OBJE\n1 FILE x.jpg\n"
+	for _, c := range []struct {
+		name, text string
+		want       HomePointers
+	}{
+		{"none", head + people, HomePointers{}},
+		{"_HOME", head + "1 _HOME @I2@\n" + people, HomePointers{Home: "@I2@"}},
+		{"_ROOT, spaces", head + "1 _ROOT  @I1@ \n" + people, HomePointers{Root: "@I1@"}},
+		{"both, as written even if no one has the xref", head + "1 _HOME @I9@\n1 _ROOT @I1@\n" + people, HomePointers{Home: "@I9@", Root: "@I1@"}},
+		{"a value that isn't a pointer", head + "1 _HOME me\n" + people, HomePointers{}},
+		{"the submitter's own INDI", head + "1 SUBM @U1@\n" + people + "0 @U1@ SUBM\n1 NAME A B\n1 OBJE @M1@\n1 _INDI @I2@\n", HomePointers{Submitter: "@I2@"}},
+		{"a submitter with no INDI", head + "1 SUBM @U1@\n" + people + "0 @U1@ SUBM\n1 NAME A B\n1 OBJE @M1@\n", HomePointers{}},
+		{"not the header's submitter", head + "1 SUBM @U1@\n" + people + "0 @U1@ SUBM\n1 NAME A\n0 @U2@ SUBM\n1 _INDI @I1@\n", HomePointers{}},
+		{"_HOME under SOUR is not the header's own", head + "1 SOUR X\n2 _HOME @I1@\n" + people, HomePointers{}},
+	} {
+		out := Enrich([]byte(c.text + "0 TRLR\n"))
+		if out.Error != "" || out.Home != c.want {
+			t.Errorf("%s: home %+v, want %+v (%s)", c.name, out.Home, c.want, out.Error)
+		}
+	}
+	if h := Enrich(read(t, "testdata/royal92.ged")).Home; h != (HomePointers{}) {
+		t.Errorf("royal92: %+v", h)
+	}
+}
+
 func TestEnrichNotGedcom(t *testing.T) {
 	png := append([]byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}, bytes.Repeat([]byte{0, 1, 2}, 500)...)
 	for _, raw := range [][]byte{png, nil, []byte("hello, this is not a gedcom file")} {
 		out := Enrich(raw)
-		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 {
+		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 || out.Home != (HomePointers{}) {
 			t.Errorf("%q…: %+v", raw[:min(len(raw), 8)], out)
 		}
 		b, _ := json.Marshal(out)
@@ -302,6 +458,9 @@ func TestEnrichEverySample(t *testing.T) {
 		if msg := sameTables(out.Tables, enrichDirect(t, raw)); msg != "" {
 			t.Errorf("%s: %s", name, msg)
 		}
+		if msg := sameRecords(t, out.Tables); msg != "" {
+			t.Errorf("%s: %s", name, msg)
+		}
 		for i, l := range append(append([]int{}, out.Lines.Individuals...), out.Lines.Families...) {
 			if l <= 0 {
 				t.Errorf("%s: row %d has line %d", name, i, l)
@@ -331,12 +490,9 @@ func TestEnrichFixtures(t *testing.T) {
 		if out.Error != "" || !out.IsGedcom {
 			t.Fatalf("%s: %+v", f.in, out)
 		}
-		var want []byte
-		if strings.HasSuffix(f.out, ".gz") {
-			want, err = json.Marshal(out)
-		} else {
-			want, err = json.MarshalIndent(out, "", " ")
-		}
+		// One line: indenting would put every value of every row on its own
+		// line. The .ged files are the readable source.
+		want, err := json.Marshal(out)
 		if err != nil {
 			t.Fatal(err)
 		}

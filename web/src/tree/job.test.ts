@@ -60,7 +60,7 @@ describe('the worker\'s enrich job', () => {
   });
 
   it('a file that isn\'t GEDCOM: an empty tree, no error', () => {
-    const notGedcom = JSON.stringify({ ...cousinJSON, isGedcom: false, tables: Object.fromEntries(Object.keys(cousinJSON.tables).map(k => [k, []])), lines: { individuals: [], families: [] } });
+    const notGedcom = JSON.stringify({ ...cousinJSON, isGedcom: false, tables: Object.fromEntries(Object.keys(cousinJSON.tables).map(k => [k, { columns: [], rows: [] }])), lines: { individuals: [], families: [] } });
     const r = result(run(fakeApi(notGedcom, ['parse'])));
     expect(r).toMatchObject({ isGedcom: false, graph: { people: [], unions: [] } });
     expect(r.error).toBeUndefined();

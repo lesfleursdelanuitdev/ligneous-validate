@@ -1,7 +1,9 @@
 // What ligneous.enrich() returns (check/enrich.go): the enricher's own tables,
-// unchanged. The row types mirror enricher/types.go in ligneous-gedcom-lib
-// v0.3.1, with its JSON names. Index fields point into another table; -1 is
-// "none". Fields the library leaves out when empty are optional here.
+// unchanged, each written with its field names once (check/compact.go, spec
+// T24) and read back here into the same records. The row types mirror
+// enricher/types.go in ligneous-gedcom-lib v0.3.1, with its JSON names. Index
+// fields point into another table; -1 is "none". Fields the library leaves
+// out when empty are optional here.
 
 import type { Counts } from '../types';
 
@@ -80,10 +82,6 @@ export interface EnrichedEvent {
   sort_order: number;
 }
 
-export interface IndividualEventLink { individual_xref: string; event_index: number; role: string }
-export interface FamilyEventLink { family_xref: string; event_index: number }
-export interface SpouseEdge { individual_xref: string; spouse_xref: string; family_xref: string }
-
 export interface ParentChildEdge {
   parent_xref: string;
   child_xref: string;
@@ -103,16 +101,16 @@ export interface NameFormSurnameLink { name_form_index: number; surname_index: n
 /** Deduplicated by lower case: `value` is the spelling first met in the file. */
 export interface NameValue { value: string; lower: string; frequency: number }
 
-/** The tables, under EnrichedDocument's own field names. */
+/**
+ * The tables, under EnrichedDocument's own field names. IndividualEvents,
+ * FamilyEvents and Spouses are left out (spec T25): Events and Families say the same.
+ */
 export interface Tables {
   Individuals: EnrichedIndividual[];
   Families: EnrichedFamily[];
   Dates: ParsedDate[];
   Places: ParsedPlace[];
   Events: EnrichedEvent[];
-  IndividualEvents: IndividualEventLink[];
-  FamilyEvents: FamilyEventLink[];
-  Spouses: SpouseEdge[];
   ParentChild: ParentChildEdge[];
   FamilyChildren: FamilyChildEdge[];
   NameForms: NameForm[];
@@ -122,6 +120,15 @@ export interface Tables {
   Surnames: NameValue[];
 }
 
+export interface HomePointers {
+  /** HEAD's own _HOME. */
+  home: string;
+  /** HEAD's own _ROOT. */
+  root: string;
+  /** A pointer to an INDI on the submitter record HEAD names. */
+  submitter: string;
+}
+
 export interface Enriched {
   isGedcom: boolean;
   /** The parser's findings by severity (decoding and line problems; the validator doesn't run). */
@@ -129,6 +136,8 @@ export interface Enriched {
   tables: Tables;
   /** individuals[i] is the line of tables.Individuals[i]; families likewise. */
   lines: { individuals: number[]; families: number[] };
+  /** The header's home-person pointers as written (spec T26); "" when none. */
+  home: HomePointers;
   /** The library failed (a recovered panic). */
   error?: string;
 }
@@ -140,9 +149,6 @@ const SHAPES: Record<keyof Tables, Record<string, 'string' | 'number' | 'boolean
   Dates: { original: 'string', type: 'string' },
   Places: { original: 'string' },
   Events: { event_type: 'string', date_index: 'number', place_index: 'number', owner_xref: 'string', owner_type: 'string' },
-  IndividualEvents: { individual_xref: 'string', event_index: 'number' },
-  FamilyEvents: { family_xref: 'string', event_index: 'number' },
-  Spouses: { individual_xref: 'string', spouse_xref: 'string', family_xref: 'string' },
   ParentChild: { parent_xref: 'string', child_xref: 'string', family_xref: 'string', relationship_type: 'string' },
   FamilyChildren: { family_xref: 'string', child_xref: 'string', birth_order: 'number' },
   NameForms: { individual_xref: 'string', name_type: 'string', is_primary: 'boolean' },
@@ -163,44 +169,74 @@ const isObject = (v: unknown): v is Record<string, unknown> => typeof v === 'obj
 const numbers = (v: unknown): v is number[] => Array.isArray(v) && v.every(n => typeof n === 'number');
 
 /**
- * Checks the parsed answer of ligneous.enrich() and returns it typed. The top
- * level is checked in full; of each table, only the first row. The rows come
- * from our own wasm, built from the same Go types, and checking every row of
- * a big file (over a million) would cost more than the conversion. The
- * first-row check catches a wasm built from another library version.
+ * One compact table read back into its records: a null is a field the plain
+ * encoding leaves out. Every row must have a value for each column; of the
+ * values, only the first row's required fields are type-checked.
+ */
+function records(name: string, table: unknown, fields: Record<string, 'string' | 'number' | 'boolean'>): unknown[] {
+  if (!isObject(table) || !Array.isArray(table.columns) || !Array.isArray(table.rows)) {
+    throw new EnrichShapeError(`tables.${name} is not {columns, rows}`);
+  }
+  const columns: unknown[] = table.columns;
+  const rows: unknown[] = table.rows;
+  if (!columns.every((c): c is string => typeof c === 'string' && c !== '__proto__')) {
+    throw new EnrichShapeError(`tables.${name}.columns`);
+  }
+  const names = columns as string[];
+  const n = names.length;
+  if (rows.length > 0) {
+    for (const [field, type] of Object.entries(fields)) {
+      const at = names.indexOf(field);
+      const first = rows[0];
+      if (at < 0 || !Array.isArray(first) || typeof first[at] !== type) throw new EnrichShapeError(`tables.${name}: ${field}`);
+    }
+  }
+  const out: Record<string, unknown>[] = new Array(rows.length);
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row) || row.length !== n) throw new EnrichShapeError(`tables.${name} row ${i}`);
+    const rec: Record<string, unknown> = {};
+    for (let j = 0; j < n; j++) {
+      const v: unknown = row[j];
+      if (v !== null) rec[names[j]] = v;
+    }
+    out[i] = rec;
+  }
+  return out;
+}
+
+/**
+ * Checks the parsed answer of ligneous.enrich() and returns it typed, each
+ * table read back into its records. The top level is checked in full; every
+ * row's length too, but of the values only the first row's required fields:
+ * the rows come from our own wasm, built from the same Go types, and the
+ * check catches a wasm built from another library version.
  */
 export function readEnriched(json: unknown): Enriched {
   if (!isObject(json)) throw new EnrichShapeError('not an object');
-  const { isGedcom, parseFindings, tables, lines, error } = json;
+  const { isGedcom, parseFindings, tables, lines, home, error } = json;
   if (typeof isGedcom !== 'boolean') throw new EnrichShapeError('isGedcom');
   if (error !== undefined && typeof error !== 'string') throw new EnrichShapeError('error');
   if (!isObject(parseFindings) || !['errors', 'warnings', 'hints'].every(k => typeof parseFindings[k] === 'number')) {
     throw new EnrichShapeError('parseFindings');
   }
   if (!isObject(lines) || !numbers(lines.individuals) || !numbers(lines.families)) throw new EnrichShapeError('lines');
+  if (!isObject(home) || typeof home.home !== 'string' || typeof home.root !== 'string' || typeof home.submitter !== 'string') {
+    throw new EnrichShapeError('home');
+  }
   if (!isObject(tables)) throw new EnrichShapeError('tables');
   const out: Record<string, unknown[]> = {};
-  for (const [name, fields] of Object.entries(SHAPES)) {
-    const rows = tables[name];
-    if (!Array.isArray(rows)) throw new EnrichShapeError(`tables.${name} is not a list`);
-    const first: unknown = rows[0];
-    if (rows.length > 0) {
-      if (!isObject(first)) throw new EnrichShapeError(`tables.${name}[0]`);
-      for (const [field, type] of Object.entries(fields)) {
-        if (typeof first[field] !== type) throw new EnrichShapeError(`tables.${name}[0].${field}`);
-      }
-    }
-    out[name] = rows;
-  }
+  for (const [name, fields] of Object.entries(SHAPES)) out[name] = records(name, tables[name], fields);
   if (lines.individuals.length !== out.Individuals.length || lines.families.length !== out.Families.length) {
     throw new EnrichShapeError('lines do not match the rows');
   }
   return {
     isGedcom,
     parseFindings: { errors: Number(parseFindings.errors), warnings: Number(parseFindings.warnings), hints: Number(parseFindings.hints) },
-    // Checked above: every table is a list whose first row has its fields.
+    // Checked above: every table's rows were read into records whose first has its fields.
     tables: out as unknown as Tables,
     lines: { individuals: lines.individuals, families: lines.families },
+    home: { home: home.home, root: home.root, submitter: home.submitter },
     ...(error ? { error } : {}),
   };
 }
