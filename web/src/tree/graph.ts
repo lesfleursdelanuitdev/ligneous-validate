@@ -4,7 +4,7 @@
 // "The shared shape"). Every value is the enricher's: names, dates and places
 // are read from its tables, never parsed again. The chart rules that the
 // enricher has no part in live here: a placeholder partner per family, the
-// child type, and the living rule. One pass over each table: O(rows).
+// child type (PEDI in lower case), and the living rule. One pass over each table: O(rows).
 //
 // No value imports: Node runs this file as it is (scripts/enrich-times.mjs).
 
@@ -122,26 +122,19 @@ function genderOf(sex: string | undefined, gender: string | undefined): string |
   return gender || null;
 }
 
-type Category = 'birth' | 'adopted' | 'foster' | 'step' | 'sealing';
+/** One edge's PEDI as the engine takes it: lower case, as written; none is "birth". */
+const pediOfEdge = (edge: ParentChildEdge): string => (edge.pedigree ?? '').trim().toLowerCase() || 'birth';
 
 /**
- * One parent–child edge's category, by the Gonsalves site's rule
- * (lib/tree/parents-label-for-family.ts): the pedigree first, in any case,
- * then the relationship type.
+ * The engine's child type (UnionChild.pedi): the GEDCOM PEDI in lower case,
+ * as written (birth, adopted, foster, sealing; anything else is kept, in
+ * lower case), and "birth" when there is none. The pedigree is read, never
+ * the relationship type, which the enricher derives from it. When the two
+ * parents' edges differ (a mixed-parentage note: one birth parent, one
+ * adoptive), the first that isn't "birth".
  */
-function category(edge: ParentChildEdge): Category {
-  for (const raw of [edge.pedigree ?? '', edge.relationship_type || 'biological']) {
-    const v = raw.trim().toLowerCase();
-    if (v === 'adoptive' || v === 'adopted') return 'adopted';
-    if (v === 'foster' || v === 'step' || v === 'sealing') return v;
-    if (v === 'birth' || v === 'biological') return 'birth';
-  }
-  return 'birth';
-}
-
-/** The engine's child type: "birth" when every edge is birth (or there is none), else "adopted". */
 function pediOf(edges: ParentChildEdge[]): string {
-  return edges.every(e => category(e) === 'birth') ? 'birth' : 'adopted';
+  return edges.map(pediOfEdge).find(p => p !== 'birth') ?? 'birth';
 }
 
 const relationOf = (e: ParentChildEdge | undefined): Relation | null =>

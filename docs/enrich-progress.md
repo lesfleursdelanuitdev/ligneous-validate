@@ -41,12 +41,13 @@ Tests: `GOFLAGS=-mod=mod go test ./...` 44 top-level tests pass in `check` (10 n
 - `graph.ts`: `buildGraph(enriched, { thisYear }) → { graph: { people, unions }, details: { people, families }, problems }`. One pass per table.
   - People: id = xref. firstName/lastName = the primary name form's given names and surname from the enricher's link tables (GIVN/SURN first, as the enricher reads them). Years and places from `Dates`/`Places` (`year`, `original`). Gender mapped as the Gonsalves site does (M Male, F Female, U Unknown, X Other).
   - Unions: one per FAM, id = xref. A missing husband or wife, or one pointing to a person who isn't in the file, is `<xref>:unknown-husb` / `-wife`, with its own placeholder person (`firstName: 'Unknown'`, `xref: null`, `isLiving: false`, `_unknownPlaceholder: true`).
-  - Child type: `"birth"` only when every parent-child edge of that child in that family is birth-like, else `"adopted"`: the Gonsalves chart API's rule (`chartPediBirthOrAdopted`, pedigree read first in any case, then the relationship). The exact edges stay in `details.families[…].children`.
+  - Child type (`pedi`), as the engine asked on 2026-10-30: the PEDI of the enricher's parent-child edges in lower case, as written (`birth`, `adopted`, `foster`, `sealing`; anything else kept in lower case), `birth` when there is none. Only the pedigree is read: the enricher derives the relationship type from it. When the father's and mother's edges differ (only a mixed-parentage note does that), the first that isn't `birth`. The exact edges stay in `details.families[…].children`. (Until then it was the Gonsalves site's `birth`/`adopted` rule.)
   - Living rule (spec Part 2), with `thisYear` passed in: no DEAT, BURI or CREM event (dated or not), and either a birth year ≥ thisYear − 100, or no readable year on any of the person's events or their families' events.
   - Details: line, NAME as written, SEX, birth, death and marriage (date as written, year, place as written), other names with TYPE, and each child's edges.
   - Duplicate xrefs: the first record wins; `problems` lists every xref used twice with all its lines. Children of families sharing an xref merge into the first (the enricher's edges carry only the xref).
-- Fixtures: cousin marriage, own ancestor (and own parent), adoption (adopted, foster, sealing, GEDCOM 7 `ADOPTED`, mixed-parentage note, a child in two families), no partner (one side missing, both missing, broken partner and child pointers), the living rule's edges, names, duplicate families, the library's duplicate-xref sample. Golden graph for royal92: `web/src/testdata/tree/royal92-graph.txt.gz` (one record per line; `UPDATE_GOLDEN=1 npx vitest run web/src/tree` rewrites it).
-- Mutation checks (each made the tests fail, then reverted): living window 99 years (3 fail), PEDI read case-sensitively (2 fail), first-row field check off (1 fail), lines-match check off (1 fail).
+- Fixtures: cousin marriage, own ancestor (and own parent), adoption (adopted, foster, sealing, GEDCOM 7 `ADOPTED` and `OTHER`, mixed-parentage note, a child in two families), no partner (one side missing, both missing, broken partner and child pointers), the living rule's edges, names, duplicate families, the library's duplicate-xref sample. Golden graph for royal92: `web/src/testdata/tree/royal92-graph.txt.gz` (one record per line; `UPDATE_GOLDEN=1 npx vitest run web/src/tree` rewrites it).
+- Mutation checks (each made the tests fail, then reverted): living window 99 years (3 fail), first-row field check off (1 fail), lines-match check off (1 fail); for the PEDI rule, not lower-cased (2 fail) and no `birth` for a missing PEDI (7 fail).
+- PEDI values the enricher gives in all 70 sample files and people70000.ged: none (121,848 edges), `adopted` (3), `birth` (1), `foster` (2). Nothing outside the four.
 
 ### 4. The worker
 
@@ -55,7 +56,7 @@ Tests: `GOFLAGS=-mod=mod go test ./...` 44 top-level tests pass in `check` (10 n
 - `progress.ts`: `ENRICH_STAGES` parse 24, enrich 49, finish 17, graph 10, from the Chromium 70k run.
 - Sizes: the wasm grows 5,309,982 → 5,332,132 bytes (gzip -9: 1,445,424 → 1,451,407). The worker bundle 2,918 → 10,149 bytes (the conversion is in it). The page's own JS is unchanged (44.79 kB).
 
-Tests: `npx vitest run` 283 pass, 13 files (216 before). `npx tsc --noEmit -p .` exit 0. `e2e/enrich.spec.ts`: the built worker and wasm in Chromium read royal92 into a tree, with only same-origin requests (2 pass: desktop, phone).
+Tests: `npx vitest run` 283 pass, 13 files (216 before); 284 after the `pedi` change. `npx tsc --noEmit -p .` exit 0. `e2e/enrich.spec.ts`: the built worker and wasm in Chromium read royal92 into a tree, with only same-origin requests (2 pass: desktop, phone).
 
 ### 5. Measurements (2026-10-30, library v0.3.1)
 
@@ -97,11 +98,13 @@ So no choice of whole tables reaches 10 MB. Even at zero JSON cost, parse plus t
 
 `npx tsc --noEmit -p .`: exit 0. `go.mod` and `go.sum` unchanged; nothing was fetched.
 
+Rerun after the `pedi` change, 18:43 UTC, same command, exit 0: Go ok (check, wasm), vitest 284 passed (one new: the mixed-parentage case), build ok, Playwright 198 passed and the same 2 skipped, including the privacy and enrich tests on both projects.
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
 
-- **PEDI is compared in lower case only** (enricher.go): GEDCOM 7 `ADOPTED` gets `relationship_type: "biological"` with `pedigree: "ADOPTED"`. The chart is still right because the conversion reads the pedigree first, in any case, like the Gonsalves site; the details show the enricher's values. GEDCOM 7 `OTHER` falls back to the relationship ("birth").
+- **PEDI is compared in lower case only** (enricher.go): GEDCOM 7 `ADOPTED` gets `relationship_type: "biological"` with `pedigree: "ADOPTED"`. The chart is still right because the conversion reads only the pedigree, lower-cased; the details show the enricher's values. GEDCOM 7 `OTHER` becomes `pedi: "other"`, outside the four values.
 - **No duplicate-xref check.** Handled as above. The enricher is not consistent itself: its PEDI lookup takes the first record with an xref, its family surnames the last. Events of every record with that xref share one owner, so a DEAT on a second record makes the first count as dead.
 - **Name parts are shared by lower case**, so `JOHN /SMITH/` shows as "John Smith" when "John /Smith/" came first. The NAME as written (what the validator shows) is in the details.
 - **`@@` is not unescaped**: "Bob @@work".
@@ -114,7 +117,7 @@ All tested as they are now; none fixed (library read only).
 2. Drop IndividualEvents, FamilyEvents and Spouses (unused, −16 MB at 70k)?
 3. The living rule as written counts as dead someone with no birth date but a recent christening (2010) or marriage (2015), and as living everyone with no readable dates (813 of royal92's 3,010; 1,131 living in all). Use the earliest dated event as the birth year when there's none?
 4. The home person: should enrich also return HEAD's pointers, or does the viewer start from the best-connected person only?
-5. For the engine side: placeholders are `firstName: 'Unknown'` (the engine's applyParents keys on it) with `_unknownPlaceholder: true`; child `pedi` is only `"birth"` or `"adopted"`, as Gonsalves sends.
+5. Done as the engine asked (2026-10-30): union ids are the FAM xref with its `@`s; placeholders set `_unknownPlaceholder: true` (and still `firstName: 'Unknown'`); `pedi` is the lower-cased PEDI. Values outside birth/adopted/foster/sealing: `other` (GEDCOM 7 `OTHER`, in a fixture only). The mixed-parentage case gives `adopted`.
 
 ## Commits
 
@@ -125,4 +128,5 @@ All tested as they are now; none fixed (library read only).
 | 62d10b4 | tree: the conversion, its tests, royal92 golden |
 | 1a543db | worker: the enrich message (`tree/job.ts`) |
 | aa75c17 | measurement scripts, `ENRICH_STAGES`, e2e test |
-| (this one) | this ledger's measurements, findings and open questions |
+| 8768742 | this ledger's measurements, findings and open questions |
+| (next) | `pedi` = the PEDI in lower case, as the engine asked |

@@ -104,16 +104,23 @@ describe('a person who is their own ancestor', () => {
 describe('adoption: the child type comes from the enricher\'s parent–child edges', () => {
   const t = build(adoptionJSON);
 
-  it('is "birth" only when every edge says birth, otherwise "adopted", as the Gonsalves chart API does', () => {
+  it('is the PEDI as written, in lower case; none is "birth"', () => {
     expect(kids(t, '@F1@')).toEqual([
       '@I3@ adopted', // PEDI adopted
-      '@I4@ adopted', // PEDI foster
-      '@I5@ birth', //   no PEDI: biological
+      '@I4@ foster', //  PEDI foster
+      '@I5@ birth', //   no PEDI
       '@I6@ adopted', // PEDI ADOPTED (GEDCOM 7 spelling), see below
       '@I7@ adopted', // mixed-parentage note: birth father, adoptive mother
-      '@I9@ adopted', // PEDI sealing
+      '@I9@ sealing', // PEDI sealing
+      '@I10@ other', //  PEDI OTHER (GEDCOM 7): not one of the four, kept in lower case
     ]);
     expect(kids(t, '@F2@')).toEqual(['@I3@ birth']);
+  });
+
+  it('when the two parents\' edges differ (a mixed-parentage note), the one that isn\'t birth', () => {
+    const of = t.details.families.get('@F1@')?.children.find(c => c.id === '@I7@');
+    expect([of?.father?.pedigree, of?.mother?.pedigree]).toEqual(['birth', 'adopted']);
+    expect(kids(t, '@F1@')).toContain('@I7@ adopted');
   });
 
   it('keeps every edge as the enricher gave it in the family details', () => {
@@ -128,10 +135,10 @@ describe('adoption: the child type comes from the enricher\'s parent–child edg
     expect(of('@I5@')?.father).toEqual({ relationship: 'biological', pedigree: '' });
   });
 
-  it('library v0.3.1: GEDCOM 7 "ADOPTED" gets relationship "biological"; the PEDI read first still makes it adopted', () => {
+  it('library v0.3.1: GEDCOM 7 "ADOPTED" gets relationship "biological"; its PEDI in lower case is still "adopted"', () => {
     // enricher.go compares PEDI in lower case only. The conversion reads the
-    // pedigree before the relationship, like the Gonsalves site, so the chart
-    // is right; the details show what the enricher said.
+    // pedigree, never the relationship, so the chart is right; the details
+    // show what the enricher said.
     const of = t.details.families.get('@F1@')?.children.find(c => c.id === '@I6@');
     expect(of?.father).toEqual({ relationship: 'biological', pedigree: 'ADOPTED' });
     expect(kids(t, '@F1@')).toContain('@I6@ adopted');

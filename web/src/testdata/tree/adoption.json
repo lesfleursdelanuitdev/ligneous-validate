@@ -105,6 +105,17 @@
     "death_date_index": -1,
     "death_place_index": -1,
     "primary_surname_lower": "stone"
+   },
+   {
+    "xref": "@I10@",
+    "full_name": "Ham /Stone/",
+    "full_name_lower": "ham /stone/",
+    "sex": "M",
+    "birth_date_index": -1,
+    "birth_place_index": -1,
+    "death_date_index": -1,
+    "death_place_index": -1,
+    "primary_surname_lower": "stone"
    }
   ],
   "Families": [
@@ -114,7 +125,7 @@
     "wife_xref": "@I2@",
     "marriage_date_index": -1,
     "marriage_place_index": -1,
-    "children_count": 6
+    "children_count": 7
    },
    {
     "xref": "@F2@",
@@ -237,6 +248,22 @@
     "pedigree": "sealing"
    },
    {
+    "parent_xref": "@I1@",
+    "child_xref": "@I10@",
+    "family_xref": "@F1@",
+    "parent_type": "father",
+    "relationship_type": "biological",
+    "pedigree": "OTHER"
+   },
+   {
+    "parent_xref": "@I2@",
+    "child_xref": "@I10@",
+    "family_xref": "@F1@",
+    "parent_type": "mother",
+    "relationship_type": "biological",
+    "pedigree": "OTHER"
+   },
+   {
     "parent_xref": "@I8@",
     "child_xref": "@I3@",
     "family_xref": "@F2@",
@@ -275,6 +302,11 @@
     "family_xref": "@F1@",
     "child_xref": "@I9@",
     "birth_order": 6
+   },
+   {
+    "family_xref": "@F1@",
+    "child_xref": "@I10@",
+    "birth_order": 7
    },
    {
     "family_xref": "@F2@",
@@ -336,6 +368,12 @@
     "name_type": "birth",
     "is_primary": true,
     "sort_order": 0
+   },
+   {
+    "individual_xref": "@I10@",
+    "name_type": "birth",
+    "is_primary": true,
+    "sort_order": 0
    }
   ],
   "NameFormGivenNames": [
@@ -383,6 +421,11 @@
     "name_form_index": 8,
     "given_name_index": 8,
     "position": 1
+   },
+   {
+    "name_form_index": 9,
+    "given_name_index": 9,
+    "position": 1
    }
   ],
   "NameFormSurnames": [
@@ -428,6 +471,11 @@
    },
    {
     "name_form_index": 8,
+    "surname_index": 0,
+    "position": 1
+   },
+   {
+    "name_form_index": 9,
     "surname_index": 0,
     "position": 1
    }
@@ -477,13 +525,18 @@
     "value": "Lot",
     "lower": "lot",
     "frequency": 1
+   },
+   {
+    "value": "Ham",
+    "lower": "ham",
+    "frequency": 1
    }
   ],
   "Surnames": [
    {
     "value": "Stone",
     "lower": "stone",
-    "frequency": 8
+    "frequency": 9
    },
    {
     "value": "Field",
@@ -502,11 +555,12 @@
    30,
    35,
    40,
-   44
+   44,
+   49
   ],
   "families": [
-   49,
-   58
+   54,
+   64
   ]
  }
 }
