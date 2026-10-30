@@ -57,7 +57,7 @@ test('e2e: the worker reads a file into a tree, with nothing leaving the page', 
   expect(out.error).toBe('');
   expect(out.seen).toEqual(['status Reading the file…', 'enrich parse', 'enrich enrich', 'enrich finish', 'enrich graph']);
   expect(out).toMatchObject({
-    isGedcom: true, parseFindings: { errors: 0, warnings: 0, hints: 1 }, parts: '5 of 5', people: 3294, unions: 1422, f1Children: 9,
+    isGedcom: true, parseFindings: { errors: 0, warnings: 0, hints: 1 }, parts: '6 of 6', people: 3294, unions: 1422, f1Children: 9,
     famc: '2018 ["@F1@"]', // Victoria's eldest daughter, a child of @F1@
     start: { id: '@I1@', reason: 'most-relatives', relatives: 200 },
   });

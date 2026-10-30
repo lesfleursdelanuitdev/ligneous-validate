@@ -76,7 +76,7 @@ describe('the worker\'s enrich job', () => {
     ]);
     // Then the tree's parts (one per kind, at this size), then the summary.
     expect(posted.slice(5).map(m => m.type === 'tree-part' ? m.part.kind : m.type))
-      .toEqual(['people', 'unions', 'personDetails', 'familyDetails', 'famcOrder', 'enriched']);
+      .toEqual(['people', 'unions', 'personDetails', 'familyDetails', 'famcOrder', 'famsOrder', 'enriched']);
     const r = result(posted);
     expect(r.error).toBeUndefined();
     expect(r.isGedcom).toBe(true);
@@ -100,7 +100,7 @@ describe('the worker\'s enrich job', () => {
   });
 
   it('a file that isn\'t GEDCOM: an empty tree, no error', () => {
-    const notGedcom = JSON.stringify({ ...cousinJSON, isGedcom: false, tables: Object.fromEntries(Object.keys(cousinJSON.tables).map(k => [k, { columns: [], rows: [] }])), lines: { individuals: [], families: [] }, famc: [] });
+    const notGedcom = JSON.stringify({ ...cousinJSON, isGedcom: false, tables: Object.fromEntries(Object.keys(cousinJSON.tables).map(k => [k, { columns: [], rows: [] }])), lines: { individuals: [], families: [] }, famc: [], fams: [] });
     const r = result(run(fakeApi(notGedcom, ['parse'])));
     expect(r).toMatchObject({ isGedcom: false, graph: { people: [], unions: [] }, start: null });
     expect(r.error).toBeUndefined();

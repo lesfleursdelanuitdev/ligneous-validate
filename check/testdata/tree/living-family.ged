@@ -117,6 +117,16 @@
 1 BIRT
 2 DATE 1990
 1 FAMS @F17@
+0 @A2@ INDI
+1 NAME Adoptee /OnlyAdoptive/
+1 FAMC @F18@
+1 FAMC @F19@
+2 PEDI adopted
+0 @AP@ INDI
+1 NAME Adoptive /Old/
+1 BIRT
+2 DATE 1880
+1 FAMS @F19@
 0 @F1@ FAM
 1 HUSB @K1@
 1 WIFE @Q1@
@@ -168,4 +178,9 @@
 0 @F17@ FAM
 1 HUSB @DD@
 1 WIFE @Y3@
+0 @F18@ FAM
+1 CHIL @A2@
+0 @F19@ FAM
+1 HUSB @AP@
+1 CHIL @A2@
 0 TRLR

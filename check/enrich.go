@@ -27,7 +27,10 @@ type Enriched struct {
 	// in that record's order, as written (trimmed; not checked against the
 	// families). The engine's birth-family rule needs the order (T20), and
 	// the enricher's tables keep only each family's CHIL order.
-	Famc [][]string   `json:"famc"`
+	Famc [][]string `json:"famc"`
+	// Fams[i] is the same for the record's FAMS pointers: the partner order
+	// of last resort (T37).
+	Fams [][]string   `json:"fams"`
 	Home HomePointers `json:"home"`
 	// Error is set when the library itself failed (a recovered panic).
 	Error string `json:"error,omitempty"`
@@ -143,17 +146,21 @@ func EnrichWithProgress(raw []byte, progress func(stage string)) (out Enriched) 
 	families := recordsOf(doc.Families, len(ed.Families), func(i int) string { return ed.Families[i].Xref })
 	out.Lines.Individuals = make([]int, len(people))
 	out.Famc = make([][]string, len(people))
+	out.Fams = make([][]string, len(people))
 	for i, r := range people {
-		out.Famc[i] = []string{}
+		out.Famc[i], out.Fams[i] = []string{}, []string{}
 		if r < 0 {
 			continue
 		}
 		out.Lines.Individuals[i] = doc.Individuals[r].Line
 		for _, c := range doc.Individuals[r].Children {
-			if c.Tag == "FAMC" {
-				if p := pointer(c.Value); p != "" {
-					out.Famc[i] = append(out.Famc[i], p)
-				}
+			p := pointer(c.Value)
+			switch {
+			case p == "":
+			case c.Tag == "FAMC":
+				out.Famc[i] = append(out.Famc[i], p)
+			case c.Tag == "FAMS":
+				out.Fams[i] = append(out.Fams[i], p)
 			}
 		}
 	}
@@ -169,7 +176,7 @@ func EnrichWithProgress(raw []byte, progress func(stage string)) (out Enriched) 
 // emptyEnriched is the answer for a file with nothing in it. An empty Table
 // is written as {"columns":[],"rows":[]}, never null.
 func emptyEnriched() Enriched {
-	return Enriched{Lines: Lines{Individuals: []int{}, Families: []int{}}, Famc: [][]string{}}
+	return Enriched{Lines: Lines{Individuals: []int{}, Families: []int{}}, Famc: [][]string{}, Fams: [][]string{}}
 }
 
 // pointer is a value that is a pointer (@X1@), trimmed, or "".

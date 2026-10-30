@@ -155,6 +155,34 @@ Budgets (T24): royal92 under 2 s, met; 70k about 13 s with a progress bar and no
 
 Final check, round 4: `npm run check` under a lease, exit 0: Go ok (`check`, `wasm`), vitest 356 passed in 17 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped, including both privacy tests and the enrich test on desktop and phone; `npx tsc --noEmit -p .` exit 0.
 
+## Round 5: real family shapes (T47, T48, T49)
+
+### 17. Fixtures, invented names
+
+`check/testdata/tree/families-*.ged`, each with all three T48 shapes: (a) Hugh marries Nora, the niece of his brother Ralph's wife Edith; (b) Tobias, whose mother Rose died in 1952, is adopted by Arthur and Maud; (c) their biological son Simon and his wife Vera adopt Vera's niece Lena, whose sister Cora marries Tobias. Three ways of writing it: `adop-event` (ADOP events with FAMC/ADOP BOTH, plus PEDI), `birth-first` (PEDI only, the birth FAMC first with `PEDI birth`), `adoptive-first` (PEDI only, the adoptive FAMC first, the birth FAMC with no PEDI). Adoption is always in FAM.CHIL and INDI.FAMC.PEDI. `repeated.ged` (T49): Magnus has three children with Wilma, among them Dagny; then a son Sven with Dagny, a second FAM; Magnus lists the Dagny family first in his FAMS.
+
+### 18. What the converter gives
+
+- Tobias and Lena are in both their families, `adopted` in one and `birth` in the other, in all three files; Cora only in her birth family. `famcOrder` follows each INDI record (birth-first or adoptive-first).
+- New: `enrich` returns `fams` (each INDI's FAMS pointers as written), and `graph.famsOrder` holds them like `famcOrder` (T37's last-resort partner order). Not in the engine's `GraphInput`: an extra field, sent to the page as its own part.
+- `details.people[…].parentFamilies`: every family the person is a child of, in FAMC order then the file's (as the engine orders them), with `type` (the pedi), `label` ("Birth parents", "Adoptive parents", "Foster parents", "Sealing parents", else "Parents") and `parents` (ids, husband first, unknown ones left out). `partnerFamilies`: every family they are a partner in, in FAMS order then the file's, with `partnerId`.
+- T49: Magnus has two unions, Dagny is a child of one and a partner in the other; Sven's parents are Magnus and Dagny, Dagny's partner is Magnus; `famsOrder` of Magnus is [the Dagny family, the Wilma family], his record's order, not the FAM records'.
+- royal92: only the new detail lists and 2,291 `famsOrder` entries (counted independently from the .ged) were added to the golden; every person, union and living answer is unchanged (387 living).
+
+### 19. The living rule through adoptive families (refines T32)
+
+The checks found T32 wrong for (b): Tobias, undated, took 1915 from his adoptive father (born 1900, +15), so he counted as dead, while his birth mother (born 1930) points to about 1945. Adoptive parents can be any age, so the search now runs in two passes: first through birth links (a child whose pedi is birth), partners and siblings; then, nearest first, on to the people that left out, through adoptive, foster and other links too. Results, PEDI-only files: Tobias, Lena and Cora 1945, one step, living (Lena took 1940 from her adoptive parents before). `living-family.ged` gained an adoptee whose only dated relative is an adoptive father born 1880: 1895, dead, through pass 2. T49: Dagny takes 1850 (her father as her partner, the earlier of 1850 and 1865), Sven 1865; both dead; the search ends. Mutation check: adoptive links in pass 1 fail both Tobias tests. **This changes T32 for momolig to confirm.**
+
+### 20. Timeline adoptions (T40, T47)
+
+An ADOP event names the next adoptive family's parents (in FAMC order): `relation: 'parent'`, `personIds`, `familyId` ("Adopted by X and Y"); an adoptive family no ADOP event covers (only PEDI says so) becomes an undated context line, last. Living adoptive parents are left out of `personIds` under Hide living people.
+
+### 21. Cost
+
+70k, `buildGraph` alone (Node, 7 runs alternating with round 4's code): 927 → 1,109 ms (the noise between runs is about ±60 ms); the family lists are about 150 ms of it, after making them lean (union indexes, no pass 2 when no child link is adoptive, no Sets for one-entry lists; the first version cost +423 ms). Chromium, 70k, 5 runs at load 4-6.5: ready in 12,450 ms (12,267-13,570; round 4: 11,859 at load 0.4-1.5), graph stage 1,485 ms (1,227), 57 parts; no main-thread task over 50 ms. royal92: 471 ms.
+
+Checks, round 5: `npx tsc --noEmit -p .` exit 0; Go ok (`check`, `wasm`); vitest 384 passed in 17 files; the build ok. **Playwright did not pass: 98 failed, 100 passed, 2 skipped.** 95 of the failures are `net::ERR_CONNECTION_REFUSED at http://localhost:5199/`: the test server went away mid-run while another session's "1034 release check e2e, 7 batches" and a Gonsalves production build ran (load 10.8, momolig's slice at 21.2 of 22 GiB); the other 3 are timeouts in the same minutes. Rerun once those leases end (below).
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
@@ -256,3 +284,4 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | 8a5935c | T32: the living rule across the family; this ledger, round 3 |
 | 1d156f7 | T40: IndividualEvents, FamilyEvents, Attributes, Residences; timelineFor; the worker's timeline message |
 | bdaf86e | this ledger, round 4; the timing script times the timeline |
+| (next) | T47-T49: family fixtures, fams/famsOrder, parent and partner families, the two-pass living search, timeline adoptions |

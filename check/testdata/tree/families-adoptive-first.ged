@@ -1,0 +1,195 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @Silas@ INDI
+1 NAME Silas /Marlow/
+1 SEX M
+1 BIRT
+2 DATE 1860
+1 FAMS @FM0@
+0 @Agnes@ INDI
+1 NAME Agnes /Marlow/
+1 SEX F
+1 BIRT
+2 DATE 1862
+1 FAMS @FM0@
+0 @Ralph@ INDI
+1 NAME Ralph /Marlow/
+1 SEX M
+1 BIRT
+2 DATE 1885
+1 FAMC @FM0@
+1 FAMS @FRE@
+0 @Hugh@ INDI
+1 NAME Hugh /Marlow/
+1 SEX M
+1 BIRT
+2 DATE 1890
+1 FAMC @FM0@
+1 FAMS @FHN@
+0 @Jonas@ INDI
+1 NAME Jonas /Penrose/
+1 SEX M
+1 BIRT
+2 DATE 1858
+1 FAMS @FP0@
+0 @Ida@ INDI
+1 NAME Ida /Penrose/
+1 SEX F
+1 BIRT
+2 DATE 1860
+1 FAMS @FP0@
+0 @Edith@ INDI
+1 NAME Edith /Penrose/
+1 SEX F
+1 BIRT
+2 DATE 1888
+1 FAMC @FP0@
+1 FAMS @FRE@
+0 @Clara@ INDI
+1 NAME Clara /Penrose/
+1 SEX F
+1 BIRT
+2 DATE 1880
+1 FAMC @FP0@
+1 FAMS @FCW@
+0 @Walter@ INDI
+1 NAME Walter /Ash/
+1 SEX M
+1 BIRT
+2 DATE 1878
+1 FAMS @FCW@
+0 @Nora@ INDI
+1 NAME Nora /Ash/
+1 SEX F
+1 BIRT
+2 DATE 1905
+1 FAMC @FCW@
+1 FAMS @FHN@
+0 @Rose@ INDI
+1 NAME Rose /Field/
+1 SEX F
+1 BIRT
+2 DATE 1930
+1 DEAT
+2 DATE 1952
+1 FAMS @FB0@
+0 @Leon@ INDI
+1 NAME Leon /Field/
+1 SEX M
+1 FAMS @FB0@
+0 @Tobias@ INDI
+1 NAME Tobias /Field/
+1 SEX M
+1 FAMC @FA@
+2 PEDI adopted
+1 FAMC @FB0@
+1 FAMS @FTC@
+0 @Arthur@ INDI
+1 NAME Arthur /Quill/
+1 SEX M
+1 BIRT
+2 DATE 1900
+1 FAMS @FA@
+0 @Maud@ INDI
+1 NAME Maud /Quill/
+1 SEX F
+1 BIRT
+2 DATE 1905
+1 FAMS @FA@
+0 @Simon@ INDI
+1 NAME Simon /Quill/
+1 SEX M
+1 BIRT
+2 DATE 1925
+1 FAMC @FA@
+1 FAMS @FSW@
+0 @Otto@ INDI
+1 NAME Otto /Lund/
+1 SEX M
+1 FAMS @FW0@
+0 @Vera@ INDI
+1 NAME Vera /Lund/
+1 SEX F
+1 BIRT
+2 DATE 1928
+1 FAMC @FW0@
+1 FAMS @FSW@
+0 @Paul@ INDI
+1 NAME Paul /Lund/
+1 SEX M
+1 BIRT
+2 DATE 1930
+1 FAMC @FW0@
+1 FAMS @FL0@
+0 @Greta@ INDI
+1 NAME Greta /Lund/
+1 SEX F
+1 FAMS @FL0@
+0 @Lena@ INDI
+1 NAME Lena /Lund/
+1 SEX F
+1 FAMC @FSW@
+2 PEDI adopted
+1 FAMC @FL0@
+0 @Cora@ INDI
+1 NAME Cora /Lund/
+1 SEX F
+1 FAMC @FL0@
+1 FAMS @FTC@
+0 @FM0@ FAM
+1 HUSB @Silas@
+1 WIFE @Agnes@
+1 CHIL @Ralph@
+1 CHIL @Hugh@
+0 @FP0@ FAM
+1 HUSB @Jonas@
+1 WIFE @Ida@
+1 CHIL @Clara@
+1 CHIL @Edith@
+0 @FRE@ FAM
+1 HUSB @Ralph@
+1 WIFE @Edith@
+1 MARR
+2 DATE 1910
+0 @FCW@ FAM
+1 HUSB @Walter@
+1 WIFE @Clara@
+1 CHIL @Nora@
+0 @FHN@ FAM
+1 HUSB @Hugh@
+1 WIFE @Nora@
+1 MARR
+2 DATE 1925
+0 @FB0@ FAM
+1 HUSB @Leon@
+1 WIFE @Rose@
+1 CHIL @Tobias@
+0 @FA@ FAM
+1 HUSB @Arthur@
+1 WIFE @Maud@
+1 CHIL @Simon@
+1 CHIL @Tobias@
+1 MARR
+2 DATE 1924
+0 @FW0@ FAM
+1 HUSB @Otto@
+1 CHIL @Vera@
+1 CHIL @Paul@
+0 @FSW@ FAM
+1 HUSB @Simon@
+1 WIFE @Vera@
+1 CHIL @Lena@
+1 MARR
+2 DATE 1950
+0 @FL0@ FAM
+1 HUSB @Paul@
+1 WIFE @Greta@
+1 CHIL @Lena@
+1 CHIL @Cora@
+0 @FTC@ FAM
+1 HUSB @Tobias@
+1 WIFE @Cora@
+0 TRLR

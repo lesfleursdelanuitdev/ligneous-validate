@@ -10,7 +10,7 @@
 //
 // No value imports: Node runs this file as it is.
 
-import type { TreeData } from './graph';
+import type { ParentFamily, TreeData } from './graph';
 import type { Enriched, ParsedDate, Tables } from './tables';
 
 export interface TimelineEvent {
@@ -32,6 +32,8 @@ export interface TimelineEvent {
   relation?: 'partner' | 'child' | 'parent';
   /** That person's id (absent when the partner is unknown). */
   personId?: string;
+  /** An adoption's adoptive parents, from the adoptive family (T47): "Adopted by X and Y". */
+  personIds?: string[];
   /** The family the event belongs to or comes through. */
   familyId?: string;
 }
@@ -62,6 +64,7 @@ export interface TimelineSource {
   readonly asPartner: ReadonlyMap<string, TreeData['graph']['unions']>;
   readonly asChild: ReadonlyMap<string, TreeData['graph']['unions']>;
   readonly living: ReadonlyMap<string, boolean>;
+  readonly parentFamilies: (person: string) => ParentFamily[];
 }
 
 function push<K, V>(m: Map<K, V[]>, k: K, v: V): void {
@@ -111,6 +114,7 @@ export function timelineSource(e: Enriched, tree: TreeData): TimelineSource {
   const living = new Map(tree.graph.people.filter(p => p._unknownPlaceholder !== true).map(p => [p.id, p.isLiving]));
   return {
     items, asPartner, asChild, living,
+    parentFamilies: person => tree.details.people.get(person)?.parentFamilies ?? [],
     births: person => ofType(person, 'BIRT'),
     deaths: person => ofType(person, 'DEAT'),
   };
@@ -126,9 +130,17 @@ export function timelineSource(e: Enriched, tree: TreeData): TimelineSource {
 export function timelineFor(personId: string, source: TimelineSource, opts: { hideLiving: boolean }): TimelineEvent[] {
   const isLiving = source.living.get(personId);
   if (isLiving === undefined || (opts.hideLiving && isLiving)) return [];
-  const out: Item[] = [...source.items(`INDI ${personId}`)];
   const known = (id: string) => source.living.has(id);
   const hidden = (id: string) => opts.hideLiving && source.living.get(id) === true;
+  // Adoptions (T47): each ADOP event names the next adoptive family's parents,
+  // in FAMC order; an adoptive family no ADOP event covers (only PEDI says
+  // so) becomes an undated context line, last.
+  const adoptive = source.parentFamilies(personId).filter(f => f.type === 'adopted');
+  const adoptedBy = (f: ParentFamily): Partial<TimelineEvent> =>
+    ({ relation: 'parent', personIds: f.parents.filter(p => !hidden(p)), familyId: f.familyId });
+  let next = 0;
+  const out: Item[] = source.items(`INDI ${personId}`).map(i =>
+    (i.event.type === 'ADOP' && next < adoptive.length ? { ...i, event: { ...i.event, ...adoptedBy(adoptive[next++]) } } : i));
   const add = (from: Item[], extra: Partial<TimelineEvent>) => {
     for (const i of from) out.push({ ...i, event: { ...i.event, ...extra } });
   };
@@ -152,7 +164,13 @@ export function timelineFor(personId: string, source: TimelineSource, opts: { hi
     context(u.husb, 'parent', u.id, source.deaths);
     context(u.wife, 'parent', u.id, source.deaths);
   }
-  // A stable sort: ties keep the order above (own, family, context).
+  for (const f of adoptive.slice(next)) {
+    out.push({
+      event: { type: 'ADOP', label: 'Adoption', date: '', year: null, place: '', value: '', context: true, ...adoptedBy(f) },
+      y: Infinity, m: 0, d: 0,
+    });
+  }
+  // A stable sort: ties keep the order above (own, family, context, adoptions).
   out.sort((a, b) => (a.y === b.y ? 0 : a.y < b.y ? -1 : 1) || a.m - b.m || a.d - b.d);
   return out.map(i => i.event);
 }

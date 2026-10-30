@@ -22,7 +22,7 @@ function failed(message: string): TreeResult {
   return {
     isGedcom: false,
     parseFindings: { errors: 0, warnings: 0, hints: 0 },
-    graph: { people: [], unions: [], famcOrder: new Map() },
+    graph: { people: [], unions: [], famcOrder: new Map(), famsOrder: new Map() },
     details: { people: new Map(), families: new Map() },
     problems: { duplicatePeople: [], duplicateFamilies: [] },
     start: null,

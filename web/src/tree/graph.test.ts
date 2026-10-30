@@ -12,6 +12,10 @@ import cousinJSON from '../testdata/tree/cousin-marriage.json';
 import dupFamiliesJSON from '../testdata/tree/duplicate-families.json';
 import dupXrefJSON from '../testdata/tree/duplicate-xref.json';
 import famcJSON from '../testdata/tree/famc.json';
+import famAdopJSON from '../testdata/tree/families-adop-event.json';
+import famBirthFirstJSON from '../testdata/tree/families-birth-first.json';
+import famAdoptiveFirstJSON from '../testdata/tree/families-adoptive-first.json';
+import repeatedJSON from '../testdata/tree/repeated.json';
 import livingJSON from '../testdata/tree/living.json';
 import livingFamilyJSON from '../testdata/tree/living-family.json';
 import namesJSON from '../testdata/tree/names.json';
@@ -25,6 +29,7 @@ const royal92 = (): Enriched =>
 
 const FIXTURES: Record<string, unknown> = {
   adoption: adoptionJSON, cousin: cousinJSON, dupFamilies: dupFamiliesJSON, dupXref: dupXrefJSON, famc: famcJSON,
+  famAdop: famAdopJSON, famBirthFirst: famBirthFirstJSON, famAdoptiveFirst: famAdoptiveFirstJSON, repeated: repeatedJSON,
   living: livingJSON, livingFamily: livingFamilyJSON, names: namesJSON, noPartner: noPartnerJSON, ownAncestor: ownAncestorJSON,
 };
 const build = (json: unknown, thisYear = YEAR) => buildGraph(readEnriched(json), { thisYear });
@@ -56,7 +61,7 @@ describe('the whole file, in the engine\'s shape', () => {
       for (const p of t.graph.people) expect(typeof p.isLiving).toBe('boolean');
       for (const [, d] of t.details.people) expect(['death', 'birth', 'event', 'relatives', 'none']).toContain(d.living.by);
       const unionIds = new Set(t.graph.unions.map(u => u.id));
-      for (const [id, fams] of t.graph.famcOrder) {
+      for (const [id, fams] of [...t.graph.famcOrder, ...t.graph.famsOrder]) {
         expect(ids.has(id) && !isPlaceholder(id)).toBe(true);
         expect(fams.length).toBeGreaterThan(0);
         expect(fams.every(f => unionIds.has(f))).toBe(true);
@@ -340,6 +345,10 @@ describe('T32: estimates pass across the family', () => {
     expect(at('@L@')).toEqual([true, { by: 'none' }]);
   });
 
+  it('estimates pass through an adoptive family only to people no birth family, partner or sibling reaches', () => {
+    expect(at('@A2@')).toEqual([false, { by: 'relatives', year: 1895, steps: 1 }]);
+  });
+
   it('a cycle ends: a person who is their own grandparent', () => {
     // C2 is C1's parent (1900 - 15) and C1's child (1900 + 15): the earlier.
     expect(at('@C2@')).toEqual([false, { by: 'relatives', year: 1885, steps: 1 }]);
@@ -416,6 +425,7 @@ function goldenText(t: TreeData): string {
   for (const p of t.graph.people) lines.push('P ' + JSON.stringify(p));
   for (const u of t.graph.unions) lines.push('U ' + JSON.stringify(u));
   for (const [id, f] of t.graph.famcOrder) lines.push(`O ${id} ` + JSON.stringify(f));
+  for (const [id, f] of t.graph.famsOrder) lines.push(`S ${id} ` + JSON.stringify(f));
   for (const [id, d] of t.details.people) lines.push(`D ${id} ` + JSON.stringify(d));
   for (const [id, d] of t.details.families) lines.push(`F ${id} ` + JSON.stringify(d));
   lines.push('X ' + JSON.stringify(t.problems));
@@ -487,5 +497,103 @@ describe('readEnriched reads the compact answer back into the enricher\'s record
     ['a FAMC that isn\'t a string', () => { const j = good(); (j.famc as unknown[][])[2] = [7]; return j; }],
   ])('refuses %s', (_, make) => {
     expect(() => readEnriched(make())).toThrow(/expected shape/);
+  });
+});
+
+describe('real family shapes, invented names (T48, T49)', () => {
+  const variants = { adopEvent: famAdopJSON, birthFirst: famBirthFirstJSON, adoptiveFirst: famAdoptiveFirstJSON };
+
+  for (const [name, json] of Object.entries(variants)) {
+    describe(name, () => {
+      const t = build(json);
+      const pediOf = (child: string) => t.graph.unions.filter(u => u.children.some(c => c.id === child))
+        .map(u => `${u.id} ${u.children.find(c => c.id === child)?.pedi}`);
+
+      it('(b) the adopted boy is in both families, adopted in one and born in the other', () => {
+        expect(pediOf('@Tobias@')).toEqual(['@FB0@ birth', '@FA@ adopted']);
+      });
+
+      it('(c) the adopted niece likewise; her sister only in their birth family', () => {
+        expect(pediOf('@Lena@')).toEqual(['@FSW@ adopted', '@FL0@ birth']);
+        expect(pediOf('@Cora@')).toEqual(['@FL0@ birth']);
+        expect(union(t, '@FTC@')).toMatchObject({ husb: '@Tobias@', wife: '@Cora@' });
+      });
+
+      it('famcOrder follows each INDI record', () => {
+        const adoptiveFirst = name === 'adoptiveFirst';
+        expect(t.graph.famcOrder.get('@Tobias@')).toEqual(adoptiveFirst ? ['@FA@', '@FB0@'] : ['@FB0@', '@FA@']);
+        expect(t.graph.famcOrder.get('@Lena@')).toEqual(adoptiveFirst ? ['@FSW@', '@FL0@'] : ['@FL0@', '@FSW@']);
+      });
+
+      it('the details list every parent family, in that order, by type, with the parents', () => {
+        const families = t.details.people.get('@Tobias@')?.parentFamilies;
+        const birth = { familyId: '@FB0@', type: 'birth', label: 'Birth parents', parents: ['@Leon@', '@Rose@'] };
+        const adoptive = { familyId: '@FA@', type: 'adopted', label: 'Adoptive parents', parents: ['@Arthur@', '@Maud@'] };
+        expect(families).toEqual(name === 'adoptiveFirst' ? [adoptive, birth] : [birth, adoptive]);
+        expect(t.details.people.get('@Cora@')?.parentFamilies).toEqual([
+          { familyId: '@FL0@', type: 'birth', label: 'Birth parents', parents: ['@Paul@', '@Greta@'] },
+        ]);
+        expect(t.details.people.get('@Rose@')?.parentFamilies).toEqual([]);
+      });
+
+      if (name !== 'adopEvent') {
+        it('the living rule: the boy and the sisters through their birth families, not the older adoptive ones', () => {
+          // Birth mother born 1930 (+15), adoptive father 1900 (+15 would be 1915, dead).
+          expect(t.details.people.get('@Tobias@')?.living).toEqual({ by: 'relatives', year: 1945, steps: 1 });
+          expect(person(t, '@Tobias@').isLiving).toBe(true);
+          // Birth father born 1930; the adoptive parents (1925, 1928) don't lower it.
+          expect(t.details.people.get('@Lena@')?.living).toEqual({ by: 'relatives', year: 1945, steps: 1 });
+          expect(t.details.people.get('@Cora@')?.living).toEqual({ by: 'relatives', year: 1945, steps: 1 });
+        });
+      }
+    });
+  }
+
+  it('(a) a man marries his sister-in-law\'s niece: one union, each person once', () => {
+    const t = build(famBirthFirstJSON);
+    expect(union(t, '@FHN@')).toMatchObject({ husb: '@Hugh@', wife: '@Nora@' });
+    expect(union(t, '@FRE@')).toMatchObject({ husb: '@Ralph@', wife: '@Edith@' }); // Hugh's brother and Edith
+    expect(kids(t, '@FP0@')).toEqual(['@Clara@ birth', '@Edith@ birth']); // Edith and Clara are sisters
+    expect(kids(t, '@FCW@')).toEqual(['@Nora@ birth']); // Nora is Clara's daughter
+    expect(t.graph.people.filter(p => p.id === '@Hugh@' || p.id === '@Nora@')).toHaveLength(2);
+  });
+
+  describe('(d) a man has a son with his own daughter, recorded as a second family (T49)', () => {
+    const t = build(repeatedJSON);
+
+    it('gives him two unions and her two roles', () => {
+      expect(t.graph.unions.filter(u => u.husb === '@M@').map(u => `${u.id} ${u.wife}`)).toEqual(['@FMW@ @W@', '@FMD@ @D@']);
+      expect(kids(t, '@FMW@')).toEqual(['@C1@ birth', '@D@ birth', '@C3@ birth']);
+      expect(union(t, '@FMD@')).toMatchObject({ husb: '@M@', wife: '@D@' });
+      expect(kids(t, '@FMD@')).toEqual(['@S@ birth']);
+    });
+
+    it('the details: the son\'s parents are M and D; D\'s partner is M; M\'s partners in his FAMS order', () => {
+      expect(t.details.people.get('@S@')?.parentFamilies).toEqual([
+        { familyId: '@FMD@', type: 'birth', label: 'Birth parents', parents: ['@M@', '@D@'] },
+      ]);
+      expect(t.details.people.get('@D@')?.parentFamilies).toEqual([
+        { familyId: '@FMW@', type: 'birth', label: 'Birth parents', parents: ['@M@', '@W@'] },
+      ]);
+      expect(t.details.people.get('@D@')?.partnerFamilies).toEqual([{ familyId: '@FMD@', partnerId: '@M@' }]);
+      expect(t.details.people.get('@M@')?.partnerFamilies).toEqual([
+        { familyId: '@FMD@', partnerId: '@D@' }, { familyId: '@FMW@', partnerId: '@W@' },
+      ]);
+    });
+
+    it('famcOrder and famsOrder follow the INDI records', () => {
+      expect(t.graph.famcOrder.get('@D@')).toEqual(['@FMW@']);
+      expect(t.graph.famcOrder.get('@S@')).toEqual(['@FMD@']);
+      expect(t.graph.famsOrder.get('@M@')).toEqual(['@FMD@', '@FMW@']); // not the FAM records' order
+      expect(t.graph.famsOrder.get('@D@')).toEqual(['@FMD@']);
+      expect(t.graph.famsOrder.has('@S@')).toBe(false);
+    });
+
+    it('the living rule ends, and the repeated links give the earliest estimate', () => {
+      // D: her father as a parent (1865) or as a partner (1850): the earlier. S: his father (1865).
+      expect(t.details.people.get('@D@')?.living).toEqual({ by: 'relatives', year: 1850, steps: 1 });
+      expect(t.details.people.get('@S@')?.living).toEqual({ by: 'relatives', year: 1865, steps: 1 });
+      expect(person(t, '@D@').isLiving || person(t, '@S@').isLiving).toBe(false);
+    });
   });
 });

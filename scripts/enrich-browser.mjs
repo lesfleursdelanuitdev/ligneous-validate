@@ -81,6 +81,7 @@ async function readOnce(page, inputUrl) {
     const details = new Map();
     const familyDetails = new Map();
     const famcOrder = new Map();
+    const famsOrder = new Map();
     let parts = 0;
     const t0 = performance.now();
     const result = await new Promise(ok => {
@@ -94,6 +95,7 @@ async function readOnce(page, inputUrl) {
           if (m.part.kind === 'personDetails') for (const [k, v] of m.part.rows) details.set(k, v);
           if (m.part.kind === 'familyDetails') for (const [k, v] of m.part.rows) familyDetails.set(k, v);
           if (m.part.kind === 'famcOrder') for (const [k, v] of m.part.rows) famcOrder.set(k, v);
+          if (m.part.kind === 'famsOrder') for (const [k, v] of m.part.rows) famsOrder.set(k, v);
         }
         if (m.type === 'enriched') ok({ ...m.summary, graph: { people, unions } });
       });

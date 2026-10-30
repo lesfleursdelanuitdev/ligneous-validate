@@ -152,7 +152,7 @@ func TestEnrichJSONShape(t *testing.T) {
 	if err := json.Unmarshal(b, &top); err != nil {
 		t.Fatal(err)
 	}
-	if got := keys(top); strings.Join(got, ",") != "famc,home,isGedcom,lines,parseFindings,tables" {
+	if got := keys(top); strings.Join(got, ",") != "famc,fams,home,isGedcom,lines,parseFindings,tables" {
 		t.Fatalf("top-level keys = %v", got)
 	}
 	var tables map[string]json.RawMessage
@@ -361,6 +361,27 @@ func TestEnrichFamcInFileOrder(t *testing.T) {
 	}
 }
 
+// FAMS likewise (T37 orders partners by FAMS order last; T49).
+func TestEnrichFamsInFileOrder(t *testing.T) {
+	out := Enrich(read(t, "testdata/tree/repeated.ged"))
+	if len(out.Fams) != len(out.Tables.Individuals) {
+		t.Fatalf("%d fams lists for %d people", len(out.Fams), len(out.Tables.Individuals))
+	}
+	got := map[string][]string{}
+	for i, p := range out.Tables.Individuals {
+		got[p.Xref] = out.Fams[i]
+	}
+	// M lists the family with D before the one with W; the FAM records come the other way.
+	if !reflect.DeepEqual(got["@M@"], []string{"@FMD@", "@FMW@"}) || !reflect.DeepEqual(got["@D@"], []string{"@FMD@"}) ||
+		!reflect.DeepEqual(got["@S@"], []string{}) {
+		t.Fatalf("fams = %v", got)
+	}
+	b, _ := out.JSON()
+	if !bytes.Contains(b, []byte(`,"fams":[["@FMD@","@FMW@"],`)) || bytes.Contains(b, []byte(`"fams":null`)) {
+		t.Fatalf("fams in JSON: %s", b[bytes.Index(b, []byte(`"fams"`)):])
+	}
+}
+
 // T26: the header's home-person pointers, as written. The page decides which
 // to use (web/src/tree/start.ts).
 func TestEnrichHome(t *testing.T) {
@@ -394,7 +415,7 @@ func TestEnrichNotGedcom(t *testing.T) {
 	png := append([]byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}, bytes.Repeat([]byte{0, 1, 2}, 500)...)
 	for _, raw := range [][]byte{png, nil, []byte("hello, this is not a gedcom file")} {
 		out := Enrich(raw)
-		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 || out.Home != (HomePointers{}) || out.Famc == nil {
+		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 || out.Home != (HomePointers{}) || out.Famc == nil || out.Fams == nil {
 			t.Errorf("%q…: %+v", raw[:min(len(raw), 8)], out)
 		}
 		b, _ := json.Marshal(out)

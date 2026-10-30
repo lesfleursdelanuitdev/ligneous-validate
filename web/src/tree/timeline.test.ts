@@ -4,6 +4,8 @@ import { readEnriched } from './tables';
 import { timelineFor, timelineSource } from './timeline';
 import type { TimelineEvent } from './timeline';
 import timelineJSON from '../testdata/tree/timeline.json';
+import famAdopJSON from '../testdata/tree/families-adop-event.json';
+import famBirthFirstJSON from '../testdata/tree/families-birth-first.json';
 
 const enriched = readEnriched(timelineJSON);
 const tree = buildGraph(enriched, { thisYear: 2026 });
@@ -102,5 +104,34 @@ describe('the life-events timeline (T40)', () => {
   it('nobody, or a placeholder partner: no events', () => {
     expect(timelineFor('@I404@', source, show)).toEqual([]);
     expect(timelineFor('@F4@:unknown-husb', source, show)).toEqual([]);
+  });
+});
+
+describe('adoption in the timeline (T47, T48)', () => {
+  const sourceOf = (json: unknown) => {
+    const e = readEnriched(json);
+    return timelineSource(e, buildGraph(e, { thisYear: 2026 }));
+  };
+
+  it('an ADOP event says who adopted: the adoptive family\'s parents', () => {
+    const adop = timelineFor('@Tobias@', sourceOf(famAdopJSON), show).find(e => e.type === 'ADOP');
+    expect(adop).toEqual({
+      type: 'ADOP', label: 'Adoption', date: '1953', year: 1953, place: '', value: '', context: false,
+      relation: 'parent', personIds: ['@Arthur@', '@Maud@'], familyId: '@FA@',
+    });
+    expect(timelineFor('@Lena@', sourceOf(famAdopJSON), show).find(e => e.type === 'ADOP')?.personIds).toEqual(['@Simon@', '@Vera@']);
+  });
+
+  it('only PEDI says adopted: an undated context line, last', () => {
+    const events = timelineFor('@Tobias@', sourceOf(famBirthFirstJSON), show);
+    expect(events.at(-1)).toEqual({
+      type: 'ADOP', label: 'Adoption', date: '', year: null, place: '', value: '', context: true,
+      relation: 'parent', personIds: ['@Arthur@', '@Maud@'], familyId: '@FA@',
+    });
+    expect(events.filter(e => e.type === 'ADOP')).toHaveLength(1);
+  });
+
+  it('a birth family is never an adoption', () => {
+    expect(timelineFor('@Cora@', sourceOf(famBirthFirstJSON), show).some(e => e.type === 'ADOP')).toBe(false);
   });
 });

@@ -263,6 +263,9 @@ func (e Enriched) JSON() ([]byte, error) {
 	if err := small("famc", e.Famc); err != nil {
 		return nil, err
 	}
+	if err := small("fams", e.Fams); err != nil {
+		return nil, err
+	}
 	if err := small("home", e.Home); err != nil {
 		return nil, err
 	}
