@@ -36,3 +36,14 @@ export interface UnionRecord {
   wife: string;
   children: UnionChild[];
 }
+
+/** Engine: GraphInput (src/graph/GraphSnapshot.ts), what a converter hands to the engine. */
+export interface GraphInput {
+  readonly people: readonly DescendancyPerson[];
+  readonly unions: readonly UnionRecord[];
+  /**
+   * Each person's parent families (FAMC) in the order their own record lists them: the
+   * engine's birth-family rule (T20) takes the first birth family in it, else the first.
+   */
+  readonly famcOrder?: ReadonlyMap<string, readonly string[]>;
+}

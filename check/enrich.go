@@ -20,10 +20,15 @@ type Enriched struct {
 	// ParseFindings counts the parser's findings (decoding and line-level
 	// problems) by severity. The validator's own findings are not counted:
 	// enrich doesn't run it.
-	ParseFindings Counts       `json:"parseFindings"`
-	Tables        Tables       `json:"tables"`
-	Lines         Lines        `json:"lines"`
-	Home          HomePointers `json:"home"`
+	ParseFindings Counts `json:"parseFindings"`
+	Tables        Tables `json:"tables"`
+	Lines         Lines  `json:"lines"`
+	// Famc[i] is the FAMC pointers of the record behind Tables.Individuals[i],
+	// in that record's order, as written (trimmed; not checked against the
+	// families). The engine's birth-family rule needs the order (T20), and
+	// the enricher's tables keep only each family's CHIL order.
+	Famc [][]string   `json:"famc"`
+	Home HomePointers `json:"home"`
 	// Error is set when the library itself failed (a recovered panic).
 	Error string `json:"error,omitempty"`
 }
@@ -123,15 +128,37 @@ func EnrichWithProgress(raw []byte, progress func(stage string)) (out Enriched) 
 
 	step(StageFinish)
 	out.Home = homePointers(doc)
-	out.Lines.Individuals = linesOf(doc.Individuals, len(ed.Individuals), func(i int) string { return ed.Individuals[i].Xref })
-	out.Lines.Families = linesOf(doc.Families, len(ed.Families), func(i int) string { return ed.Families[i].Xref })
+	people := recordsOf(doc.Individuals, len(ed.Individuals), func(i int) string { return ed.Individuals[i].Xref })
+	families := recordsOf(doc.Families, len(ed.Families), func(i int) string { return ed.Families[i].Xref })
+	out.Lines.Individuals = make([]int, len(people))
+	out.Famc = make([][]string, len(people))
+	for i, r := range people {
+		out.Famc[i] = []string{}
+		if r < 0 {
+			continue
+		}
+		out.Lines.Individuals[i] = doc.Individuals[r].Line
+		for _, c := range doc.Individuals[r].Children {
+			if c.Tag == "FAMC" {
+				if p := pointer(c.Value); p != "" {
+					out.Famc[i] = append(out.Famc[i], p)
+				}
+			}
+		}
+	}
+	out.Lines.Families = make([]int, len(families))
+	for i, r := range families {
+		if r >= 0 {
+			out.Lines.Families[i] = doc.Families[r].Line
+		}
+	}
 	return out
 }
 
 // emptyEnriched is the answer for a file with nothing in it. An empty Table
 // is written as {"columns":[],"rows":[]}, never null.
 func emptyEnriched() Enriched {
-	return Enriched{Lines: Lines{Individuals: []int{}, Families: []int{}}}
+	return Enriched{Lines: Lines{Individuals: []int{}, Families: []int{}}, Famc: [][]string{}}
 }
 
 // pointer is a value that is a pointer (@X1@), trimmed, or "".
@@ -175,23 +202,24 @@ func homePointers(doc *gedcom.GedcomDocument) HomePointers {
 	return h
 }
 
-// linesOf gives each of the n enriched rows the line of its record. The
+// recordsOf gives each of the n enriched rows the index of its record. The
 // enricher keeps the records' order and skips some (those with no xref), so
-// rows and records are walked together, matching xrefs: records that share an
-// xref each give their own line. A row with no record left gets 0.
-func linesOf(recs []gedcom.GedcomRecord, n int, xref func(int) string) []int {
-	lines := make([]int, n)
+// rows and records are walked together, matching xrefs: records that share
+// an xref each keep their own. A row with no record left gets -1.
+func recordsOf(recs []gedcom.GedcomRecord, n int, xref func(int) string) []int {
+	out := make([]int, n)
 	j := 0
 	for i := 0; i < n; i++ {
 		for j < len(recs) && recs[j].Xref != xref(i) {
 			j++
 		}
+		out[i] = -1
 		if j < len(recs) {
-			lines[i] = recs[j].Line
+			out[i] = j
 			j++
 		}
 	}
-	return lines
+	return out
 }
 
 func (c *Counts) add(severity string) {

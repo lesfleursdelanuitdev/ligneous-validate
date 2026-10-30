@@ -31,16 +31,17 @@ describe('the tree in parts, so no single copy into the page is long (T24)', () 
       'unions 1000', 'unions 422',
       'personDetails 1000', 'personDetails 1000', 'personDetails 1000', 'personDetails 10',
       'familyDetails 1000', 'familyDetails 422',
+      'famcOrder 1000', 'famcOrder 1000', 'famcOrder 18', // 2,018 people with a FAMC
     ]);
     expect(summary).toEqual({
-      isGedcom: true, parseFindings: tree.parseFindings, problems: tree.problems, start: tree.start, parts: 12,
+      isGedcom: true, parseFindings: tree.parseFindings, problems: tree.problems, start: tree.start, parts: 15,
     });
-    expect(splitTree(tree).parts).toHaveLength(4); // PART_SIZE: each kind fits in one
+    expect(splitTree(tree).parts).toHaveLength(5); // PART_SIZE: each kind fits in one
     expect(PART_SIZE).toBe(5_000);
   });
 
   it('an empty tree is no parts', () => {
-    const empty: TreeResult = { ...tree, graph: { people: [], unions: [] }, details: { people: new Map(), families: new Map() } };
+    const empty: TreeResult = { ...tree, graph: { people: [], unions: [], famcOrder: new Map() }, details: { people: new Map(), families: new Map() } };
     const { parts, summary } = splitTree(empty);
     expect(parts).toEqual([]);
     expect(treeAssembler().finish(summary)).toEqual(empty);
@@ -50,7 +51,7 @@ describe('the tree in parts, so no single copy into the page is long (T24)', () 
     const { parts, summary } = splitTree(tree, 1000);
     const join = treeAssembler();
     for (const p of parts.slice(1)) join.add(p);
-    expect(() => join.finish(summary)).toThrow(/11 parts of 12/);
+    expect(() => join.finish(summary)).toThrow(/14 parts of 15/);
   });
 
   it('refuses a part size below 1', () => {

@@ -1,0 +1,51 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Ada /Adopted/
+1 FAMC @F1@
+2 PEDI adopted
+1 FAMC @F2@
+2 PEDI birth
+0 @I2@ INDI
+1 NAME Bo /TwoBirths/
+1 FAMC @F3@
+1 FAMC @F2@
+0 @I3@ INDI
+1 NAME Cy /MissingFirst/
+1 FAMC @F99@
+1 FAMC @F1@
+0 @I4@ INDI
+1 NAME Di /OnlyMissing/
+1 FAMC @F98@
+0 @I5@ INDI
+1 NAME Ed /Twice/
+1 FAMC  @F1@
+1 FAMC @F1@
+0 @I6@ INDI
+1 NAME Fay /NoFamc/
+0 @P1@ INDI
+1 NAME Pa /One/
+1 FAMS @F1@
+0 @P2@ INDI
+1 NAME Pa /Two/
+1 FAMS @F2@
+0 @P3@ INDI
+1 NAME Pa /Three/
+1 FAMS @F3@
+0 @F1@ FAM
+1 HUSB @P1@
+1 CHIL @I1@
+1 CHIL @I3@
+1 CHIL @I5@
+0 @F2@ FAM
+1 HUSB @P2@
+1 CHIL @I1@
+1 CHIL @I2@
+1 CHIL @I6@
+0 @F3@ FAM
+1 HUSB @P3@
+1 CHIL @I2@
+0 TRLR

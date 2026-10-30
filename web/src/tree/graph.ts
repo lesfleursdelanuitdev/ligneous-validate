@@ -28,10 +28,16 @@ export interface GraphUnion extends UnionRecord {
   id: string;
 }
 
-/** The engine's input (its GraphSnapshot people and unions), for the whole file. */
+/** The engine's GraphInput, for the whole file, with famcOrder always filled. */
 export interface GraphInput {
   people: GraphPerson[];
   unions: GraphUnion[];
+  /**
+   * Each person's FAMC families in their own record's order, those in the file only, once
+   * each; people with none are left out. The enricher's tables keep only each family's CHIL
+   * order, so this comes from enrich's famc lists, read from the INDI records.
+   */
+  famcOrder: Map<string, string[]>;
 }
 
 /** A date and a place as written in the file. */
@@ -262,6 +268,14 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
     return year === undefined || opts.thisYear - year <= LIVING_YEARS;
   };
 
+  const famcOrder = new Map<string, string[]>();
+  const firstRow = new Map<string, number>();
+  t.Individuals.forEach((p, i) => { if (!firstRow.has(p.xref)) firstRow.set(p.xref, i); });
+  for (const [xref, i] of firstRow) {
+    const fams = [...new Set(e.famc[i])].filter(f => families.first.has(f));
+    if (fams.length > 0) famcOrder.set(xref, fams);
+  }
+
   const graphPeople: GraphPerson[] = [];
   const personDetails = new Map<string, PersonDetails>();
   for (const [xref, { row: p, line }] of people.first) {
@@ -327,7 +341,7 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
   }
 
   return {
-    graph: { people: graphPeople.concat(placeholders), unions },
+    graph: { people: graphPeople.concat(placeholders), unions, famcOrder },
     details: { people: personDetails, families: familyDetails },
     problems: { duplicatePeople: people.duplicates, duplicateFamilies: families.duplicates },
   };

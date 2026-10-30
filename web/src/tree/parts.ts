@@ -16,7 +16,8 @@ export type TreePart =
   | { kind: 'people'; rows: GraphPerson[] }
   | { kind: 'unions'; rows: GraphUnion[] }
   | { kind: 'personDetails'; rows: [string, PersonDetails][] }
-  | { kind: 'familyDetails'; rows: [string, FamilyDetails][] };
+  | { kind: 'familyDetails'; rows: [string, FamilyDetails][] }
+  | { kind: 'famcOrder'; rows: [string, string[]][] };
 
 /** Everything else of the tree, sent last, with the number of parts sent before it. */
 export type TreeSummary = Omit<TreeResult, 'graph' | 'details'> & { parts: number };
@@ -35,6 +36,7 @@ export function splitTree(r: TreeResult, size = PART_SIZE): { parts: TreePart[];
     ...slices(r.graph.unions, size).map(rows => ({ kind: 'unions' as const, rows })),
     ...slices([...r.details.people], size).map(rows => ({ kind: 'personDetails' as const, rows })),
     ...slices([...r.details.families], size).map(rows => ({ kind: 'familyDetails' as const, rows })),
+    ...slices([...r.graph.famcOrder], size).map(rows => ({ kind: 'famcOrder' as const, rows })),
   ];
   const { graph: _graph, details: _details, ...rest } = r;
   return { parts, summary: { ...rest, parts: parts.length } };
@@ -52,6 +54,7 @@ export function treeAssembler(): TreeAssembler {
   const unions: GraphUnion[] = [];
   const personDetails = new Map<string, PersonDetails>();
   const familyDetails = new Map<string, FamilyDetails>();
+  const famcOrder = new Map<string, string[]>();
   let count = 0;
   return {
     add(part) {
@@ -61,12 +64,13 @@ export function treeAssembler(): TreeAssembler {
         case 'unions': for (const u of part.rows) unions.push(u); break;
         case 'personDetails': for (const [id, d] of part.rows) personDetails.set(id, d); break;
         case 'familyDetails': for (const [id, d] of part.rows) familyDetails.set(id, d); break;
+        case 'famcOrder': for (const [id, f] of part.rows) famcOrder.set(id, f); break;
       }
     },
     finish(summary) {
       if (count !== summary.parts) throw new Error(`the tree came in ${count} parts of ${summary.parts}`);
       const { parts: _parts, ...rest } = summary;
-      return { ...rest, graph: { people, unions }, details: { people: personDetails, families: familyDetails } };
+      return { ...rest, graph: { people, unions, famcOrder }, details: { people: personDetails, families: familyDetails } };
     },
   };
 }

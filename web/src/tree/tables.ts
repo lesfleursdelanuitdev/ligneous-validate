@@ -136,6 +136,8 @@ export interface Enriched {
   tables: Tables;
   /** individuals[i] is the line of tables.Individuals[i]; families likewise. */
   lines: { individuals: number[]; families: number[] };
+  /** famc[i]: the FAMC pointers of tables.Individuals[i]'s record, in its order, as written. */
+  famc: string[][];
   /** The header's home-person pointers as written (spec T26); "" when none. */
   home: HomePointers;
   /** The library failed (a recovered panic). */
@@ -214,7 +216,7 @@ function records(name: string, table: unknown, fields: Record<string, 'string' |
  */
 export function readEnriched(json: unknown): Enriched {
   if (!isObject(json)) throw new EnrichShapeError('not an object');
-  const { isGedcom, parseFindings, tables, lines, home, error } = json;
+  const { isGedcom, parseFindings, tables, lines, famc, home, error } = json;
   if (typeof isGedcom !== 'boolean') throw new EnrichShapeError('isGedcom');
   if (error !== undefined && typeof error !== 'string') throw new EnrichShapeError('error');
   if (!isObject(parseFindings) || !['errors', 'warnings', 'hints'].every(k => typeof parseFindings[k] === 'number')) {
@@ -230,12 +232,18 @@ export function readEnriched(json: unknown): Enriched {
   if (lines.individuals.length !== out.Individuals.length || lines.families.length !== out.Families.length) {
     throw new EnrichShapeError('lines do not match the rows');
   }
+  if (!Array.isArray(famc) || famc.length !== out.Individuals.length ||
+      !famc.every((l: unknown) => Array.isArray(l) && l.every(x => typeof x === 'string'))) {
+    throw new EnrichShapeError('famc');
+  }
   return {
     isGedcom,
     parseFindings: { errors: Number(parseFindings.errors), warnings: Number(parseFindings.warnings), hints: Number(parseFindings.hints) },
     // Checked above: every table's rows were read into records whose first has its fields.
     tables: out as unknown as Tables,
     lines: { individuals: lines.individuals, families: lines.families },
+    // Checked above: one list of strings per person.
+    famc: famc as string[][],
     home: { home: home.home, root: home.root, submitter: home.submitter },
     ...(error ? { error } : {}),
   };

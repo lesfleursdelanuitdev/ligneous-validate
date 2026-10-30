@@ -14,8 +14,11 @@ export type StartSuggestion =
 /** "Within 3 generations", read as: at most 3 steps, a step to a parent, a child or a partner. */
 const STEPS = 3;
 
+/** What the suggestion reads of the tree. */
+type Family = Pick<GraphInput, 'people' | 'unions'>;
+
 /** The people who aren't placeholders, in file order. */
-function realPeople(graph: GraphInput): string[] {
+function realPeople(graph: Family): string[] {
   return graph.people.filter(p => p._unknownPlaceholder !== true).map(p => p.id);
 }
 
@@ -26,7 +29,7 @@ function realPeople(graph: GraphInput): string[] {
  * through a placeholder. One walk per person, each touching only that
  * person's relatives: O(people × relatives).
  */
-export function relativesWithin(graph: GraphInput, steps: number): Map<string, number> {
+export function relativesWithin(graph: Family, steps: number): Map<string, number> {
   const ids = realPeople(graph);
   const index = new Map<string, number>();
   ids.forEach((id, i) => index.set(id, i));
@@ -79,7 +82,7 @@ export function relativesWithin(graph: GraphInput, steps: number): Map<string, n
  * the person with the most relatives within 3 generations (the first in file
  * order on a tie). Null for a file with nobody in it.
  */
-export function suggestStart(graph: GraphInput, home: HomePointers): StartSuggestion | null {
+export function suggestStart(graph: Family, home: HomePointers): StartSuggestion | null {
   const ids = realPeople(graph);
   const known = new Set(ids);
   for (const reason of ['home', 'root', 'submitter'] as const) {

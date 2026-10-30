@@ -5,7 +5,10 @@ package main
 
 import (
 	"encoding/json"
+	"math"
 	"os"
+	"runtime"
+	"runtime/debug"
 	"strings"
 	"syscall/js"
 	"testing"
@@ -204,6 +207,37 @@ func TestEnrich(t *testing.T) {
 	throws := js.Global().Get("Function").New("throw new Error('no')")
 	if enrichFn(js.Undefined(), []js.Value{jsBytes(t, royal), throws}).(string) != got {
 		t.Fatal("a throwing callback changed the answer")
+	}
+}
+
+// Each read starts from a collected heap and runs under a soft memory
+// limit, which is then put back: check and the rest never run under it.
+func TestEnrichMemory(t *testing.T) {
+	var during []int64
+	var before, first runtime.MemStats
+	progress := js.FuncOf(func(js.Value, []js.Value) any {
+		if len(during) == 0 {
+			runtime.ReadMemStats(&first) // at "parse", before anything is read
+		}
+		during = append(during, debug.SetMemoryLimit(-1))
+		return nil
+	})
+	defer progress.Release()
+	raw := jsBytes(t, "../check/testdata/royal92.ged")
+	runtime.ReadMemStats(&before)
+	enrichFn(js.Undefined(), []js.Value{raw, progress.Value})
+	if first.NumGC <= before.NumGC {
+		t.Errorf("no collection before the read: %d then %d", before.NumGC, first.NumGC)
+	}
+	if len(during) == 0 || during[0] != enrichMemoryLimit {
+		t.Errorf("limit during the read: %v", during)
+	}
+	if l := debug.SetMemoryLimit(-1); l != math.MaxInt64 {
+		t.Errorf("limit after the read: %d", l)
+	}
+	checkFn(js.Undefined(), []js.Value{jsBytes(t, "../check/testdata/royal92.ged")})
+	if l := debug.SetMemoryLimit(-1); l != math.MaxInt64 {
+		t.Errorf("limit after check: %d", l)
 	}
 }
 

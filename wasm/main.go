@@ -7,6 +7,8 @@ package main
 import (
 	"encoding/json"
 	"fmt"
+	"runtime"
+	"runtime/debug"
 	"syscall/js"
 
 	"github.com/lesfleursdelanuitdev/ligneous-validate/check"
@@ -154,10 +156,22 @@ func saveFn(_ js.Value, args []js.Value) (ret any) {
 	return map[string]any{"data": data, "json": "{}"}
 }
 
+// enrichMemoryLimit is the Go heap's soft limit while enrich runs. The wasm
+// heap never shrinks, so its peak is what a read costs the page. One read of
+// 70,000 people peaked at 956 MiB to 2 GiB without a limit, and at about 1 GiB
+// with this one, in the same time; 125,000 people took 15% longer and 22%
+// less memory (docs/enrich-progress.md).
+const enrichMemoryLimit = 1 << 30
+
 // enrichFn is enrich(bytes, progress?): check.Enrich as JSON, the enricher's
 // own tables for the tree viewer (never the parsed document). The optional
-// second argument is called with each stage name, as check's is.
+// second argument is called with each stage name, as check's is. Each read
+// starts from a collected heap (one after another in one worker, the heap
+// used to double each time) and runs under enrichMemoryLimit, which is put
+// back after it: the validator's own calls never run under it.
 func enrichFn(_ js.Value, args []js.Value) (ret any) {
+	runtime.GC()
+	defer debug.SetMemoryLimit(debug.SetMemoryLimit(enrichMemoryLimit))
 	defer func() {
 		if r := recover(); r != nil {
 			ret = errJSON(fmt.Sprint(r))

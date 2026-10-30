@@ -22,6 +22,7 @@ test('e2e: the worker reads a file into a tree, with nothing leaving the page', 
     const people: { id: string; isLiving: boolean }[] = [];
     const unions: { id: string; children: unknown[] }[] = [];
     const details = new Map<string, { line: number; fullName: string }>();
+    const famcOrder = new Map<string, string[]>();
     interface Msg {
       type: string; job?: string; stage?: string; text?: string; message?: string;
       part?: { kind: string; rows: unknown[] }; summary?: { error?: string; isGedcom: boolean; parseFindings: unknown; start: unknown; parts: number };
@@ -37,6 +38,7 @@ test('e2e: the worker reads a file into a tree, with nothing leaving the page', 
         if (m.part.kind === 'people') people.push(...(m.part.rows as typeof people));
         if (m.part.kind === 'unions') unions.push(...(m.part.rows as typeof unions));
         if (m.part.kind === 'personDetails') for (const [id, d] of m.part.rows as [string, { line: number; fullName: string }][]) details.set(id, d);
+        if (m.part.kind === 'famcOrder') for (const [id, f] of m.part.rows as [string, string[]][]) famcOrder.set(id, f);
       }
       if (m.type === 'enriched' && m.summary) ok(m.summary);
       if (m.type === 'error') fail(new Error(m.message));
@@ -48,13 +50,15 @@ test('e2e: the worker reads a file into a tree, with nothing leaving the page', 
       victoria: people.find(p => p.id === '@I1@'),
       victoriaDetails: details.get('@I1@'),
       f1Children: unions.find(u => u.id === '@F1@')?.children.length,
+      famc: `${famcOrder.size} ${JSON.stringify(famcOrder.get('@I3@'))}`,
     };
   }, [workerUrl, b64] as const);
 
   expect(out.error).toBe('');
   expect(out.seen).toEqual(['status Reading the file…', 'enrich parse', 'enrich enrich', 'enrich finish', 'enrich graph']);
   expect(out).toMatchObject({
-    isGedcom: true, parseFindings: { errors: 0, warnings: 0, hints: 1 }, parts: '4 of 4', people: 3294, unions: 1422, f1Children: 9,
+    isGedcom: true, parseFindings: { errors: 0, warnings: 0, hints: 1 }, parts: '5 of 5', people: 3294, unions: 1422, f1Children: 9,
+    famc: '2018 ["@F1@"]', // Victoria's eldest daughter, a child of @F1@
     start: { id: '@I1@', reason: 'most-relatives', relatives: 200 },
   });
   expect(out.victoria).toMatchObject({ firstName: 'Victoria', lastName: 'Hanover', birthYear: 1819, deathYear: 1901, isLiving: false });

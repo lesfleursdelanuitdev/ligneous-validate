@@ -152,7 +152,7 @@ func TestEnrichJSONShape(t *testing.T) {
 	if err := json.Unmarshal(b, &top); err != nil {
 		t.Fatal(err)
 	}
-	if got := keys(top); strings.Join(got, ",") != "home,isGedcom,lines,parseFindings,tables" {
+	if got := keys(top); strings.Join(got, ",") != "famc,home,isGedcom,lines,parseFindings,tables" {
 		t.Fatalf("top-level keys = %v", got)
 	}
 	var tables map[string]json.RawMessage
@@ -326,6 +326,39 @@ func parseCounts(t *testing.T, raw []byte) Counts {
 	return c
 }
 
+// Each INDI's FAMC pointers in its own order (the engine's famcOrder, T20),
+// as written: the enricher's tables keep only each family's CHIL order.
+func TestEnrichFamcInFileOrder(t *testing.T) {
+	out := Enrich(read(t, "testdata/tree/famc.ged"))
+	if len(out.Famc) != len(out.Tables.Individuals) {
+		t.Fatalf("%d famc lists for %d people", len(out.Famc), len(out.Tables.Individuals))
+	}
+	got := map[string][]string{}
+	for i, p := range out.Tables.Individuals {
+		got[p.Xref] = out.Famc[i]
+	}
+	want := map[string][]string{
+		"@I1@": {"@F1@", "@F2@"},  // the adoptive family first, as listed
+		"@I2@": {"@F3@", "@F2@"},  // two birth families: not the FAM records' order
+		"@I3@": {"@F99@", "@F1@"}, // a missing family, kept as written
+		"@I4@": {"@F98@"},         // only a missing family
+		"@I5@": {"@F1@", "@F1@"},  // twice, the first with two spaces
+		"@I6@": {}, "@P1@": {}, "@P2@": {}, "@P3@": {},
+	}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("famc = %v\nwant %v", got, want)
+	}
+	b, _ := out.JSON()
+	if !bytes.Contains(b, []byte(`,"famc":[["@F1@","@F2@"],["@F3@","@F2@"],`)) || bytes.Contains(b, []byte(`"famc":null`)) {
+		t.Fatalf("famc in JSON: %s", b[bytes.Index(b, []byte(`"famc"`)):])
+	}
+	// Records sharing an xref each keep their own list.
+	dup := Enrich([]byte("0 HEAD\n1 GEDC\n2 VERS 5.5.1\n0 @I1@ INDI\n1 FAMC @F1@\n0 @I1@ INDI\n1 FAMC @F2@\n0 TRLR\n"))
+	if !reflect.DeepEqual(dup.Famc, [][]string{{"@F1@"}, {"@F2@"}}) {
+		t.Fatalf("duplicates: %v", dup.Famc)
+	}
+}
+
 // T26: the header's home-person pointers, as written. The page decides which
 // to use (web/src/tree/start.ts).
 func TestEnrichHome(t *testing.T) {
@@ -359,7 +392,7 @@ func TestEnrichNotGedcom(t *testing.T) {
 	png := append([]byte{0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a}, bytes.Repeat([]byte{0, 1, 2}, 500)...)
 	for _, raw := range [][]byte{png, nil, []byte("hello, this is not a gedcom file")} {
 		out := Enrich(raw)
-		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 || out.Home != (HomePointers{}) {
+		if out.IsGedcom || out.Error != "" || len(out.Tables.Individuals) != 0 || out.Home != (HomePointers{}) || out.Famc == nil {
 			t.Errorf("%q…: %+v", raw[:min(len(raw), 8)], out)
 		}
 		b, _ := json.Marshal(out)

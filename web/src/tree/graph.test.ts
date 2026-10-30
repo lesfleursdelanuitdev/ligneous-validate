@@ -11,6 +11,7 @@ import adoptionJSON from '../testdata/tree/adoption.json';
 import cousinJSON from '../testdata/tree/cousin-marriage.json';
 import dupFamiliesJSON from '../testdata/tree/duplicate-families.json';
 import dupXrefJSON from '../testdata/tree/duplicate-xref.json';
+import famcJSON from '../testdata/tree/famc.json';
 import livingJSON from '../testdata/tree/living.json';
 import namesJSON from '../testdata/tree/names.json';
 import noPartnerJSON from '../testdata/tree/no-partner.json';
@@ -22,7 +23,7 @@ const royal92 = (): Enriched =>
   readEnriched(JSON.parse(new TextDecoder().decode(gunzipSync(readFileSync(gz('royal92.json.gz'))))));
 
 const FIXTURES: Record<string, unknown> = {
-  adoption: adoptionJSON, cousin: cousinJSON, dupFamilies: dupFamiliesJSON, dupXref: dupXrefJSON,
+  adoption: adoptionJSON, cousin: cousinJSON, dupFamilies: dupFamiliesJSON, dupXref: dupXrefJSON, famc: famcJSON,
   living: livingJSON, names: namesJSON, noPartner: noPartnerJSON, ownAncestor: ownAncestorJSON,
 };
 const build = (json: unknown, thisYear = YEAR) => buildGraph(readEnriched(json), { thisYear });
@@ -52,6 +53,13 @@ describe('the whole file, in the engine\'s shape', () => {
         expect(new Set(u.children.map(c => c.id)).size).toBe(u.children.length);
       }
       for (const p of t.graph.people) expect(typeof p.isLiving).toBe('boolean');
+      const unionIds = new Set(t.graph.unions.map(u => u.id));
+      for (const [id, fams] of t.graph.famcOrder) {
+        expect(ids.has(id) && !isPlaceholder(id)).toBe(true);
+        expect(fams.length).toBeGreaterThan(0);
+        expect(fams.every(f => unionIds.has(f))).toBe(true);
+        expect(new Set(fams).size).toBe(fams.length);
+      }
     });
   }
 });
@@ -146,6 +154,39 @@ describe('adoption: the child type comes from the enricher\'s parent–child edg
 
   it('a child in two families is a child of both', () => {
     expect(t.graph.unions.filter(u => u.children.some(c => c.id === '@I3@')).map(u => u.id)).toEqual(['@F1@', '@F2@']);
+  });
+});
+
+describe('famcOrder: each person\'s parent families in their own record\'s order (T20)', () => {
+  const t = build(famcJSON);
+  const order = (id: string) => t.graph.famcOrder.get(id);
+
+  it('an adopted child whose adoptive FAMC is listed first', () => {
+    expect(order('@I1@')).toEqual(['@F1@', '@F2@']);
+    // The engine takes the first birth family in this order: F2, not F1.
+    expect(kids(t, '@F1@')).toContain('@I1@ adopted');
+    expect(kids(t, '@F2@')).toContain('@I1@ birth');
+  });
+
+  it('two birth families: the record\'s order, not the FAM records\' order', () => {
+    expect(order('@I2@')).toEqual(['@F3@', '@F2@']);
+    expect(t.graph.unions.filter(u => u.children.some(c => c.id === '@I2@')).map(u => u.id)).toEqual(['@F2@', '@F3@']);
+  });
+
+  it('a FAMC pointing to a family that isn\'t in the file is left out', () => {
+    expect(order('@I3@')).toEqual(['@F1@']);
+    expect(t.graph.famcOrder.has('@I4@')).toBe(false); // its only FAMC is missing
+  });
+
+  it('a family listed twice counts once; no FAMC, no entry', () => {
+    expect(order('@I5@')).toEqual(['@F1@']);
+    expect(t.graph.famcOrder.has('@I6@')).toBe(false); // a child of F2 by its CHIL only
+    expect([...t.graph.famcOrder.keys()]).toEqual(['@I1@', '@I2@', '@I3@', '@I5@']);
+  });
+
+  it('records that share an xref: the first record\'s list', () => {
+    const d = build(dupXrefJSON);
+    expect(d.graph.famcOrder.size).toBe(0);
   });
 });
 
@@ -312,6 +353,7 @@ function goldenText(t: TreeData): string {
   const lines: string[] = [];
   for (const p of t.graph.people) lines.push('P ' + JSON.stringify(p));
   for (const u of t.graph.unions) lines.push('U ' + JSON.stringify(u));
+  for (const [id, f] of t.graph.famcOrder) lines.push(`O ${id} ` + JSON.stringify(f));
   for (const [id, d] of t.details.people) lines.push(`D ${id} ` + JSON.stringify(d));
   for (const [id, d] of t.details.families) lines.push(`F ${id} ` + JSON.stringify(d));
   lines.push('X ' + JSON.stringify(t.problems));
@@ -378,6 +420,9 @@ describe('readEnriched reads the compact answer back into the enricher\'s record
     ['lines that don\'t match the rows', () => ({ ...good(), lines: { individuals: [1], families: [] } })],
     ['parse findings without counts', () => ({ ...good(), parseFindings: {} })],
     ['no home pointers', () => ({ ...good(), home: undefined })],
+    ['no FAMC lists', () => ({ ...good(), famc: undefined })],
+    ['FAMC lists that don\'t match the rows', () => ({ ...good(), famc: [] })],
+    ['a FAMC that isn\'t a string', () => { const j = good(); (j.famc as unknown[][])[2] = [7]; return j; }],
   ])('refuses %s', (_, make) => {
     expect(() => readEnriched(make())).toThrow(/expected shape/);
   });
