@@ -253,4 +253,4 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | 75af2a9 | this ledger, round 2 |
 | 8a5935c | T32: the living rule across the family; this ledger, round 3 |
 | 1d156f7 | T40: IndividualEvents, FamilyEvents, Attributes, Residences; timelineFor; the worker's timeline message |
-| (next) | this ledger, round 4 |
+| bdaf86e | this ledger, round 4; the timing script times the timeline |
