@@ -14,10 +14,10 @@ describe('a file "very large" for phones (T24)', () => {
     [0, false],
     [499_788, false], // royal92.ged
     [1_102_000, false], // pres2020.ged
-    [2_079_272, false], // people5000.ged: 260 MiB at its peak in Chromium
-    [4_238_183, true], // people10000.ged: 530 MiB
-    [5_507_917, true], // indented2.ged: 755 MiB
-    [29_642_841, true], // people70000.ged: 1.7 GiB
+    [2_079_272, false], // people5000.ged: 267 MiB at its peak in Chromium
+    [4_238_183, true], // people10000.ged: 511 MiB
+    [5_507_917, true], // indented2.ged: 738 MiB
+    [29_642_841, true], // people70000.ged: 1.6 GiB
   ])('%d bytes: %s', (bytes, want) => {
     expect(isVeryLargeForPhones(bytes)).toBe(want);
   });

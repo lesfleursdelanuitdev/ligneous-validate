@@ -30,16 +30,17 @@ export const REPAIR_STAGES: StageTable = [
 ];
 
 // The tree viewer's read (web/src/tree/job.ts): Go's parse, enrich and finish
-// (which includes the JSON), then the worker's graph (JSON.parse is in
-// finish; the copy of the tree to the page is in graph). Timed through the
-// built worker in Chromium (`node scripts/enrich-browser.mjs`, 2026-10-30,
-// library v0.3.1), set from the big file:
-//   people70000.ged 28.3 MiB, 12.8 s: parse 24.2, enrich 49.3, finish 16.3, graph 10.1
-//   royal92.ged      0.5 MiB, 0.33 s: parse 32, enrich 36, finish 19, graph 13
+// (writing the JSON; JSON.parse and reading the tables back are in it too),
+// then the worker's graph (the conversion, the starting person and the tree's
+// parts copied to the page). Timed through the built worker in Chromium
+// (`node scripts/enrich-browser.mjs`, 2026-10-30, library v0.3.1, compact
+// JSON), set from the big file:
+//   people70000.ged 28.3 MiB, 12.0 s: parse 25.1, enrich 53.1, finish 11.7, graph 10.1
+//   royal92.ged      0.5 MiB, 0.43 s: parse 27, enrich 46, finish 15, graph 12
 export const ENRICH_STAGES: StageTable = [
-  ['parse', 24],
-  ['enrich', 49],
-  ['finish', 17],
+  ['parse', 25],
+  ['enrich', 53],
+  ['finish', 12],
   ['graph', 10],
 ];
 
