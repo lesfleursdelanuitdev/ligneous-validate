@@ -221,4 +221,4 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | 62939be | famcOrder; the Go heap collected and limited during enrich; the phone threshold |
 | c3c62f7 | progress weights and threshold numbers from the final run |
 | 75af2a9 | this ledger, round 2 |
-| (next) | T32: the living rule across the family; this ledger, round 3 |
+| 8a5935c | T32: the living rule across the family; this ledger, round 3 |
