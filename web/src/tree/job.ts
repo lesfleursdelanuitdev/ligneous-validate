@@ -4,6 +4,7 @@
 // tested without the wasm.
 
 import { buildGraph } from './graph';
+import { suggestStart } from './start';
 import { readEnriched } from './tables';
 import type { FromWorker, TreeResult } from '../types';
 
@@ -21,6 +22,7 @@ function failed(message: string): TreeResult {
     graph: { people: [], unions: [] },
     details: { people: new Map(), families: new Map() },
     problems: { duplicatePeople: [], duplicateFamilies: [] },
+    start: null,
     error: message,
   };
 }
@@ -47,7 +49,8 @@ export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWor
       result = failed(typeof enriched === 'string' ? enriched : enriched.error ?? '');
     } else {
       post({ type: 'stage', job: 'enrich', stage: STAGE_GRAPH });
-      result = { isGedcom: enriched.isGedcom, parseFindings: enriched.parseFindings, ...buildGraph(enriched, { thisYear }) };
+      const tree = buildGraph(enriched, { thisYear });
+      result = { isGedcom: enriched.isGedcom, parseFindings: enriched.parseFindings, ...tree, start: suggestStart(tree.graph, enriched.home) };
     }
   } catch (err) {
     result = failed(String(err));

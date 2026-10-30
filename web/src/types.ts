@@ -1,6 +1,7 @@
 // Mirrors check/check.go, check/summary.go and check/repair.go.
 
 import type { TreeData } from './tree/graph';
+import type { StartSuggestion } from './tree/start';
 
 export type Severity = 'error' | 'warning' | 'hint';
 export type Group = 'format' | 'header' | 'links' | 'dates' | 'names';
@@ -141,6 +142,8 @@ export interface TreeResult extends TreeData {
   isGedcom: boolean;
   /** The parser's findings by severity: the file has problems the validator would show. */
   parseFindings: Counts;
+  /** The suggested starting person (web/src/tree/start.ts); null when there is nobody. */
+  start: StartSuggestion | null;
   /** Set when reading failed (a recovered panic, a crash in the worker, an answer in the wrong shape). */
   error?: string;
 }

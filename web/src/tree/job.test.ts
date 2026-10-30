@@ -52,6 +52,13 @@ describe('the worker\'s enrich job', () => {
     expect(r.graph.people).toHaveLength(9);
     expect(r.graph.unions).toHaveLength(4);
     expect(r.details.people.get('@I1@')?.line).toBe(6);
+    // No home person in the header: the best-connected person, found in the worker.
+    expect(r.start).toEqual({ id: '@I1@', reason: 'most-relatives', relatives: 8 }); // everyone is within 3 steps of George; he is first
+  });
+
+  it('starts from the header\'s home person when it names someone', () => {
+    const withHome = JSON.stringify({ ...cousinJSON, home: { home: '@I9@', root: '', submitter: '' } });
+    expect(result(run(fakeApi(withHome))).start).toEqual({ id: '@I9@', reason: 'home' });
   });
 
   it('applies the living rule with the year it is given', () => {
@@ -62,7 +69,7 @@ describe('the worker\'s enrich job', () => {
   it('a file that isn\'t GEDCOM: an empty tree, no error', () => {
     const notGedcom = JSON.stringify({ ...cousinJSON, isGedcom: false, tables: Object.fromEntries(Object.keys(cousinJSON.tables).map(k => [k, { columns: [], rows: [] }])), lines: { individuals: [], families: [] } });
     const r = result(run(fakeApi(notGedcom, ['parse'])));
-    expect(r).toMatchObject({ isGedcom: false, graph: { people: [], unions: [] } });
+    expect(r).toMatchObject({ isGedcom: false, graph: { people: [], unions: [] }, start: null });
     expect(r.error).toBeUndefined();
   });
 
@@ -75,7 +82,7 @@ describe('the worker\'s enrich job', () => {
   ])('%s: an empty tree with the error, as check does', (_, reply, message) => {
     const r = result(run(fakeApi(reply)));
     expect(r.error).toContain(message);
-    expect(r).toMatchObject({ isGedcom: false, parseFindings: { errors: 0, warnings: 0, hints: 0 }, graph: { people: [], unions: [] } });
+    expect(r).toMatchObject({ isGedcom: false, parseFindings: { errors: 0, warnings: 0, hints: 0 }, graph: { people: [], unions: [] }, start: null });
     expect(r.details.people.size + r.details.families.size).toBe(0);
   });
 
