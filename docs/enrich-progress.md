@@ -100,6 +100,10 @@ So no choice of whole tables reaches 10 MB. Even at zero JSON cost, parse plus t
 
 Rerun after the `pedi` change, 18:43 UTC, same command, exit 0: Go ok (check, wasm), vitest 284 passed (one new: the mixed-parentage case), build ok, Playwright 198 passed and the same 2 skipped, including the privacy and enrich tests on both projects.
 
+### 13. Final check, round 2
+
+`GOFLAGS=-mod=mod with-lease "tree-viewer enrich: full check incl. e2e (round 2)" -- npm run check`, exit 0: Go ok (`check` 48 top-level tests, `wasm` 9), vitest 336 passed in 16 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped on desktop, including both privacy tests and the enrich test (now joining the 5 parts, the start and famcOrder) on desktop and phone. `npx tsc --noEmit -p .` exit 0. `go.mod`/`go.sum` unchanged; nothing fetched.
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
@@ -111,13 +115,71 @@ All tested as they are now; none fixed (library read only).
 - **A second HEAD replaces the first, and SUBN is dropped**: no effect on the conversion, but the home-person suggestion (spec Part 4 item 2) needs HEAD's `_HOME`/`_ROOT`/submitter, which no enricher table carries.
 - **The enricher is the slowest part in wasm**: 6.3 of the 12.8 s at 70,000 people.
 
-## Open questions for momolig
+## Decided 2026-10-30 (momolig), done in round 2 below
 
-1. **The size budget can't be met with unchanged tables** (114.6 MiB at 70,000 people, about 1.7 KB per person). Raise the budget, allow a different encoding of the same tables, or bring the JavaScript port forward? The 1.3 GB Go heap is the bigger risk on phones.
-2. Drop IndividualEvents, FamilyEvents and Spouses (unused, −16 MB at 70k)?
-3. The living rule as written counts as dead someone with no birth date but a recent christening (2010) or marriage (2015), and as living everyone with no readable dates (813 of royal92's 3,010; 1,131 living in all). Use the earliest dated event as the birth year when there's none?
-4. The home person: should enrich also return HEAD's pointers, or does the viewer start from the best-connected person only?
-5. Done as the engine asked (2026-10-30): union ids are the FAM xref with its `@`s; placeholders set `_unknownPlaceholder: true` (and still `firstName: 'Unknown'`); `pedi` is the lower-cased PEDI. Values outside birth/adopted/foster/sealing: `other` (GEDCOM 7 `OTHER`, in a fixture only). The mixed-parentage case gives `adopted`.
+The five questions of round 1 became T24 (compact JSON, new budgets, phone warning), T25 (drop three tables), T10 (the living rule) and T26 (home pointers); point 5 was the engine's request, done. The engine also asked for `famcOrder` (its `GraphInput`).
+
+## Round 2: T24, T25, T26, T10, famcOrder
+
+### 7. Compact JSON, three tables out, home pointers (T24, T25, T26)
+
+- `check/compact.go`: `Table[T]` writes a table as `{"columns": […], "rows": [[…], …]}`, the values encoding/json would write, in the columns' order, `null` where it would leave a field out; a column empty in every row (`id`) is left out. `web/src/tree/tables.ts` reads each row back into the same record (a null is a field left out), so the conversion didn't change. `TestEnrichEverySample` checks every table of all 71 files reads back exactly as encoding/json writes it; `TestCompactTable` covers odd strings, invalid UTF-8, lists, pointers, omitted fields.
+- The encoder body isn't generic: generic, it added 122 KB to the wasm; as one function, 57 KB.
+- `Enriched.JSON()` writes the whole answer in one pass (a test reads it back as json.Marshal's on every sample): json.Marshal re-reads every table a MarshalJSON gives it. Natively 206-309 ms against 423-680 ms at 70k.
+- T25: IndividualEvents, FamilyEvents and Spouses are gone.
+- T26: `home: {home, root, submitter}`: HEAD's own `_HOME` and `_ROOT` (pointer values only), and the first pointer to an INDI on the submitter record HEAD's SUBM names, whatever its tag (a SUBM may also point to OBJE). Nothing in the library or its samples knew these tags; none of the samples has one. Tests: none, each tag, spaces, a value that isn't a pointer, a pointer to nobody (kept: the page decides), a submitter with no INDI, a SUBM that isn't the header's, `_HOME` under SOUR (not read).
+
+### 8. The living rule (T10)
+
+`graph.ts`: dead with a DEAT, BURI or CREM event (a death year that can't be read is still a death). Otherwise the birth year (the enricher's, from BIRT), or when it's missing, first of: (1) the earliest dated event of the person or of a family they are a partner in, (2) the earliest child's birth − 15, (3) the later parent's birth + 15. Births only, never another estimate. Dead when that year is over 100 years ago (1925 in 2026; 1926 is living). No dates anywhere: living.
+
+`check/testdata/tree/living.ged` (38 people) covers each source at its edge (1926/1925), the order of the sources, the earliest event and child, the later parent, a parent with only a death, and the old cases: christened 2010 and married 2015 now count as living.
+
+**royal92: 891 of 3,010 living** (1,131 before). Recounted independently in Python from the enrich JSON: 891, of them 318 by their birth year, 21 by their own earliest event, 19 by their children, 23 by their parents, and **510 with no dates anywhere** (813 people had no dates of their own under the old rule). 261 people turned dead and 21 living; nothing else in the golden changed.
+
+### 9. The starting person (T26)
+
+`web/src/tree/start.ts`: `suggestStart(graph, home)`: `_HOME`, then `_ROOT`, then the submitter's INDI, the first that names a person in the file; otherwise the person with the most relatives within 3 generations, read as **at most 3 steps, a step to a parent, a child or a partner**, each relative once, placeholders neither counted nor walked through, the first in file order on a tie. One walk per person, O(people × relatives). The worker runs it and sends `start` with the tree. royal92: Victoria (`@I1@`, 200 relatives). 70k: 190-290 ms.
+
+### 10. famcOrder (engine's GraphInput, T20)
+
+The enricher's tables keep each family's CHIL order, not a person's FAMC order, so `enrich` returns `famc`: each INDI record's FAMC pointers as written, in order, aligned with `tables.Individuals` like `lines`. The converter fills `graph.famcOrder` for every person whose list names a family in the file: those families only, once each, the first record's list for a shared xref. `check/testdata/tree/famc.ged`: an adopted child whose adoptive FAMC is first (`[F1, F2]`; the engine then takes F2, the first birth family), two birth families (`[F3, F2]`, not the FAM records' order), a FAMC to a missing family (left out; a person whose only FAMC is missing has no entry), a family listed twice, a child by CHIL only (no entry). royal92: 2,018 entries (counted independently from the .ged), added to the golden; nothing else in it changed.
+
+### 11. No freeze, a bounded heap, the phone threshold
+
+- **The tree comes in parts** (`web/src/tree/parts.ts`): `tree-part` messages of at most 5,000 records (people, unions, person details, family details, famcOrder), then `enriched` with the rest and the part count; `treeAssembler()` joins them and refuses a missing part. One message holding the 70k tree cost the page **one 358 ms main-thread task**; parts of 10,000 left one of 64 ms; parts of 5,000 leave none over 50 ms.
+- **The Go heap.** It never shrinks in wasm. Reading the same 70k file six times in one instance ran out of wasm memory (`cannot allocate 12582912-byte block (4231823360 in use)`): each read in an instance roughly doubled the heap. `enrichFn` now collects first and runs under a 1 GiB soft memory limit (`debug.SetMemoryLimit`), put back after the call, so check, repair, plan and save never run under it (a wasm test checks both). Three reads of 70k, before → after: 976-1,952 MiB → 932-1,040 MiB, no slower; 125,153 people: 1,940 → 1,512 MiB, 15% slower. **The viewer should still start a fresh worker for each file**, as the validator does ("a fresh runtime for the next file").
+- **Phone warning** (`web/src/tree/size.ts`): `isVeryLargeForPhones(bytes)`, true from **3 MiB** (`PHONE_LARGE_BYTES`). How it was chosen: the renderer's peak memory (the table below) is 133 MiB with nothing read, at most 267 MiB under 2 MiB, 511 MiB at 4.04 MiB; the worst rate, royal92's and the dense indented2's, is about 117 MiB per MiB of file. Assumed phone budget: about 512 MiB for the tab (a tab much above that risks being killed, or failing to grow its wasm memory, on phones with 3-4 GB). At the worst rate a 3 MiB file needs about 484 MiB. **Not tested on a phone.**
+
+### 12. Measurements, round 2 (2026-10-30 19:49-19:54 UTC, load 2-4)
+
+Same commands as step 5, plus `node --expose-gc scripts/enrich-times.mjs --runs 0 FILE` (one read per process, for its own Go heap) and `node scripts/enrich-browser.mjs --memory FILES` (fresh browser per file; renderer VmHWM). Chromium now runs on a blank page of the same origin with the site's CSP, and also gives the page's longest main-thread task (Long Tasks API: tasks over 50 ms).
+
+| File | JSON (was) | Ready, Node, 5 runs | Ready, Chromium, 5 runs | Longest main-thread task | Budget |
+|---|---:|---:|---:|---:|---|
+| royal92.ged | 1,334,026 B, 1.27 MiB (3.47) | 304 ms (297-343) | 446 ms (383-462) | none over 50 ms | < 2 s: **met** |
+| pres2020.ged | 1,170,681 B, 1.12 MiB (3.03) | 288 ms (283-303) | 442 ms (406-464) | none over 50 ms | – |
+| people70000.ged | 41,130,016 B, 39.22 MiB (114.57) | 12,092 ms (11,897-15,351) | 11,932 ms (11,653-12,219) | none over 50 ms (was 358 ms) | about 13 s, progress bar, no freeze: **met** |
+
+70k in Chromium: parse 3.0 s, enrich 6.4 s, finish 1.4 s (was 2.1), graph 1.2 s; 4 stage messages and 49 parts reach the page during the read. Node: inside `enrich()` parse 2.8, enrich 6.3, finish 0.88 s (was 1.8); JSON.parse 0.52 s, tables read back 0.16 s, graph 1.0 s, start 0.29 s. 70k JSON by table: Events 10.1 MB, Individuals 8.9, Dates 8.7, ParentChild 6.1, NameForms 1.9, FamilyChildren 1.4, the name links 1.9, Families 0.8, the rest under 0.1. Six 70k reads in one instance now end at 1,954 MiB (they ran out of memory before the fix).
+
+Memory, one read each:
+
+| File | Size | People | Go heap, Node | Renderer peak, Chromium | Ready, Chromium |
+|---|---:|---:|---:|---:|---:|
+| nothing read | – | – | – | 133 MiB | – |
+| royal92.ged | 0.48 MiB | 3,010 | 32 MiB | 189 MiB | 0.47 s |
+| pres2020.ged | 1.05 MiB | 2,322 | 44 MiB | 210 MiB | 0.49 s |
+| people5000.ged | 1.98 MiB | 5,000 | 80 MiB | 267 MiB | 1.1 s |
+| people10000.ged | 4.04 MiB | 10,002 | 280 MiB | 511 MiB | 2.1 s |
+| indented2.ged (no families) | 5.25 MiB | 70,000 | 332 MiB | 738 MiB | 4.1 s |
+| people20000.ged | 7.98 MiB | 20,003 | 356 MiB | 690 MiB | 3.6 s |
+| people35000.ged | 14.12 MiB | 35,004 | 1,005 MiB | 1,450 MiB | 7.1 s |
+| synth20.ged | 20.07 MiB | 49,989 | 888 MiB | 1,437 MiB | 10.2 s |
+| people70000.ged | 28.27 MiB | 70,002 | 1,008 MiB | 1,648 MiB | 12.7 s |
+| synth50.ged | 50.71 MiB | 125,153 | 1,524 MiB | 2,520 MiB | 25.3 s |
+
+The Go heap grows in steps (Go's arenas), so neighbouring files can swap places (people35000 above synth20). Sizes: the wasm is 5,407,706 bytes (gzip -9 1,465,880), against 5,309,982 (1,445,424) before this branch; the worker bundle 12.88 kB (2.9 kB before the branch).
 
 ## Commits
 
@@ -130,3 +192,13 @@ All tested as they are now; none fixed (library read only).
 | aa75c17 | measurement scripts, `ENRICH_STAGES`, e2e test |
 | 8768742 | this ledger's measurements, findings and open questions |
 | 4258a2a | `pedi` = the PEDI in lower case, as the engine asked |
+| 107207d | ledger |
+| 010a058 | compact tables (T24), three tables out (T25), home pointers (T26) |
+| 22b4a12 | the living rule (T10) |
+| d7ebaf1 | the starting person (T26) |
+| 633eef0 | the compact encoder out of the generic method (−65 KB wasm) |
+| fdaeab2 | `Enriched.JSON()`, one pass |
+| 1bf08f1 | the tree in parts; measurement scripts: single read, longest task, renderer memory |
+| 62939be | famcOrder; the Go heap collected and limited during enrich; the phone threshold |
+| c3c62f7 | progress weights and threshold numbers from the final run |
+| (this one) | this ledger, round 2 |
