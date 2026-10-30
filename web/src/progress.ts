@@ -29,6 +29,20 @@ export const REPAIR_STAGES: StageTable = [
   ['finish', 3],
 ];
 
+// The tree viewer's read (web/src/tree/job.ts): Go's parse, enrich and finish
+// (which includes the JSON), then the worker's graph (JSON.parse is in
+// finish; the copy of the tree to the page is in graph). Timed through the
+// built worker in Chromium (`node scripts/enrich-browser.mjs`, 2026-10-30,
+// library v0.3.1), set from the big file:
+//   people70000.ged 28.3 MiB, 12.8 s: parse 24.2, enrich 49.3, finish 16.3, graph 10.1
+//   royal92.ged      0.5 MiB, 0.33 s: parse 32, enrich 36, finish 19, graph 13
+export const ENRICH_STAGES: StageTable = [
+  ['parse', 24],
+  ['enrich', 49],
+  ['finish', 17],
+  ['graph', 10],
+];
+
 /**
  * The percentage at the start of `stage`: the sum of the weights before it.
  * 'done' is 100; a stage not in the table is -1 (the bar doesn't move).

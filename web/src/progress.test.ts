@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { CHECK_STAGES, REPAIR_STAGES, downloadPercent, downloadTotal, readWithProgress, stagePercent } from './progress';
+import { CHECK_STAGES, ENRICH_STAGES, REPAIR_STAGES, downloadPercent, downloadTotal, readWithProgress, stagePercent } from './progress';
 
 describe('stage percentages', () => {
-  for (const [name, table] of [['check', CHECK_STAGES], ['repair', REPAIR_STAGES]] as const) {
+  for (const [name, table] of [['check', CHECK_STAGES], ['repair', REPAIR_STAGES], ['enrich', ENRICH_STAGES]] as const) {
     it(`${name}: cumulative, monotonic, ends at 100`, () => {
       const total = table.reduce((sum, [, w]) => sum + w, 0);
       expect(total).toBe(100);
@@ -24,11 +24,14 @@ describe('stage percentages', () => {
   it('check stages are in the order Go reports them', () => {
     expect(CHECK_STAGES.map(([s]) => s)).toEqual(['decode', 'parse', 'validate', 'summary', 'finish']);
     expect(REPAIR_STAGES.map(([s]) => s)).toEqual(['repair', 'parse', 'validate', 'finish']);
+    // Go's three, then the worker's own (web/src/tree/job.ts).
+    expect(ENRICH_STAGES.map(([s]) => s)).toEqual(['parse', 'enrich', 'finish', 'graph']);
   });
 
   it('each stage starts where the measured (v0.2.1, big-file) weights put it', () => {
     expect(CHECK_STAGES.map(([s]) => stagePercent(CHECK_STAGES, s))).toEqual([0, 1, 18, 52, 85]);
     expect(REPAIR_STAGES.map(([s]) => stagePercent(REPAIR_STAGES, s))).toEqual([0, 53, 67, 97]);
+    expect(ENRICH_STAGES.map(([s]) => stagePercent(ENRICH_STAGES, s))).toEqual([0, 24, 73, 90]);
   });
 
   it('an unknown stage never moves the bar', () => {
