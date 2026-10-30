@@ -4,18 +4,17 @@
 //
 // Reading a file takes memory in the page's renderer in proportion to the
 // file (measured in headless Chromium, the renderer's peak resident memory,
-// scripts/enrich-browser.mjs --memory; numbers in docs/enrich-progress.md):
-// 133 MiB with nothing read; up to 267 MiB for every file under 2 MiB; 511
-// MiB for a 4 MiB file; at worst (royal92, and a dense file of 70,000 people
-// in 5.25 MiB) about 117 MiB more for each MiB of file. The budget assumed
-// for a phone is about 512 MiB, which a 3 MiB file at that worst rate (about
-// 484 MiB) stays under. A phone was not tested. Decided at 3 MiB (T33).
-// Since the timeline tables (T40): 282 MiB at 2 MiB, 545 MiB at 4 MiB, and
-// royal92's rate about 162 MiB per MiB, which puts a 3 MiB file of its
-// density near 620 MiB (docs/enrich-progress.md, round 4).
+// scripts/enrich-browser.mjs --memory; numbers in docs/enrich-progress.md).
+// With the timeline tables (T40): 133 MiB with nothing read; 211 MiB for
+// royal92 (0.48 MiB), 214 MiB for pres2020 (1.05 MiB), 282 MiB for a 1.98 MiB
+// file, 545 MiB for 4.04 MiB, 766 MiB for a dense 5.25 MiB file. The worst
+// rate, royal92's, is about 162 MiB more for each MiB of file. The budget
+// assumed for a phone tab is about 512 MiB: at that worst rate a 2 MiB file
+// needs about 457 MiB, a 3 MiB file about 620 MiB. So 2 MiB (T33, amended;
+// it was 3 MiB before T40's tables). A phone was not tested.
 
 /** From this size up, a file is very large for a phone. */
-export const PHONE_LARGE_BYTES = 3 * 2 ** 20;
+export const PHONE_LARGE_BYTES = 2 * 2 ** 20;
 
 /** Whether a phone should be warned before opening a file of this many bytes. */
 export function isVeryLargeForPhones(bytes: number): boolean {

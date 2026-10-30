@@ -149,6 +149,8 @@ Budgets (T24): royal92 under 2 s, met; 70k about 13 s with a progress bar and no
 
 **The phone threshold (T33, 3 MiB) under T40:** pres2020 214 MiB (was 210), people5000 (1.98 MiB) 282 (267), people10000 (4.04 MiB) 545 (511), indented2 (5.25 MiB) 766 (738). Linked files put a 3 MiB file near 410 MiB; royal92's rate, now about 162 MiB per MiB of file, puts a 3 MiB file of its density near 620 MiB, over the assumed 512 MiB. Left at 3 MiB (decided); flagged for momolig: 2 MiB would keep every measured rate under 512 MiB.
 
+**T33 amended (momolig): the warning starts at 2 MiB.** How it was chosen, with the T40 numbers: the renderer's peak memory is 133 MiB with nothing read, 211 MiB for royal92 (0.48 MiB), 214 for pres2020 (1.05 MiB), 282 for people5000 (1.98 MiB), 545 for people10000 (4.04 MiB), 766 for the dense indented2 (5.25 MiB). The worst rate is royal92's, about 162 MiB more for each MiB of file. With the assumed budget of about 512 MiB per phone tab, a 2 MiB file at that rate needs about 457 MiB and a 3 MiB file about 620 MiB, so `PHONE_LARGE_BYTES` is 2 MiB. Every measured file of 2 MiB or more is warned about; every one below it stayed under 290 MiB. Still to be rechecked on real phones before launch.
+
 `ENRICH_STAGES` unchanged: the 70k split is now 24/51/14/10, within a point or two of the table.
 
 Final check, round 4: `npm run check` under a lease, exit 0: Go ok (`check`, `wasm`), vitest 356 passed in 17 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped, including both privacy tests and the enrich test on desktop and phone; `npx tsc --noEmit -p .` exit 0.

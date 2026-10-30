@@ -4,20 +4,21 @@ import { PHONE_LARGE_BYTES, isVeryLargeForPhones } from './size';
 const MiB = 2 ** 20;
 
 describe('a file "very large" for phones (T24)', () => {
-  it('starts at 3 MiB (docs/enrich-progress.md says how it was chosen)', () => {
-    expect(PHONE_LARGE_BYTES).toBe(3 * MiB);
-    expect(isVeryLargeForPhones(3 * MiB - 1)).toBe(false);
-    expect(isVeryLargeForPhones(3 * MiB)).toBe(true);
+  it('starts at 2 MiB (T33 amended; docs/enrich-progress.md says how it was chosen)', () => {
+    expect(PHONE_LARGE_BYTES).toBe(2 * MiB);
+    expect(isVeryLargeForPhones(2 * MiB - 1)).toBe(false);
+    expect(isVeryLargeForPhones(2 * MiB)).toBe(true);
   });
 
   it.each([
     [0, false],
     [499_788, false], // royal92.ged
     [1_102_000, false], // pres2020.ged
-    [2_079_272, false], // people5000.ged: 267 MiB at its peak in Chromium
-    [4_238_183, true], // people10000.ged: 511 MiB
-    [5_507_917, true], // indented2.ged: 738 MiB
-    [29_642_841, true], // people70000.ged: 1.6 GiB
+    [2_079_272, false], // people5000.ged, 1.98 MiB: 282 MiB at its peak in Chromium (T40)
+    [3 * MiB, true], // royal92's density: about 620 MiB
+    [4_238_183, true], // people10000.ged: 545 MiB
+    [5_507_917, true], // indented2.ged: 766 MiB
+    [29_642_841, true], // people70000.ged: 1.7 GiB
   ])('%d bytes: %s', (bytes, want) => {
     expect(isVeryLargeForPhones(bytes)).toBe(want);
   });
