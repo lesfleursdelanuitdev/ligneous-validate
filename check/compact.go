@@ -70,14 +70,21 @@ func isEmpty(v reflect.Value) bool {
 }
 
 // MarshalJSON writes the table compactly (see Table). The work is in
-// marshalCompact, which isn't generic, so the wasm holds it once, not once
-// per row type.
-func (t Table[T]) MarshalJSON() ([]byte, error) { return marshalCompact(reflect.ValueOf([]T(t))) }
+// writeCompact, which isn't generic, so the wasm holds it once, not once per
+// row type.
+func (t Table[T]) MarshalJSON() ([]byte, error) {
+	var b bytes.Buffer
+	if err := writeCompact(&b, reflect.ValueOf([]T(t))); err != nil {
+		return nil, err
+	}
+	return b.Bytes(), nil
+}
 
-func marshalCompact(rows reflect.Value) ([]byte, error) {
+// writeCompact appends a table (a slice of structs) to b, compactly.
+func writeCompact(b *bytes.Buffer, rows reflect.Value) error {
 	rt := rows.Type().Elem()
 	if rt.Kind() != reflect.Struct {
-		return nil, fmt.Errorf("compact table of %s: rows must be structs", rt)
+		return fmt.Errorf("compact table of %s: rows must be structs", rt)
 	}
 	n := rows.Len()
 	all := fieldsOf(rt)
@@ -92,14 +99,13 @@ func marshalCompact(rows reflect.Value) ([]byte, error) {
 			}
 		}
 	}
-	var b bytes.Buffer
-	b.Grow(64 + n*16*max(len(cols), 1))
+	b.Grow(64 + n*8*max(len(cols), 1))
 	b.WriteString(`{"columns":[`)
 	for i, f := range cols {
 		if i > 0 {
 			b.WriteByte(',')
 		}
-		appendString(&b, f.name)
+		appendString(b, f.name)
 	}
 	b.WriteString(`],"rows":[`)
 	for i := 0; i < n; i++ {
@@ -116,14 +122,14 @@ func marshalCompact(rows reflect.Value) ([]byte, error) {
 				b.WriteString("null")
 				continue
 			}
-			if err := appendValue(&b, row.Field(f.index)); err != nil {
-				return nil, fmt.Errorf("compact table of %s, %s: %w", rt, f.name, err)
+			if err := appendValue(b, row.Field(f.index)); err != nil {
+				return fmt.Errorf("compact table of %s, %s: %w", rt, f.name, err)
 			}
 		}
 		b.WriteByte(']')
 	}
 	b.WriteString(`]}`)
-	return b.Bytes(), nil
+	return nil
 }
 
 // appendValue writes one value as JSON, for the kinds the enricher's rows use.
@@ -132,7 +138,7 @@ func appendValue(b *bytes.Buffer, v reflect.Value) error {
 	case reflect.String:
 		appendString(b, v.String())
 	case reflect.Int, reflect.Int64:
-		b.WriteString(strconv.FormatInt(v.Int(), 10))
+		b.Write(strconv.AppendInt(b.AvailableBuffer(), v.Int(), 10))
 	case reflect.Bool:
 		b.WriteString(strconv.FormatBool(v.Bool()))
 	case reflect.Float64:
@@ -218,3 +224,49 @@ func appendString(b *bytes.Buffer, s string) {
 }
 
 var _ json.Marshaler = Table[struct{}]{}
+
+// JSON is what enrich returns: the same as json.Marshal(e), read back, in one
+// pass. json.Marshal re-reads every table it gets from MarshalJSON to check
+// and copy it, which in wasm costs about as much as writing it.
+func (e Enriched) JSON() ([]byte, error) {
+	var b bytes.Buffer
+	b.Grow(1 << 16)
+	small := func(key string, v any) error {
+		j, err := json.Marshal(v)
+		if err != nil {
+			return err
+		}
+		b.WriteString(`,"` + key + `":`)
+		b.Write(j)
+		return nil
+	}
+	b.WriteString(`{"isGedcom":` + strconv.FormatBool(e.IsGedcom))
+	if err := small("parseFindings", e.ParseFindings); err != nil {
+		return nil, err
+	}
+	b.WriteString(`,"tables":{`)
+	tv := reflect.ValueOf(e.Tables)
+	for i := 0; i < tv.NumField(); i++ {
+		if i > 0 {
+			b.WriteByte(',')
+		}
+		appendString(&b, tv.Type().Field(i).Name)
+		b.WriteByte(':')
+		if err := writeCompact(&b, tv.Field(i)); err != nil {
+			return nil, err
+		}
+	}
+	b.WriteByte('}')
+	if err := small("lines", e.Lines); err != nil {
+		return nil, err
+	}
+	if err := small("home", e.Home); err != nil {
+		return nil, err
+	}
+	if e.Error != "" {
+		b.WriteString(`,"error":`)
+		appendString(&b, e.Error)
+	}
+	b.WriteByte('}')
+	return b.Bytes(), nil
+}

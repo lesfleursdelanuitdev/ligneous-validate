@@ -187,12 +187,12 @@ func TestEnrich(t *testing.T) {
 	progress := js.FuncOf(func(_ js.Value, a []js.Value) any { stages = append(stages, a[0].String()); return nil })
 	defer progress.Release()
 	got := enrichFn(js.Undefined(), []js.Value{jsBytes(t, royal), progress.Value}).(string)
-	want, err := json.Marshal(check.Enrich(raw))
+	want, err := check.Enrich(raw).JSON()
 	if err != nil {
 		t.Fatal(err)
 	}
 	if got != string(want) {
-		t.Fatalf("enrich JSON differs from check.Enrich (%d against %d bytes)", len(got), len(want))
+		t.Fatalf("enrich JSON differs from check.Enrich(…).JSON() (%d against %d bytes)", len(got), len(want))
 	}
 	if strings.Join(stages, ",") != "parse,enrich,finish" {
 		t.Fatalf("stages = %v", stages)

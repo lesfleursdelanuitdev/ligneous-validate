@@ -449,8 +449,8 @@ func TestEnrichEverySample(t *testing.T) {
 		if c := Check(raw); out.IsGedcom != c.IsGedcom {
 			t.Errorf("%s: isGedcom %v, Check says %v", name, out.IsGedcom, c.IsGedcom)
 		}
-		if _, err := json.Marshal(out); err != nil {
-			t.Errorf("%s: %v", name, err)
+		if msg := sameJSON(out); msg != "" {
+			t.Errorf("%s: %s", name, msg)
 		}
 		if !out.IsGedcom {
 			continue
@@ -490,9 +490,8 @@ func TestEnrichFixtures(t *testing.T) {
 		if out.Error != "" || !out.IsGedcom {
 			t.Fatalf("%s: %+v", f.in, out)
 		}
-		// One line: indenting would put every value of every row on its own
-		// line. The .ged files are the readable source.
-		want, err := json.Marshal(out)
+		// The bytes enrich returns, on one line. The .ged files are the readable source.
+		want, err := out.JSON()
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -505,6 +504,45 @@ func TestEnrichFixtures(t *testing.T) {
 		if got, err := readFixture(f.out); err != nil || !bytes.Equal(got, want) {
 			t.Errorf("%s is out of date (UPDATE_ENRICH=1 go test ./check): %v", f.out, err)
 		}
+	}
+}
+
+// sameJSON reports how out.JSON() differs from json.Marshal(out), read back
+// (they differ only in escaping: JSON() leaves <, > and & as they are).
+func sameJSON(out Enriched) string {
+	fast, err := out.JSON()
+	if err != nil {
+		return "JSON(): " + err.Error()
+	}
+	plain, err := json.Marshal(out)
+	if err != nil {
+		return "json.Marshal: " + err.Error()
+	}
+	var a, b any
+	if err := json.Unmarshal(fast, &a); err != nil {
+		return "JSON() is not JSON: " + err.Error()
+	}
+	_ = json.Unmarshal(plain, &b)
+	if !reflect.DeepEqual(a, b) {
+		return "JSON() reads back differently from json.Marshal"
+	}
+	return ""
+}
+
+func TestEnrichJSONIsMarshal(t *testing.T) {
+	for _, raw := range [][]byte{[]byte(smallTree), read(t, "testdata/royal92.ged"), nil, []byte("not gedcom")} {
+		if msg := sameJSON(Enrich(raw)); msg != "" {
+			t.Fatal(msg)
+		}
+	}
+	failed := Enrich([]byte(smallTree))
+	failed.Error = "boom <&>"
+	if msg := sameJSON(failed); msg != "" {
+		t.Fatal(msg)
+	}
+	b, _ := failed.JSON()
+	if !bytes.HasPrefix(b, []byte(`{"isGedcom":true,"parseFindings":{`)) || !bytes.HasSuffix(b, []byte(`,"error":"boom <&>"}`)) {
+		t.Fatalf("got %.80s … %s", b, b[len(b)-40:])
 	}
 }
 

@@ -166,7 +166,7 @@ func enrichFn(_ js.Value, args []js.Value) (ret any) {
 	if len(args) < 1 {
 		return errJSON("enrich needs a Uint8Array")
 	}
-	b, err := json.Marshal(check.EnrichWithProgress(bytesIn(args[0]), progressFrom(args, 1)))
+	b, err := check.EnrichWithProgress(bytesIn(args[0]), progressFrom(args, 1)).JSON()
 	if err != nil {
 		return errJSON(err.Error())
 	}
