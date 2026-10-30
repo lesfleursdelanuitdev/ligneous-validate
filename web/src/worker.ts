@@ -3,6 +3,7 @@
 // created.
 
 import { downloadPercent, readWithProgress } from './progress';
+import { runEnrich } from './tree/job';
 import type { Counts, FromWorker, PlanOut, RepairOptions, RepairOut, Result, ToWorker } from './types';
 
 /** The size of ligneous.wasm, baked in at build time (web/vite.config.ts). */
@@ -18,6 +19,7 @@ interface Api {
   repair(bytes: Uint8Array, before?: Counts, options?: RepairOptions, progress?: (stage: string) => void): { data: Uint8Array; json: string };
   plan(bytes: Uint8Array, options?: RepairOptions): string;
   save(bytes: Uint8Array): { data: Uint8Array; json: string };
+  enrich(bytes: Uint8Array, progress?: (stage: string) => void): string;
 }
 
 interface WorkerScope {
@@ -85,6 +87,7 @@ function failed(message: string): Result {
 scope.addEventListener('message', async e => {
   const msg = e.data;
   if (!loaded && msg.type === 'check') post({ type: 'status', text: 'Getting the checker ready…' });
+  if (!loaded && msg.type === 'enrich') post({ type: 'status', text: 'Getting the file reader ready…' });
   let api: Api;
   try {
     api = await ready;
@@ -95,7 +98,7 @@ scope.addEventListener('message', async e => {
   // The editor's Check again checks the file Download would give, with its CHAR
   // set the same way; the plan and the repair that follow it work on that file
   // too. If it can't be made (no GEDCOM line), the text as it is.
-  if (msg.type !== 'save' && msg.save) {
+  if ('save' in msg && msg.save) {
     try {
       const out = api.save(bytes);
       if (!(JSON.parse(out.json) as { error?: string }).error) bytes = out.data;
@@ -139,5 +142,7 @@ scope.addEventListener('message', async e => {
     } catch (err) {
       post({ type: 'saved', data: new ArrayBuffer(0), error: String(err) });
     }
+  } else if (msg.type === 'enrich') {
+    runEnrich(api, bytes, post, new Date().getFullYear());
   }
 });

@@ -1,5 +1,7 @@
 // Mirrors check/check.go, check/summary.go and check/repair.go.
 
+import type { TreeData } from './tree/graph';
+
 export type Severity = 'error' | 'warning' | 'hint';
 export type Group = 'format' | 'header' | 'links' | 'dates' | 'names';
 export type Role = 'person' | 'child' | 'father' | 'mother' | 'family' | 'target';
@@ -130,7 +132,18 @@ export type ToWorker =
   /** id: answers to an older request are dropped. */
   | { type: 'plan'; bytes: ArrayBuffer; options?: RepairOptions; id: number; save?: boolean }
   /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
-  | { type: 'save'; bytes: ArrayBuffer };
+  | { type: 'save'; bytes: ArrayBuffer }
+  /** The tree viewer: read the file into the chart engine's input (web/src/tree/job.ts). */
+  | { type: 'enrich'; bytes: ArrayBuffer };
+
+/** The tree viewer's answer for one file: the whole tree, or an empty one with the error. */
+export interface TreeResult extends TreeData {
+  isGedcom: boolean;
+  /** The parser's findings by severity: the file has problems the validator would show. */
+  parseFindings: Counts;
+  /** Set when reading failed (a recovered panic, a crash in the worker, an answer in the wrong shape). */
+  error?: string;
+}
 
 export type FromWorker =
   | { type: 'status'; text: string }
@@ -138,10 +151,11 @@ export type FromWorker =
   /** How much of the checker has downloaded, 0-99 (whole percent). */
   | { type: 'download'; percent: number }
   /** A stage the Go checker has reached, sent while it is still running. */
-  | { type: 'stage'; job: 'check' | 'repair'; stage: string }
+  | { type: 'stage'; job: 'check' | 'repair' | 'enrich'; stage: string }
   | { type: 'result'; result: Result }
   | { type: 'repaired'; data: ArrayBuffer; info: RepairOut }
   /** The preview of each kind of fix, from plan(). */
   | { type: 'planned'; info: PlanOut; id: number }
   | { type: 'saved'; data: ArrayBuffer; error?: string }
+  | { type: 'enriched'; result: TreeResult }
   | { type: 'error'; message: string };
