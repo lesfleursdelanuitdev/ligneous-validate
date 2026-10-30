@@ -57,6 +57,17 @@ export interface OtherName {
   surname: string;
 }
 
+/**
+ * What the living rule (T10, T32) rested on: a death; their own birth year,
+ * or their own earliest dated event; an estimate from relatives `steps`
+ * relations away; or no date anywhere in their family.
+ */
+export type LivingBasis =
+  | { by: 'death' }
+  | { by: 'birth' | 'event'; year: number }
+  | { by: 'relatives'; year: number; steps: number }
+  | { by: 'none' };
+
 export interface PersonDetails {
   /** The line of the INDI record, for "Open in the editor". */
   line: number;
@@ -68,6 +79,8 @@ export interface PersonDetails {
   death: DatePlace | null;
   /** The person's other NAMEs, in file order. */
   otherNames: OtherName[];
+  /** Why isLiving is what it is. */
+  living: LivingBasis;
 }
 
 /** How a child is linked to one parent: the enricher's parent–child edge, as it is. */
@@ -122,6 +135,72 @@ export function isPlaceholder(id: string): boolean {
 const LIVING_YEARS = 100;
 /** The years between a parent's birth and a child's, for the estimate (T10). */
 const GENERATION_YEARS = 15;
+/**
+ * The years between partners' births, and between siblings' (T32): 0, the
+ * same generation. Most partners and siblings are born within about 10 years
+ * of each other, under the 15-year generation step, so an estimate passed
+ * through one is about as good as one through a parent or child; a margin
+ * would only move the 100-year line for everyone estimated this way.
+ */
+const SAME_GENERATION_YEARS = 0;
+
+interface LivingPerson {
+  died: boolean;
+  /** Their own birth year, else null. */
+  birth: number | null;
+  /** Their earliest dated event, their own or a family's they are a partner in, else null. */
+  event: number | null;
+}
+
+/**
+ * The living rule's basis for each person (T10, T32). Their own birth year,
+ * else their own earliest dated event, starts a walk across the family: one
+ * breadth-first search from every dated person at once, through people and
+ * families, so each person gets the estimate from the fewest relations away,
+ * and the earliest year where estimates as near disagree. A relation is a
+ * parent (the year minus 15), a child (plus 15), a partner or a sibling
+ * (plus 0); each is two hops through the family: in from a partner +0 or
+ * from a child −15, out to a partner +0 or to a child +15. Each person and
+ * family is visited once: O(people + families + links).
+ */
+function livingBases(people: LivingPerson[], partnersOf: number[][], childrenOf: number[][]): LivingBasis[] {
+  const n = people.length;
+  const asPartner: number[][] = people.map(() => []);
+  const asChild: number[][] = people.map(() => []);
+  partnersOf.forEach((ps, f) => { for (const p of ps) asPartner[p].push(f); });
+  childrenOf.forEach((cs, f) => { for (const c of cs) asChild[c].push(f); });
+  // Nodes: people 0..n-1, then families n..n+families-1.
+  const year = new Float64Array(n + partnersOf.length);
+  const depth = new Int32Array(n + partnersOf.length).fill(-1);
+  let frontier: number[] = [];
+  people.forEach((p, i) => {
+    const own = p.birth ?? p.event;
+    if (own !== null) { year[i] = own; depth[i] = 0; frontier.push(i); }
+  });
+  for (let d = 0; frontier.length > 0; d++) {
+    const next: number[] = [];
+    const reach = (node: number, y: number) => {
+      if (depth[node] === -1) { depth[node] = d + 1; year[node] = y; next.push(node); }
+      else if (depth[node] === d + 1 && y < year[node]) year[node] = y;
+    };
+    for (const node of frontier) {
+      if (node < n) {
+        for (const f of asPartner[node]) reach(n + f, year[node] + SAME_GENERATION_YEARS);
+        for (const f of asChild[node]) reach(n + f, year[node] - GENERATION_YEARS);
+      } else {
+        for (const p of partnersOf[node - n]) reach(p, year[node]);
+        for (const c of childrenOf[node - n]) reach(c, year[node] + GENERATION_YEARS);
+      }
+    }
+    frontier = next;
+  }
+  return people.map((p, i): LivingBasis => {
+    if (p.died) return { by: 'death' };
+    if (depth[i] === 0) return { by: p.birth !== null ? 'birth' : 'event', year: year[i] };
+    if (depth[i] > 0) return { by: 'relatives', year: year[i], steps: depth[i] / 2 };
+    return { by: 'none' };
+  });
+}
 const DEATH_EVENTS = new Set(['DEAT', 'BURI', 'CREM']);
 
 /** Display gender, as the Gonsalves site maps it (lib/individual-mapper.ts formatGender). */
@@ -224,49 +303,44 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
   const childrenOf = groupBy(t.FamilyChildren, c => c.family_xref);
   const edgesOf = groupBy(t.ParentChild, pc => `${pc.family_xref} ${pc.child_xref}`);
 
-  // What the living rule reads, per person: their birth year, their earliest
-  // dated event (their own or one of the families they are a partner in),
-  // their children's earliest birth and their parents' latest birth. Births
-  // are years the enricher read from BIRT; estimates are never chained.
-  const birthOf = new Map<string, number | null>();
-  for (const [xref, { row: p }] of people.first) birthOf.set(xref, yearOf(p.birth_date_index));
-  const earliestEvent = new Map<string, number>();
-  const earliestChild = new Map<string, number>();
-  const latestParent = new Map<string, number>();
-  const lower = (m: Map<string, number>, k: string, y: number | null) => {
-    if (y !== null && !(y >= (m.get(k) ?? Infinity))) m.set(k, y);
-  };
-  const higher = (m: Map<string, number>, k: string, y: number | null) => {
-    if (y !== null && !(y <= (m.get(k) ?? -Infinity))) m.set(k, y);
-  };
-  for (const xref of people.first.keys()) {
-    for (const ev of eventsOf.get(`INDI ${xref}`) ?? []) lower(earliestEvent, xref, yearOf(ev.date_index));
-  }
-  for (const [famXref, { row: f }] of families.first) {
-    const partners = [f.husband_xref, f.wife_xref].filter((x): x is string => !!x && people.first.has(x));
-    const kids = (childrenOf.get(famXref) ?? []).map(c => c.child_xref);
-    for (const ev of eventsOf.get(`FAM ${famXref}`) ?? []) for (const x of partners) lower(earliestEvent, x, yearOf(ev.date_index));
-    for (const k of kids) for (const x of partners) {
-      lower(earliestChild, x, birthOf.get(k) ?? null);
-      higher(latestParent, k, birthOf.get(x) ?? null);
+  // The living rule (spec T10, amended by T32). Dead with a DEAT, BURI or
+  // CREM event (a death whose year can't be read is still a death).
+  // Otherwise their birth year, else their earliest dated event, else the
+  // estimate from the nearest dated relatives (livingBases). Dead when that
+  // year is over 100 years ago; with no date anywhere in the family, living.
+  const index = new Map<string, number>();
+  const livingPeople: LivingPerson[] = [];
+  for (const [xref, { row: p }] of people.first) {
+    index.set(xref, livingPeople.length);
+    let event: number | null = null;
+    for (const ev of eventsOf.get(`INDI ${xref}`) ?? []) {
+      const y = yearOf(ev.date_index);
+      if (y !== null && (event === null || y < event)) event = y;
     }
+    livingPeople.push({
+      died: (eventsOf.get(`INDI ${xref}`) ?? []).some(ev => DEATH_EVENTS.has(ev.event_type)),
+      birth: yearOf(p.birth_date_index),
+      event,
+    });
   }
-
-  // The living rule (spec T10). Dead with a DEAT, BURI or CREM event (a
-  // death whose year can't be read is still a death). Otherwise the birth
-  // year, or when it's missing an estimate, first of: (1) the earliest dated
-  // event, (2) the earliest child's birth minus 15 years, (3) the later
-  // parent's birth plus 15 years. Dead when that is over 100 years ago; with
-  // no dates anywhere, living.
-  const living = (xref: string): boolean => {
-    if ((eventsOf.get(`INDI ${xref}`) ?? []).some(ev => DEATH_EVENTS.has(ev.event_type))) return false;
-    const child = earliestChild.get(xref);
-    const parent = latestParent.get(xref);
-    const year = birthOf.get(xref) ?? earliestEvent.get(xref)
-      ?? (child === undefined ? undefined : child - GENERATION_YEARS)
-      ?? (parent === undefined ? undefined : parent + GENERATION_YEARS);
-    return year === undefined || opts.thisYear - year <= LIVING_YEARS;
-  };
+  const partnersOf: number[][] = [];
+  const kidsOf: number[][] = [];
+  for (const [famXref, { row: f }] of families.first) {
+    const partners = [...new Set([f.husband_xref, f.wife_xref])].flatMap(x => (x === undefined ? [] : index.get(x) ?? []));
+    for (const ev of eventsOf.get(`FAM ${famXref}`) ?? []) {
+      const y = yearOf(ev.date_index);
+      if (y === null) continue;
+      for (const p of partners) {
+        const own = livingPeople[p].event;
+        if (own === null || y < own) livingPeople[p].event = y;
+      }
+    }
+    partnersOf.push(partners);
+    kidsOf.push([...new Set((childrenOf.get(famXref) ?? []).map(c => c.child_xref))].flatMap(x => index.get(x) ?? []));
+  }
+  const bases = livingBases(livingPeople, partnersOf, kidsOf);
+  const living = (b: LivingBasis): boolean =>
+    b.by === 'none' || (b.by !== 'death' && opts.thisYear - b.year <= LIVING_YEARS);
 
   const famcOrder = new Map<string, string[]>();
   const firstRow = new Map<string, number>();
@@ -279,6 +353,7 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
   const graphPeople: GraphPerson[] = [];
   const personDetails = new Map<string, PersonDetails>();
   for (const [xref, { row: p, line }] of people.first) {
+    const basis = bases[index.get(xref) ?? -1];
     const [primary, ...others] = forms.get(xref) ?? [];
     const birthYear = yearOf(p.birth_date_index);
     graphPeople.push({
@@ -291,7 +366,7 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
       birthPlace: placeOf(p.birth_place_index),
       deathPlace: placeOf(p.death_place_index),
       gender: genderOf(p.sex, p.gender),
-      isLiving: living(xref),
+      isLiving: living(basis),
     });
     personDetails.set(xref, {
       line,
@@ -300,6 +375,7 @@ export function buildGraph(e: Enriched, opts: GraphOptions): TreeData {
       birth: datePlace(p.birth_date_index, p.birth_place_index),
       death: datePlace(p.death_date_index, p.death_place_index),
       otherNames: others.map(i => ({ type: t.NameForms[i].name_type, given: parts.given[i], surname: parts.surname[i] })),
+      living: basis,
     });
   }
 

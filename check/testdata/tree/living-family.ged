@@ -1,0 +1,171 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @K1@ INDI
+1 NAME King /Old/
+1 BIRT
+2 DATE 1900
+1 FAMS @F1@
+0 @Q1@ INDI
+1 NAME Queen /Old/
+1 FAMS @F1@
+0 @K2@ INDI
+1 NAME King /Young/
+1 BIRT
+2 DATE 1960
+1 FAMS @F2@
+0 @Q2@ INDI
+1 NAME Queen /Young/
+1 FAMS @F2@
+0 @S1@ INDI
+1 NAME Sib /Dated/
+1 BIRT
+2 DATE 1910
+1 FAMC @F3@
+0 @S2@ INDI
+1 NAME Sib /Undated/
+1 FAMC @F3@
+0 @S3@ INDI
+1 NAME Sib /Recent/
+1 BIRT
+2 DATE 1990
+1 FAMC @F4@
+0 @S4@ INDI
+1 NAME Sib /RecentUndated/
+1 FAMC @F4@
+0 @A@ INDI
+1 NAME Anc /Dated/
+1 BIRT
+2 DATE 1881
+1 FAMS @F5@
+0 @B@ INDI
+1 NAME Gen /One/
+1 FAMC @F5@
+1 FAMS @F6@
+0 @C@ INDI
+1 NAME Gen /Two/
+1 FAMC @F6@
+1 FAMS @F7@
+0 @D@ INDI
+1 NAME Gen /Three/
+1 FAMC @F7@
+0 @L@ INDI
+1 NAME Lone /Undated/
+1 SEX F
+0 @G@ INDI
+1 NAME Grand /Dated/
+1 BIRT
+2 DATE 1900
+1 FAMS @F8@
+0 @H@ INDI
+1 NAME Husband /Undated/
+1 FAMC @F8@
+1 FAMS @F9@
+0 @W@ INDI
+1 NAME Wife /Undated/
+1 FAMS @F9@
+0 @X@ INDI
+1 NAME Near /Partner/
+1 FAMS @F10@
+1 FAMC @F11@
+0 @Y@ INDI
+1 NAME Partner /Recent/
+1 BIRT
+2 DATE 1990
+1 FAMS @F10@
+0 @Z@ INDI
+1 NAME Parent /Undated/
+1 FAMS @F11@
+1 FAMC @F12@
+0 @ZZ@ INDI
+1 NAME Grand /Old/
+1 BIRT
+2 DATE 1800
+1 FAMS @F12@
+0 @X2@ INDI
+1 NAME Disagree /Both/
+1 FAMS @F13@
+1 FAMC @F14@
+0 @Y2@ INDI
+1 NAME Partner /Recent/
+1 BIRT
+2 DATE 1990
+1 FAMS @F13@
+0 @P2@ INDI
+1 NAME Parent /Old/
+1 BIRT
+2 DATE 1800
+1 FAMS @F14@
+0 @C1@ INDI
+1 NAME Loop /Dated/
+1 BIRT
+2 DATE 1900
+1 FAMC @F15@
+1 FAMS @F16@
+0 @C2@ INDI
+1 NAME Loop /Undated/
+1 FAMC @F16@
+1 FAMS @F15@
+0 @DD@ INDI
+1 NAME Died /Undated/
+1 DEAT Y
+1 FAMS @F17@
+0 @Y3@ INDI
+1 NAME Partner /OfDied/
+1 BIRT
+2 DATE 1990
+1 FAMS @F17@
+0 @F1@ FAM
+1 HUSB @K1@
+1 WIFE @Q1@
+0 @F2@ FAM
+1 HUSB @K2@
+1 WIFE @Q2@
+0 @F3@ FAM
+1 CHIL @S1@
+1 CHIL @S2@
+0 @F4@ FAM
+1 CHIL @S3@
+1 CHIL @S4@
+0 @F5@ FAM
+1 HUSB @A@
+1 CHIL @B@
+0 @F6@ FAM
+1 HUSB @B@
+1 CHIL @C@
+0 @F7@ FAM
+1 HUSB @C@
+1 CHIL @D@
+0 @F8@ FAM
+1 HUSB @G@
+1 CHIL @H@
+0 @F9@ FAM
+1 HUSB @H@
+1 WIFE @W@
+0 @F10@ FAM
+1 HUSB @X@
+1 WIFE @Y@
+0 @F11@ FAM
+1 HUSB @Z@
+1 CHIL @X@
+0 @F12@ FAM
+1 HUSB @ZZ@
+1 CHIL @Z@
+0 @F13@ FAM
+1 HUSB @X2@
+1 WIFE @Y2@
+0 @F14@ FAM
+1 HUSB @P2@
+1 CHIL @X2@
+0 @F15@ FAM
+1 HUSB @C2@
+1 CHIL @C1@
+0 @F16@ FAM
+1 HUSB @C1@
+1 CHIL @C2@
+0 @F17@ FAM
+1 HUSB @DD@
+1 WIFE @Y3@
+0 TRLR

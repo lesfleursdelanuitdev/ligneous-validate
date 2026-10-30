@@ -104,6 +104,25 @@ Rerun after the `pedi` change, 18:43 UTC, same command, exit 0: Go ok (check, wa
 
 `GOFLAGS=-mod=mod with-lease "tree-viewer enrich: full check incl. e2e (round 2)" -- npm run check`, exit 0: Go ok (`check` 48 top-level tests, `wasm` 9), vitest 336 passed in 16 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped on desktop, including both privacy tests and the enrich test (now joining the 5 parts, the start and famcOrder) on desktop and phone. `npx tsc --noEmit -p .` exit 0. `go.mod`/`go.sum` unchanged; nothing fetched.
 
+## Round 3: T32 (the living rule across the family), T33
+
+T33 (momolig): the 3 MiB phone threshold stands as built (`PHONE_LARGE_BYTES`).
+
+### 14. The living rule, extended (T32, amends T10)
+
+- Dead with a DEAT, BURI or CREM event, as before. Otherwise each person's own birth year, else their own earliest dated event (their own or a family's they are a partner in), seeds one breadth-first search from every dated person at once (`livingBases` in `graph.ts`). Estimates pass from relative to relative: a parent is the year − 15, a child + 15, a partner or sibling + 0. Each person takes the estimate from the **fewest relations away**; where estimates at that distance disagree, **the earliest** (so dead if any says over 100 years). No date anywhere in their family: living.
+- O(people + families + links): people and families are both nodes, so every relation is two hops through its family (in from a partner +0 or a child −15; out to a partner +0 or a child +15), and a family of many children costs its children once, not their pairs. Each node is visited once, so cycles end.
+- Partner and sibling offset 0 (`SAME_GENERATION_YEARS`): most partners and siblings are born within about 10 years of each other, under the 15-year generation step, so an estimate through one is about as good as one through a parent; a margin would only move the 100-year line for everyone estimated that way.
+- `details.people[…].living` says what the answer rested on: `{by: 'death'}`, `{by: 'birth' | 'event', year}`, `{by: 'relatives', year, steps}` or `{by: 'none'}`.
+- Changes from T10, in `living.ged`: two parents born 1800 and 1950 now give 1815 (dead; T10 took the later parent), a child born 1960 and a parent born 1800 give 1815 (dead; T10 took the child first), and a parent with only a death in 1900 gives 1915 (dead; T10 used parents' births only).
+- `check/testdata/tree/living-family.ged` (tests in `graph.test.ts`, "T32"): an undated queen with a king born 1900 (dead, 1 step) or 1960 (living); an undated sibling of one born 1910 / 1990; three undated generations under an ancestor born 1881 (1896, 1911, 1926: the third, at 100 years, living); an undated partner of an undated child of a parent born 1900 (1915, 2 steps); the fewest steps winning (a partner born 1990 over a grandparent born 1800); a tie of steps (partner 1990, parent 1800: 1815, dead); an isolated undated person (living); a person who is their own grandparent (ends; 1885, the earlier); a death beating a living partner.
+
+**royal92: 387 of 3,010 living** (891 under T10, 1,131 under the first rule): 318 by their own birth year, 21 by their own earliest event, 46 from relatives (all one relation away) and **2 with no date anywhere in their family** (510 under T10). 504 people turned dead and none living; in the golden only `isLiving` and the new `living` detail changed. Recounted independently in Python with a person-level search (explicit partner and sibling links, no family nodes): 387 (339 own, 46 at one step, 2 none). 70k file: 19,794 living, as before (everyone there has a birth date). All bases in royal92: death 1,692, birth 448, relatives 811, event 57, none 2.
+
+Speed, 70k, `buildGraph` alone (Node, 7 runs alternating with the T10 version on the same answer, after a warm-up): **800 ms (723-903) against 837 ms (785-975)**, so no slower (the T10 code had its own passes). Chromium, the built worker, 3 runs: royal92 ready in 397 ms (382-398); 70k in 11,889 ms (11,644-12,378), graph stage 1,246 ms (1,215 before); no main-thread task over 50 ms in any run.
+
+Final check, round 3: `npm run check` under a lease, exit 0: Go ok (`check`, `wasm`), vitest 347 passed in 16 files, the build ok, Playwright 198 passed and the same 2 phone-only tests skipped, including both privacy tests and the enrich test on desktop and phone; `npx tsc --noEmit -p .` exit 0.
+
 ## Library issues that matter to the viewer
 
 All tested as they are now; none fixed (library read only).
@@ -201,4 +220,5 @@ The Go heap grows in steps (Go's arenas), so neighbouring files can swap places 
 | 1bf08f1 | the tree in parts; measurement scripts: single read, longest task, renderer memory |
 | 62939be | famcOrder; the Go heap collected and limited during enrich; the phone threshold |
 | c3c62f7 | progress weights and threshold numbers from the final run |
-| (this one) | this ledger, round 2 |
+| 75af2a9 | this ledger, round 2 |
+| (next) | T32: the living rule across the family; this ledger, round 3 |

@@ -13,6 +13,7 @@ import dupFamiliesJSON from '../testdata/tree/duplicate-families.json';
 import dupXrefJSON from '../testdata/tree/duplicate-xref.json';
 import famcJSON from '../testdata/tree/famc.json';
 import livingJSON from '../testdata/tree/living.json';
+import livingFamilyJSON from '../testdata/tree/living-family.json';
 import namesJSON from '../testdata/tree/names.json';
 import noPartnerJSON from '../testdata/tree/no-partner.json';
 import ownAncestorJSON from '../testdata/tree/own-ancestor.json';
@@ -24,7 +25,7 @@ const royal92 = (): Enriched =>
 
 const FIXTURES: Record<string, unknown> = {
   adoption: adoptionJSON, cousin: cousinJSON, dupFamilies: dupFamiliesJSON, dupXref: dupXrefJSON, famc: famcJSON,
-  living: livingJSON, names: namesJSON, noPartner: noPartnerJSON, ownAncestor: ownAncestorJSON,
+  living: livingJSON, livingFamily: livingFamilyJSON, names: namesJSON, noPartner: noPartnerJSON, ownAncestor: ownAncestorJSON,
 };
 const build = (json: unknown, thisYear = YEAR) => buildGraph(readEnriched(json), { thisYear });
 
@@ -53,6 +54,7 @@ describe('the whole file, in the engine\'s shape', () => {
         expect(new Set(u.children.map(c => c.id)).size).toBe(u.children.length);
       }
       for (const p of t.graph.people) expect(typeof p.isLiving).toBe('boolean');
+      for (const [, d] of t.details.people) expect(['death', 'birth', 'event', 'relatives', 'none']).toContain(d.living.by);
       const unionIds = new Set(t.graph.unions.map(u => u.id));
       for (const [id, fams] of t.graph.famcOrder) {
         expect(ids.has(id) && !isPlaceholder(id)).toBe(true);
@@ -224,7 +226,7 @@ describe('no partner: a placeholder per family, never one shared id', () => {
   });
 });
 
-describe('the living rule (T10)', () => {
+describe('the living rule (T10, T32)', () => {
   const t = build(livingJSON);
   const living = (id: string) => person(t, id).isLiving;
 
@@ -247,21 +249,22 @@ describe('the living rule (T10)', () => {
     ['@I9@', false, 'married 1850'],
     ['@I13@', true, 'married 2015 (dead under the old rule)'],
     ['@I30@', false, 'christened 1990 but a dated event in 1900: the earliest counts'],
-    // (2) Then the children's births minus 15 years: the earliest child.
+    // (2) Then the relatives one step away: a child's birth minus 15 years, a parent's plus 15.
     ['@I17@', true, 'a child born 1941: 1926'],
     ['@I19@', false, 'a child born 1940: 1925'],
-    ['@I31@', false, 'children born 1960 and 1930: 1915'],
-    // (3) Then the parents' births plus 15 years: the later parent.
+    ['@I31@', false, 'children born 1960 and 1930: 1915, the earlier'],
     ['@I21@', true, 'a parent born 1911: 1926'],
     ['@I23@', false, 'a parent born 1910: 1925'],
-    ['@I34@', true, 'parents born 1800 and 1950: 1965'],
-    // In that order.
-    ['@I25@', true, 'christened 2000, a child born 1900: their own event first'],
-    ['@I27@', true, 'a child born 1960, a parent born 1800: the children before the parents'],
-    // No dates anywhere: living.
+    // T32: where estimates as near disagree, the earliest (living under T10's order).
+    ['@I34@', false, 'parents born 1800 and 1950: 1815'],
+    ['@I27@', false, 'a child born 1960 (1945) and a parent born 1800 (1815): 1815'],
+    // Their own event beats any relative.
+    ['@I25@', true, 'christened 2000, a child born 1900: their own event'],
+    // T32: a parent's own dated event counts (living under T10).
+    ['@I37@', false, 'a parent with only a death, in 1900: 1915'],
+    // No dates anywhere in the family: living.
     ['@I7@', true, 'no dates at all'],
     ['@I10@', true, 'a birth date with no year the enricher can read, and nothing else'],
-    ['@I37@', true, 'a parent with a death but no birth: a parent\'s own estimate isn\'t used'],
   ])('%s is living: %s (%s)', (id, want) => {
     expect(living(id)).toBe(want);
   });
@@ -286,6 +289,65 @@ describe('the living rule (T10)', () => {
   it('an estimate is never shown as a birth year', () => {
     expect(person(t, '@I12@')).toMatchObject({ birthYear: null, isLiving: true });
     expect(t.details.people.get('@I12@')?.birth).toBeNull();
+  });
+
+  it('the details say what each answer rests on', () => {
+    const basis = (id: string) => t.details.people.get(id)?.living;
+    expect(basis('@I3@')).toEqual({ by: 'death' });
+    expect(basis('@I1@')).toEqual({ by: 'birth', year: 1926 });
+    expect(basis('@I12@')).toEqual({ by: 'event', year: 2010 });
+    expect(basis('@I13@')).toEqual({ by: 'event', year: 2015 });
+    expect(basis('@I17@')).toEqual({ by: 'relatives', year: 1926, steps: 1 });
+    expect(basis('@I7@')).toEqual({ by: 'none' });
+  });
+});
+
+describe('T32: estimates pass across the family', () => {
+  const t = build(livingFamilyJSON);
+  const at = (id: string) => [person(t, id).isLiving, t.details.people.get(id)?.living];
+
+  it('an undated queen takes her king\'s birth year (a partner: the same generation)', () => {
+    expect(at('@Q1@')).toEqual([false, { by: 'relatives', year: 1900, steps: 1 }]);
+    expect(at('@Q2@')).toEqual([true, { by: 'relatives', year: 1960, steps: 1 }]);
+  });
+
+  it('an undated sibling takes the sibling\'s birth year', () => {
+    expect(at('@S2@')).toEqual([false, { by: 'relatives', year: 1910, steps: 1 }]);
+    expect(at('@S4@')).toEqual([true, { by: 'relatives', year: 1990, steps: 1 }]);
+  });
+
+  it('three undated generations under one dated ancestor: 15 years a generation', () => {
+    expect(at('@B@')).toEqual([false, { by: 'relatives', year: 1896, steps: 1 }]);
+    expect(at('@C@')).toEqual([false, { by: 'relatives', year: 1911, steps: 2 }]);
+    expect(at('@D@')).toEqual([true, { by: 'relatives', year: 1926, steps: 3 }]); // 100 years: not over
+  });
+
+  it('an undated partner of an undated child of a dated parent, through the chain', () => {
+    expect(at('@H@')).toEqual([false, { by: 'relatives', year: 1915, steps: 1 }]);
+    expect(at('@W@')).toEqual([false, { by: 'relatives', year: 1915, steps: 2 }]);
+  });
+
+  it('the fewest steps win: a partner born 1990 before a grandparent born 1800', () => {
+    expect(at('@X@')).toEqual([true, { by: 'relatives', year: 1990, steps: 1 }]);
+    expect(at('@Z@')).toEqual([false, { by: 'relatives', year: 1815, steps: 1 }]);
+  });
+
+  it('as many steps, different answers: the earliest, so dead if any says so', () => {
+    expect(at('@X2@')).toEqual([false, { by: 'relatives', year: 1815, steps: 1 }]);
+  });
+
+  it('an isolated undated person is living', () => {
+    expect(at('@L@')).toEqual([true, { by: 'none' }]);
+  });
+
+  it('a cycle ends: a person who is their own grandparent', () => {
+    // C2 is C1's parent (1900 - 15) and C1's child (1900 + 15): the earlier.
+    expect(at('@C2@')).toEqual([false, { by: 'relatives', year: 1885, steps: 1 }]);
+    expect(person(build(ownAncestorJSON), '@I1@').isLiving).toBe(true); // no dates in that loop at all
+  });
+
+  it('a death is still dead outright, whatever the relatives say', () => {
+    expect(at('@DD@')).toEqual([false, { by: 'death' }]);
   });
 });
 
