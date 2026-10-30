@@ -3,6 +3,7 @@
 import type { TreeData } from './tree/graph';
 import type { TreePart, TreeSummary } from './tree/parts';
 import type { StartSuggestion } from './tree/start';
+import type { TimelineEvent } from './tree/timeline';
 
 export type Severity = 'error' | 'warning' | 'hint';
 export type Group = 'format' | 'header' | 'links' | 'dates' | 'names';
@@ -136,7 +137,9 @@ export type ToWorker =
   /** The editor's Download edited file: UTF-8 with CHAR UTF-8, nothing else changed. */
   | { type: 'save'; bytes: ArrayBuffer }
   /** The tree viewer: read the file into the chart engine's input (web/src/tree/job.ts). */
-  | { type: 'enrich'; bytes: ArrayBuffer };
+  | { type: 'enrich'; bytes: ArrayBuffer }
+  /** The tree viewer: one person's life events from the last file read (T40); request: answers to older ones are dropped. */
+  | { type: 'timeline'; id: string; hideLiving: boolean; request: number };
 
 /** The tree viewer's answer for one file: the whole tree, or an empty one with the error. */
 export interface TreeResult extends TreeData {
@@ -165,4 +168,6 @@ export type FromWorker =
   | { type: 'tree-part'; part: TreePart }
   /** The tree viewer: the rest of the tree, after its parts. */
   | { type: 'enriched'; summary: TreeSummary }
+  /** The tree viewer: a person's timeline, or an empty one with the error. */
+  | { type: 'timeline'; request: number; id: string; events: TimelineEvent[]; error?: string }
   | { type: 'error'; message: string };

@@ -1,0 +1,133 @@
+0 HEAD
+1 GEDC
+2 VERS 5.5.1
+2 FORM LINEAGE-LINKED
+1 CHAR UTF-8
+0 @I1@ INDI
+1 NAME Thomas /Long/
+1 SEX M
+1 BIRT
+2 DATE 3 MAR 1850
+2 PLAC York, Yorkshire, England
+1 CHR
+2 DATE 10 MAR 1850
+2 PLAC York, Yorkshire, England
+1 RESI
+2 DATE 1871
+2 PLAC Leeds, Yorkshire, England
+2 ADDR 4 Mill Lane
+1 OCCU Weaver
+2 DATE 1871
+1 RESI
+2 DATE 1881
+2 PLAC Bradford, Yorkshire, England
+1 OCCU Mill manager
+2 DATE ABT 1890
+1 EVEN
+2 TYPE Letter to the editor
+2 DATE 1895
+1 EDUC Grammar school
+1 DEAT
+2 DATE 12 DEC 1930
+2 PLAC Bradford, Yorkshire, England
+1 BURI
+2 DATE 16 DEC 1930
+1 FAMC @F0@
+1 FAMS @F1@
+1 FAMS @F2@
+0 @I2@ INDI
+1 NAME Mary /First/
+1 SEX F
+1 BIRT
+2 DATE 1852
+1 DEAT
+2 DATE 1880
+1 FAMS @F1@
+0 @I3@ INDI
+1 NAME Jane /Second/
+1 SEX F
+1 BIRT
+2 DATE 1860
+1 FAMS @F2@
+0 @I4@ INDI
+1 NAME Ann /Long/
+1 BIRT
+2 DATE 1875
+2 PLAC Leeds, Yorkshire, England
+1 FAMC @F1@
+0 @I5@ INDI
+1 NAME Bob /Long/
+1 BIRT
+2 DATE 1885
+1 FAMC @F2@
+0 @I7@ INDI
+1 NAME Old /Long/
+1 SEX M
+1 BIRT
+2 DATE 1820
+1 DEAT
+2 DATE 1870
+1 FAMS @F0@
+0 @I8@ INDI
+1 NAME Ma /Long/
+1 SEX F
+1 BIRT
+2 DATE 1825
+1 DEAT Y
+1 FAMS @F0@
+0 @I9@ INDI
+1 NAME Liv /Now/
+1 SEX F
+1 BIRT
+2 DATE 1990
+1 OCCU Nurse
+2 DATE 2012
+1 FAMC @F4@
+1 FAMS @F3@
+0 @I10@ INDI
+1 NAME Partner /Now/
+1 BIRT
+2 DATE 1992
+1 FAMS @F3@
+0 @I12@ INDI
+1 NAME Gran /Gone/
+1 SEX F
+1 BIRT
+2 DATE 1930
+1 DEAT
+2 DATE 2010
+1 FAMS @F4@
+0 @F0@ FAM
+1 HUSB @I7@
+1 WIFE @I8@
+1 CHIL @I1@
+1 MARR
+2 DATE 1845
+0 @F1@ FAM
+1 HUSB @I1@
+1 WIFE @I2@
+1 CHIL @I4@
+1 MARR
+2 DATE 1872
+2 PLAC Leeds, Yorkshire, England
+1 DIV
+2 DATE 1878
+0 @F2@ FAM
+1 HUSB @I1@
+1 WIFE @I3@
+1 CHIL @I5@
+1 MARR
+2 DATE 1882
+2 PLAC Bradford, Yorkshire, England
+1 RESI
+2 DATE 1883
+2 PLAC Bradford, Yorkshire, England
+0 @F3@ FAM
+1 HUSB @I10@
+1 WIFE @I9@
+1 MARR
+2 DATE 2015
+0 @F4@ FAM
+1 WIFE @I12@
+1 CHIL @I9@
+0 TRLR

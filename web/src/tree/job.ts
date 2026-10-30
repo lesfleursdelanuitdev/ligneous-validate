@@ -7,7 +7,9 @@ import { buildGraph } from './graph';
 import { splitTree } from './parts';
 import { suggestStart } from './start';
 import { readEnriched } from './tables';
-import type { FromWorker, TreeResult } from '../types';
+import { timelineFor, timelineSource } from './timeline';
+import type { TimelineSource } from './timeline';
+import type { FromWorker, ToWorker, TreeResult } from '../types';
 
 export interface EnrichApi {
   enrich(bytes: Uint8Array, progress?: (stage: string) => void): string;
@@ -40,10 +42,14 @@ function errorOnly(json: unknown): string | undefined {
  * while the job is still running. Any failure (a recovered panic in Go, a
  * crash in the wasm, an answer in the wrong shape) posts an empty tree with
  * the error, as check posts an empty result.
+ *
+ * Returns the file's timeline source (T40), built after the tree is posted,
+ * so the page has its chart first; null when the read failed.
  */
-export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWorker) => void, thisYear: number): void {
+export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWorker) => void, thisYear: number): TimelineSource | null {
   post({ type: 'status', text: 'Reading the file…' });
   let result: TreeResult;
+  let timeline: (() => TimelineSource) | null = null;
   try {
     const json: unknown = JSON.parse(api.enrich(bytes, stage => post({ type: 'stage', job: 'enrich', stage })));
     const enriched = errorOnly(json) ?? readEnriched(json);
@@ -53,6 +59,7 @@ export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWor
       post({ type: 'stage', job: 'enrich', stage: STAGE_GRAPH });
       const tree = buildGraph(enriched, { thisYear });
       result = { isGedcom: enriched.isGedcom, parseFindings: enriched.parseFindings, ...tree, start: suggestStart(tree.graph, enriched.home) };
+      timeline = () => timelineSource(enriched, tree);
     }
   } catch (err) {
     result = failed(String(err));
@@ -60,4 +67,19 @@ export function runEnrich(api: EnrichApi, bytes: Uint8Array, post: (msg: FromWor
   const { parts, summary } = splitTree(result);
   for (const part of parts) post({ type: 'tree-part', part });
   post({ type: 'enriched', summary });
+  try {
+    return timeline ? timeline() : null;
+  } catch {
+    return null; // the tree is shown; timelineFor then says no file has been read
+  }
+}
+
+/** Answers a page's request for one person's timeline from the last file read. */
+export function runTimeline(source: TimelineSource | null, msg: Extract<ToWorker, { type: 'timeline' }>, post: (msg: FromWorker) => void): void {
+  const { id, request } = msg;
+  if (!source) {
+    post({ type: 'timeline', request, id, events: [], error: 'no file has been read' });
+    return;
+  }
+  post({ type: 'timeline', request, id, events: timelineFor(id, source, { hideLiving: msg.hideLiving }) });
 }

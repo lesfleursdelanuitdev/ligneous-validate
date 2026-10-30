@@ -159,9 +159,11 @@ func TestEnrichJSONShape(t *testing.T) {
 	if err := json.Unmarshal(top["tables"], &tables); err != nil {
 		t.Fatal(err)
 	}
-	// T25: IndividualEvents, FamilyEvents and Spouses are left out.
-	want := "Dates,Events,Families,FamilyChildren,GivenNames,Individuals," +
-		"NameFormGivenNames,NameFormSurnames,NameForms,ParentChild,Places,Surnames"
+	// T25: Spouses is left out. T40: IndividualEvents and FamilyEvents are
+	// back, with Attributes (OCCU and the rest) and Residences (RESI), which
+	// the timeline shows and the enricher keeps apart from Events.
+	want := "Attributes,Dates,Events,Families,FamilyChildren,FamilyEvents,GivenNames,IndividualEvents,Individuals," +
+		"NameFormGivenNames,NameFormSurnames,NameForms,ParentChild,Places,Residences,Surnames"
 	if got := keys(tables); strings.Join(got, ",") != want {
 		t.Fatalf("tables = %v\nwant %s", got, want)
 	}

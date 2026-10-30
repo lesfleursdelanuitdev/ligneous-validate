@@ -35,17 +35,24 @@ type Enriched struct {
 
 // Tables are whole tables of enricher.EnrichedDocument, under its own field
 // names, their rows never reshaped; as JSON each names its fields once (see
-// Table). To leave a table out, delete its field. IndividualEvents,
-// FamilyEvents and Spouses are left out (spec T25): Events and Families say
-// the same. Never the Document: the parsed tree is many times the size.
+// Table). To leave a table out, delete its field. Spouses is left out (spec
+// T25): Families says the same. The life-events timeline (T40) reads
+// IndividualEvents and FamilyEvents, and Attributes (OCCU, EDUC and the
+// rest) and Residences (RESI), which the enricher keeps apart from Events;
+// those two carry their owner, so their link tables aren't needed. Never the
+// Document: the parsed tree is many times the size.
 type Tables struct {
-	Individuals    Table[enricher.EnrichedIndividual]
-	Families       Table[enricher.EnrichedFamily]
-	Dates          Table[enricher.ParsedDate]
-	Places         Table[enricher.ParsedPlace]
-	Events         Table[enricher.Event]
-	ParentChild    Table[enricher.ParentChildEdge]
-	FamilyChildren Table[enricher.FamilyChildEdge]
+	Individuals      Table[enricher.EnrichedIndividual]
+	Families         Table[enricher.EnrichedFamily]
+	Dates            Table[enricher.ParsedDate]
+	Places           Table[enricher.ParsedPlace]
+	Events           Table[enricher.Event]
+	IndividualEvents Table[enricher.IndividualEventLink]
+	FamilyEvents     Table[enricher.FamilyEventLink]
+	Attributes       Table[enricher.Attribute]
+	Residences       Table[enricher.Residence]
+	ParentChild      Table[enricher.ParentChildEdge]
+	FamilyChildren   Table[enricher.FamilyChildEdge]
 	// The names: NameForms says whose each form is; its given names and
 	// surnames are in the link tables, their text in GivenNames and Surnames.
 	NameForms          Table[enricher.NameForm]
@@ -117,6 +124,10 @@ func EnrichWithProgress(raw []byte, progress func(stage string)) (out Enriched) 
 		Dates:              ed.Dates,
 		Places:             ed.Places,
 		Events:             ed.Events,
+		IndividualEvents:   ed.IndividualEvents,
+		FamilyEvents:       ed.FamilyEvents,
+		Attributes:         ed.Attributes,
+		Residences:         ed.Residences,
 		ParentChild:        ed.ParentChild,
 		FamilyChildren:     ed.FamilyChildren,
 		NameForms:          ed.NameForms,

@@ -82,6 +82,38 @@ export interface EnrichedEvent {
   sort_order: number;
 }
 
+/** A person's link to an event (role: "principal" in v0.3.1). */
+export interface IndividualEventLink { individual_xref: string; event_index: number; role: string }
+export interface FamilyEventLink { family_xref: string; event_index: number }
+
+/** An attribute: OCCU, EDUC, FACT and the rest of INDIVIDUAL_ATTRIBUTE_STRUCTURE, and FAM FACT. */
+export interface EnrichedAttribute {
+  index: number;
+  attribute_type: string;
+  /** FACT and IDNO's TYPE. */
+  custom_type?: string;
+  value?: string;
+  date_index: number;
+  place_index: number;
+  agency?: string;
+  owner_xref: string;
+  owner_type: string;
+  /** Shared with the owner's events and residences: their order in the record. */
+  sort_order: number;
+}
+
+/** A residence (RESI), kept apart from Events by the enricher. */
+export interface EnrichedResidence {
+  index: number;
+  /** ADDR's ADR1, else ADDR. */
+  address?: string;
+  date_index: number;
+  place_index: number;
+  owner_xref: string;
+  owner_type: string;
+  sort_order: number;
+}
+
 export interface ParentChildEdge {
   parent_xref: string;
   child_xref: string;
@@ -102,8 +134,9 @@ export interface NameFormSurnameLink { name_form_index: number; surname_index: n
 export interface NameValue { value: string; lower: string; frequency: number }
 
 /**
- * The tables, under EnrichedDocument's own field names. IndividualEvents,
- * FamilyEvents and Spouses are left out (spec T25): Events and Families say the same.
+ * The tables, under EnrichedDocument's own field names. Spouses is left out
+ * (T25); the timeline (T40) reads IndividualEvents, FamilyEvents, Attributes
+ * and Residences.
  */
 export interface Tables {
   Individuals: EnrichedIndividual[];
@@ -111,6 +144,10 @@ export interface Tables {
   Dates: ParsedDate[];
   Places: ParsedPlace[];
   Events: EnrichedEvent[];
+  IndividualEvents: IndividualEventLink[];
+  FamilyEvents: FamilyEventLink[];
+  Attributes: EnrichedAttribute[];
+  Residences: EnrichedResidence[];
   ParentChild: ParentChildEdge[];
   FamilyChildren: FamilyChildEdge[];
   NameForms: NameForm[];
@@ -151,6 +188,10 @@ const SHAPES: Record<keyof Tables, Record<string, 'string' | 'number' | 'boolean
   Dates: { original: 'string', type: 'string' },
   Places: { original: 'string' },
   Events: { event_type: 'string', date_index: 'number', place_index: 'number', owner_xref: 'string', owner_type: 'string' },
+  IndividualEvents: { individual_xref: 'string', event_index: 'number' },
+  FamilyEvents: { family_xref: 'string', event_index: 'number' },
+  Attributes: { attribute_type: 'string', date_index: 'number', place_index: 'number', owner_xref: 'string', owner_type: 'string', sort_order: 'number' },
+  Residences: { date_index: 'number', place_index: 'number', owner_xref: 'string', owner_type: 'string', sort_order: 'number' },
   ParentChild: { parent_xref: 'string', child_xref: 'string', family_xref: 'string', relationship_type: 'string' },
   FamilyChildren: { family_xref: 'string', child_xref: 'string', birth_order: 'number' },
   NameForms: { individual_xref: 'string', name_type: 'string', is_primary: 'boolean' },

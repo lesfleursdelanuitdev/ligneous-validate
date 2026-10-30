@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { runEnrich } from './job';
+import { runEnrich, runTimeline } from './job';
 import type { EnrichApi } from './job';
 import { treeAssembler } from './parts';
 import type { FromWorker } from '../types';
 import cousinJSON from '../testdata/tree/cousin-marriage.json';
+import timelineJSON from '../testdata/tree/timeline.json';
 
 const BYTES = new Uint8Array([48, 32, 72, 69, 65, 68]);
 const answer = JSON.stringify(cousinJSON);
@@ -36,6 +37,30 @@ const result = (posted: FromWorker[]) => {
   for (const m of posted) if (m.type === 'tree-part') join.add(m.part);
   return join.finish(last.summary);
 };
+
+describe('the worker\'s timeline job (T40)', () => {
+  it('answers for one person from the last file read, after the tree is posted', () => {
+    const posted: FromWorker[] = [];
+    const source = runEnrich(fakeApi(JSON.stringify(timelineJSON)), BYTES, m => posted.push(m), 2026);
+    expect(posted.at(-1)?.type).toBe('enriched');
+    const answers: FromWorker[] = [];
+    runTimeline(source, { type: 'timeline', id: '@I12@', hideLiving: true, request: 7 }, m => answers.push(m));
+    expect(answers).toEqual([{
+      type: 'timeline', request: 7, id: '@I12@',
+      events: [
+        { type: 'BIRT', label: 'Birth', date: '1930', year: 1930, place: '', value: '', context: false },
+        { type: 'DEAT', label: 'Death', date: '2010', year: 2010, place: '', value: '', context: false },
+      ],
+    }]);
+  });
+
+  it('says so when no file has been read, or the read failed', () => {
+    const answers: FromWorker[] = [];
+    runTimeline(null, { type: 'timeline', id: '@I1@', hideLiving: false, request: 1 }, m => answers.push(m));
+    expect(answers).toEqual([{ type: 'timeline', request: 1, id: '@I1@', events: [], error: 'no file has been read' }]);
+    expect(runEnrich(fakeApi(new Error('wasm died')), BYTES, () => {}, 2026)).toBeNull();
+  });
+});
 
 describe('the worker\'s enrich job', () => {
   it('posts a status, each Go stage as it happens, the graph stage, then the tree', () => {

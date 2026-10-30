@@ -3,7 +3,8 @@
 // created.
 
 import { downloadPercent, readWithProgress } from './progress';
-import { runEnrich } from './tree/job';
+import { runEnrich, runTimeline } from './tree/job';
+import type { TimelineSource } from './tree/timeline';
 import type { Counts, FromWorker, PlanOut, RepairOptions, RepairOut, Result, ToWorker } from './types';
 
 /** The size of ligneous.wasm, baked in at build time (web/vite.config.ts). */
@@ -68,6 +69,8 @@ async function load(): Promise<Api> {
 }
 
 let loaded = false;
+/** The last file the tree viewer read, for its timelines (T40). */
+let timelines: TimelineSource | null = null;
 const ready = load();
 ready.then(
   () => { loaded = true; post({ type: 'ready' }); },
@@ -86,6 +89,7 @@ function failed(message: string): Result {
 
 scope.addEventListener('message', async e => {
   const msg = e.data;
+  if (msg.type === 'timeline') { runTimeline(timelines, msg, post); return; } // no wasm needed
   if (!loaded && msg.type === 'check') post({ type: 'status', text: 'Getting the checker ready…' });
   if (!loaded && msg.type === 'enrich') post({ type: 'status', text: 'Getting the file reader ready…' });
   let api: Api;
@@ -143,6 +147,7 @@ scope.addEventListener('message', async e => {
       post({ type: 'saved', data: new ArrayBuffer(0), error: String(err) });
     }
   } else if (msg.type === 'enrich') {
-    runEnrich(api, bytes, post, new Date().getFullYear());
+    timelines = null;
+    timelines = runEnrich(api, bytes, post, new Date().getFullYear());
   }
 });
